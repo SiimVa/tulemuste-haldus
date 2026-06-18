@@ -1,0 +1,303 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Kasutajad (Admin + Korraldajad) ───────────────────────────────────────
+// role: "ADMIN" | "ORGANIZER"
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("ORGANIZER")
+  createdAt    DateTime @default(now())
+
+  competitions   Competition[]
+  memberOf       CompetitionMember[]
+  enteredResults Result[]
+}
+
+// ─── Juurdepääsu tokenid (Kohtunikud + Võistlejad) ─────────────────────────
+// type: "JUDGE" | "ATHLETE"
+
+model AccessToken {
+  id            String    @id @default(cuid())
+  token         String    @unique @default(cuid())
+  type          String
+  name          String
+  competitionId String
+  competition   Competition     @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  elementId     String?
+  element       ScoringElement? @relation(fields: [elementId], references: [id])
+  teamId        String?
+  team          Team?           @relation(fields: [teamId], references: [id])
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
+
+  enteredResults Result[]
+}
+
+// ─── Võistlus ───────────────────────────────────────────────────────────────
+// status: "SETUP" | "ACTIVE" | "FINISHED"
+
+model Competition {
+  id          String    @id @default(cuid())
+  name        String
+  date        DateTime?
+  endDate     DateTime?
+  location    String?
+  status      String    @default("SETUP")
+  organizerId String
+  organizer   User      @relation(fields: [organizerId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Hindamissüsteem
+  scoringMode          String @default("PENALTY") // "PENALTY" | "PLUS"
+
+  // KP vaikeväärtused
+  defaultKPMaxValue    Float  @default(30)
+  defaultNotPassed     Float  @default(40)
+  defaultPassedNotDone Float  @default(35)
+
+  // PK (Postkast) vaikeväärtused
+  defaultPKMaxValue    Float  @default(15)
+
+  // Vastutegevus vaikeväärtused
+  defaultVastutegevusPenaltyPerLife Float @default(5)
+
+  // Varustus vaikeväärtused
+  defaultVarustusPenaltyPerItem Float @default(5)
+
+  // Hilinemine vaikeväärtused
+  defaultHilinemineMode               String @default("ONE_TIME") // "ONE_TIME" | "PER_INTERVAL"
+  defaultHilinemineIntervalMinutes    Int    @default(1)
+  defaultHilineminePenaltyPerInterval Float  @default(1)
+  defaultHilinemineMaxPenalty         Float  @default(30)
+
+  // Arvutusmeetodi vaikeväärtus KP/PK elementidele
+  defaultCalcType           String  @default("RELATIVE_RANKING")
+  defaultHigherIsBetter     Boolean @default(false)
+  defaultRankingMinPoints   Float   @default(0)  // halvima soorituse punktid relatiivses rankingus
+
+  // Fikseeritud pingerida vaikeväärtused — JSON massiiv kohtade kaupa
+  // nt [{"place":1,"points":20},{"place":2,"points":18}]
+  defaultFixedRankingPoints String @default("[]")
+
+  elements        ScoringElement[]
+  teams           Team[]
+  accessTokens    AccessToken[]
+  manualPenalties ManualPenalty[]
+  members         CompetitionMember[]
+}
+
+// ─── Hindamiselement (KP, Postkast, Vastutegevus, Muu jne) ────────────────────
+// type: "CHECKPOINT" | "PENALTY_BOX" | "MANUAL" | "OTHER"
+
+model ScoringElement {
+  id                String      @id @default(cuid())
+  competitionId     String
+  competition       Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name              String
+  code              String
+  type              String      @default("CHECKPOINT")
+  order             Int         @default(0)
+  maxValue          Float?
+  config            String      @default("{}")
+  createdAt         DateTime    @default(now())
+  isCancelled       Boolean     @default(false)
+  directPointsEntry Boolean     @default(false)
+
+  fields       FieldDefinition[]
+  exceptions   ElementException[]
+  calcMethod   CalcMethod?
+  results      Result[]
+  accessTokens AccessToken[]
+  scores       ComputedScore[]
+  miscEntries  MiscEntry[]
+  sections     ElementSection[]
+
+  @@unique([competitionId, code])
+}
+
+// ─── Elemendi sisendväljad ──────────────────────────────────────────────────
+// type: "TIME" | "NUMBER" | "TEXT" | "COMPUTED"
+
+model FieldDefinition {
+  id            String          @id @default(cuid())
+  elementId     String
+  element       ScoringElement  @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  sectionId     String?
+  section       ElementSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  name          String
+  label         String
+  type          String
+  order           Int            @default(0)
+  isResultField   Boolean        @default(false)
+  rankingPriority Int?
+  formula         String?
+  meta            String?
+  validation      String? // JSON: { required?, min?, max?, integer? }
+}
+
+// ─── Arvutusmeetod ──────────────────────────────────────────────────────────
+// type: "RELATIVE_RANKING" | "ABSOLUTE_TIME" | "ABSOLUTE_POINTS" | "CUSTOM"
+
+model CalcMethod {
+  id            String         @id @default(cuid())
+  elementId     String         @unique
+  element       ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  type          String
+  params        String         @default("{}")
+  customFormula String?
+}
+
+// ─── Erandid ─────────────────────────────────────────────────────────────────
+
+model ElementException {
+  id        String         @id @default(cuid())
+  elementId String
+  element   ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  label     String
+  penalty   Float
+  order     Int            @default(0)
+}
+
+// ─── Võistkonnad ─────────────────────────────────────────────────────────────
+
+model Team {
+  id                  String      @id @default(cuid())
+  competitionId       String
+  competition         Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name                String
+  code                String
+  class               String?
+  isHorsDeCompetition Boolean     @default(false)
+  createdAt           DateTime    @default(now())
+  dnfFromElementOrder Int?
+  dnfReason           String?
+
+  members         TeamMember[]
+  results         Result[]
+  accessTokens    AccessToken[]
+  manualPenalties ManualPenalty[]
+  scores          ComputedScore[]
+  miscEntries     MiscEntry[]
+
+  @@unique([competitionId, code])
+}
+
+// role: "COMPETITOR" | "SUPPORT"
+
+model TeamMember {
+  id     String @id @default(cuid())
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  name   String
+  role   String @default("COMPETITOR")
+}
+
+// ─── Tulemused ───────────────────────────────────────────────────────────────
+
+model Result {
+  id               String         @id @default(cuid())
+  elementId        String
+  element          ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  teamId           String
+  team             Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  values           String         @default("{}")
+  exceptionLabel   String?
+  exceptionPenalty Float?
+  enteredByUserId  String?
+  enteredByUser    User?          @relation(fields: [enteredByUserId], references: [id])
+  enteredByTokenId String?
+  enteredByToken   AccessToken?   @relation(fields: [enteredByTokenId], references: [id])
+  enteredAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([elementId, teamId])
+}
+
+// ─── Arvutatud skoorid ────────────────────────────────────────────────────────
+
+model ComputedScore {
+  id            String         @id @default(cuid())
+  elementId     String
+  element       ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  teamId        String
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  penaltyPoints Float
+  rankInElement Int?
+  computedAt    DateTime       @default(now())
+
+  @@unique([elementId, teamId])
+}
+
+// ─── Käsitsi karistused ───────────────────────────────────────────────────────
+
+model ManualPenalty {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  teamId        String
+  team          Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  description   String
+  points        Float
+  enteredById   String
+  enteredAt     DateTime    @default(now())
+}
+
+// ─── Muu elemendi kanded ─────────────────────────────────────────────────────
+
+model MiscEntry {
+  id          String         @id @default(cuid())
+  elementId   String
+  element     ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  teamId      String
+  team        Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  points      Float
+  description String
+  createdAt   DateTime       @default(now())
+}
+
+// ─── Kombineeritud hindamise sektsioonid ──────────────────────────────────────
+
+model ElementSection {
+  id        String         @id @default(cuid())
+  elementId String
+  element   ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int            @default(0)
+  maxValue  Float?
+
+  fields    FieldDefinition[]
+  calcMethod SectionCalcMethod?
+}
+
+model SectionCalcMethod {
+  id            String         @id @default(cuid())
+  sectionId     String         @unique
+  section       ElementSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  type          String
+  params        String         @default("{}")
+  customFormula String?
+}
+
+// ─── Kaas-korraldajad ─────────────────────────────────────────────────────────
+
+model CompetitionMember {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt       DateTime    @default(now())
+
+  @@unique([competitionId, userId])
+}
