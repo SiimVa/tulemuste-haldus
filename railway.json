@@ -4,8 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "next start -p 3000",
-    "preDeployCommand": "npx prisma migrate deploy",
+    "startCommand": "npx prisma migrate deploy && next start -p 3000",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
