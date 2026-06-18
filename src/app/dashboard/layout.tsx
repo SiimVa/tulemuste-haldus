@@ -20,12 +20,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 Kasutajad
               </Link>
             )}
-            <span className="text-sm text-gray-500">
+            <Link href="/dashboard/profile" className="text-sm text-gray-500 hover:text-blue-600">
               {session.user.name}{" "}
               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
                 {session.user.role === "ADMIN" ? "Admin" : "Korraldaja"}
               </span>
-            </span>
+            </Link>
             <SignOutButton />
           </div>
         </div>

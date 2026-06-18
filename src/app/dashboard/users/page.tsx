@@ -52,6 +52,22 @@ export default function UsersPage() {
     if (res.ok) setUsers(users.filter(u => u.id !== id))
   }
 
+  async function resetPassword(id: string, name: string) {
+    const password = prompt(`Uus parool kasutajale "${name}" (vähemalt 6 tähemärki):`)
+    if (!password) return
+    const res = await fetch(`/api/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    })
+    if (res.ok) {
+      alert(`✓ Parool muudetud kasutajale "${name}"`)
+    } else {
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? "Viga parooli muutmisel")
+    }
+  }
+
   if (loading) return <div className="text-gray-400 text-sm">Laadin...</div>
 
   return (
@@ -101,12 +117,18 @@ export default function UsersPage() {
               </div>
               <p className="text-xs text-gray-400 mt-0.5">{u.email}</p>
             </div>
-            {u.role !== "ADMIN" && (
-              <button onClick={() => deleteUser(u.id)}
-                className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5">
-                Kustuta
+            <div className="flex items-center gap-1">
+              <button onClick={() => resetPassword(u.id, u.name)}
+                className="text-xs text-gray-400 hover:text-blue-600 px-2 py-1.5">
+                Muuda parooli
               </button>
-            )}
+              {u.role !== "ADMIN" && (
+                <button onClick={() => deleteUser(u.id)}
+                  className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5">
+                  Kustuta
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
