@@ -339,11 +339,10 @@ function applyAbsolutePenalty(
   formula: string,
   scoringMode: ScoringMode
 ) {
-  // eslint-disable-next-line no-new-func
-  const fn = new Function("result", "min", "max", "floor", "round", "abs", `return (${formula})`)
   for (const entry of entries) {
     try {
-      const penalty = Number(fn(Number(entry.rawValue ?? 0), Math.min, Math.max, Math.floor, Math.round, Math.abs))
+      const scope = { result: Number(entry.rawValue ?? 0) }
+      const penalty = Number(evaluate(formula, scope))
       entry.penaltyPoints = scoringMode === "PLUS" ? -Math.abs(penalty) : Math.abs(penalty)
     } catch {
       entry.penaltyPoints = Number(entry.rawValue ?? 0)

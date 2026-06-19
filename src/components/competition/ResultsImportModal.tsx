@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
 
 type ImportRowResult = {
   rowNum: number
@@ -33,7 +32,6 @@ type Props = {
 }
 
 export function ResultsImportModal({ elementId, competitionId, elementName, onClose }: Props) {
-  const router = useRouter()
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload")
   const [uploading, setUploading] = useState(false)
   const [previewData, setPreviewData] = useState<PreviewResult | null>(null)
@@ -84,7 +82,6 @@ export function ResultsImportModal({ elementId, competitionId, elementName, onCl
       const data: PreviewResult = await res.json()
       setImportResult(data)
       setStep("done")
-      router.refresh()
     } catch {
       setImportResult(null)
     }

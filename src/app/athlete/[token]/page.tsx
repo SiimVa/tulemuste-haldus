@@ -66,9 +66,9 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="font-semibold text-gray-900">{accessToken.competition.name}</span>
-          <span className="text-sm text-gray-500">{team.name}</span>
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+          <span className="font-semibold text-gray-900 truncate">{accessToken.competition.name}</span>
+          <span className="text-sm text-gray-500 shrink-0">{team.name}</span>
         </div>
       </header>
 

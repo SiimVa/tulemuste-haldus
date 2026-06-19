@@ -54,12 +54,13 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div>
+        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <span className="text-sm font-semibold text-gray-900">{accessToken.competition.name}</span>
-            <span className="text-xs text-gray-400 ml-2">· Kohtunik: {accessToken.name}</span>
+            <span className="text-xs text-gray-400 ml-2 hidden sm:inline">· Kohtunik: {accessToken.name}</span>
+            <span className="text-xs text-gray-400 block sm:hidden truncate">Kohtunik: {accessToken.name}</span>
           </div>
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+          <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${
             accessToken.competition.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
           }`}>
             {accessToken.competition.status === "ACTIVE" ? "Aktiivne" : "Ettevalmistus"}
