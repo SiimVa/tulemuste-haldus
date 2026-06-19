@@ -74,13 +74,15 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
     row: typeof inCompRows[0] | typeof horsCompRows[0]
     isHC?: boolean
     isDnf?: boolean
-  }) => (
+  }) => {
+    const stickyBg = isDnf ? "bg-red-50" : isHC ? "bg-amber-50" : "bg-white"
+    return (
     <tr className={`hover:bg-gray-50 ${isDnf ? "bg-red-50/50" : isHC ? "bg-amber-50/50" : ""}`}>
-      <td className="px-4 py-3 font-bold text-gray-900">
+      <td className={`sticky left-0 z-10 ${stickyBg} w-12 px-2 py-3 font-bold text-gray-900 text-center`}>
         {isDnf ? <span className="text-red-600 font-medium text-xs">KAT</span> : row.rank ?? <span className="text-amber-600 font-medium text-xs">AV</span>}
       </td>
-      <td className="px-4 py-3 text-gray-400 text-xs">{row.classRank ?? "–"}</td>
-      <td className="px-4 py-3">
+      <td className={`sticky left-12 z-10 ${stickyBg} w-12 px-2 py-3 text-gray-400 text-xs text-center`}>{row.classRank ?? "–"}</td>
+      <td className={`sticky left-24 z-10 ${stickyBg} border-r px-4 py-3 min-w-[160px]`}>
         <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
         <span className={`font-medium ${isDnf ? "text-red-700" : isHC ? "text-amber-700" : "text-gray-900"}`}>{row.team.name}</span>
         {isDnf && row.team.dnfReason && (
@@ -100,13 +102,14 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
           ? isPlusMode ? `-${row.manualTotal.toFixed(1)}` : `+${row.manualTotal.toFixed(1)}`
           : "–"}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className={`sticky right-0 z-10 ${stickyBg} border-l px-4 py-3 text-right`}>
         <span className={`font-bold font-mono ${isDnf ? "text-red-700" : isHC ? "text-amber-700" : "text-gray-900"}`}>
           {isDnf ? "KAT" : row.total.toFixed(2)}
         </span>
       </td>
     </tr>
-  )
+    )
+  }
 
   return (
     <div>
@@ -156,9 +159,9 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Üld</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Klass</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">Võistkond</th>
+                <th className="sticky left-0 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Üld</th>
+                <th className="sticky left-12 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Klass</th>
+                <th className="sticky left-24 z-20 bg-gray-50 border-r px-4 py-3 text-xs font-medium text-gray-500 min-w-[160px]">Võistkond</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500">Klass</th>
                 {elements.map((el) => (
                   <th key={el.id} className="px-3 py-3 text-xs font-medium text-right">
@@ -170,7 +173,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
                   </th>
                 ))}
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Lisaär.</th>
-                <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
+                <th className="sticky right-0 z-20 bg-gray-50 border-l px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
               </tr>
             </thead>
             <tbody className="divide-y">

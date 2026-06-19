@@ -135,9 +135,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left border-b">
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Üld</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Klass</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Võistkond</th>
+                  <th className="sticky left-0 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Üld</th>
+                  <th className="sticky left-12 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Klass</th>
+                  <th className="sticky left-24 z-20 bg-gray-50 border-r px-4 py-3 text-xs font-medium text-gray-500 min-w-[160px]">Võistkond</th>
                   <th className="px-4 py-3 text-xs font-medium text-gray-500">Klass</th>
                   {elements.map((el) => (
                     <th key={el.id} className="px-3 py-3 text-xs font-medium text-right">
@@ -149,15 +149,15 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     </th>
                   ))}
                   <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Lisaär.</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
+                  <th className="sticky right-0 z-20 bg-gray-50 border-l px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {inCompRows.map((row) => (
                   <tr key={row.team.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-bold text-gray-900">{row.rank}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{row.classRank}</td>
-                    <td className="px-4 py-3">
+                    <td className="sticky left-0 z-10 bg-white w-12 px-2 py-3 font-bold text-gray-900 text-center">{row.rank}</td>
+                    <td className="sticky left-12 z-10 bg-white w-12 px-2 py-3 text-gray-400 text-xs text-center">{row.classRank}</td>
+                    <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-[160px]">
                       <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                       <span className="font-medium text-gray-900">{row.team.name}</span>
                     </td>
@@ -172,7 +172,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <td className="px-4 py-3 text-right font-mono text-xs text-orange-600">
                       {row.manualTotal > 0 ? (isPlusMode ? `-${row.manualTotal.toFixed(1)}` : `+${row.manualTotal.toFixed(1)}`) : "–"}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="sticky right-0 z-10 bg-white border-l px-4 py-3 text-right">
                       <span className="font-bold text-gray-900 font-mono">{row.total.toFixed(2)}</span>
                     </td>
                   </tr>
@@ -186,9 +186,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     </tr>
                     {horsCompRows.map((row) => (
                       <tr key={row.team.id} className="hover:bg-gray-50 bg-amber-50/40">
-                        <td className="px-4 py-3 text-xs text-amber-600 font-medium">AV</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">–</td>
-                        <td className="px-4 py-3">
+                        <td className="sticky left-0 z-10 bg-amber-50 w-12 px-2 py-3 text-xs text-amber-600 font-medium text-center">AV</td>
+                        <td className="sticky left-12 z-10 bg-amber-50 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
+                        <td className="sticky left-24 z-10 bg-amber-50 border-r px-4 py-3 min-w-[160px]">
                           <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                           <span className="font-medium text-amber-700">{row.team.name}</span>
                         </td>
@@ -203,7 +203,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         <td className="px-4 py-3 text-right font-mono text-xs text-orange-600">
                           {row.manualTotal > 0 ? (isPlusMode ? `-${row.manualTotal.toFixed(1)}` : `+${row.manualTotal.toFixed(1)}`) : "–"}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="sticky right-0 z-10 bg-amber-50 border-l px-4 py-3 text-right">
                           <span className="font-bold text-amber-700 font-mono">{row.total.toFixed(2)}</span>
                         </td>
                       </tr>

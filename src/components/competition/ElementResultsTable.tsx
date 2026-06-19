@@ -163,15 +163,16 @@ export function ElementResultsTable({ element, teams }: Props) {
     const values = result ? parseValues(result.values) : {}
     const isEditing = editingTeamId === team.id
     const isHC = team.isHorsDeCompetition ?? false
+    const stickyBg = isEditing ? "bg-blue-50" : isHC ? "bg-amber-50" : "bg-white"
 
     return (
       <tr key={team.id} className={`hover:bg-gray-50 ${isEditing ? "bg-blue-50" : isHC ? "bg-amber-50/40" : ""}`}>
-        <td className="px-4 py-2.5 text-gray-400 text-xs">
+        <td className={`sticky left-0 z-10 ${stickyBg} w-10 px-2 py-2.5 text-gray-400 text-xs text-center`}>
           {score !== null
             ? (rank !== null ? rank : <span className="text-amber-600 font-medium text-xs">AV</span>)
             : "–"}
         </td>
-        <td className="px-4 py-2.5">
+        <td className={`sticky left-10 z-10 ${stickyBg} border-r px-4 py-2.5 min-w-[160px]`}>
           <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
           <span className={`font-medium ${isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
           {isHC && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">AV</span>}
@@ -341,8 +342,8 @@ export function ElementResultsTable({ element, teams }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-left">
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 w-8">#</th>
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500">Võistkond</th>
+              <th className="sticky left-0 z-20 bg-gray-50 w-10 px-2 py-2.5 text-xs font-medium text-gray-500 text-center">#</th>
+              <th className="sticky left-10 z-20 bg-gray-50 border-r px-4 py-2.5 text-xs font-medium text-gray-500 min-w-[160px]">Võistkond</th>
               {isDirectEntry ? (
                 <th className="px-4 py-2.5 text-xs font-medium text-gray-500" colSpan={inputFields.length + computedFields.length}>Kokku punktid</th>
               ) : (
