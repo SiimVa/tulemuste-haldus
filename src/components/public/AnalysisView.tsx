@@ -538,6 +538,15 @@ export default function AnalysisView({
                               <td className="px-4 py-3 text-xs">
                                 {stat?.exceptionLabel ? (
                                   <span className="text-red-500 font-medium">{stat.exceptionLabel}</span>
+                                ) : stat?.miscEntries && stat.miscEntries.length > 0 ? (
+                                  <div className="space-y-0.5">
+                                    {stat.miscEntries.map((m, mi) => (
+                                      <div key={mi} className="flex items-center gap-2">
+                                        <span className="text-gray-600">{m.description}</span>
+                                        <span className={`font-mono ${m.points >= 0 ? "text-green-600" : "text-red-600"}`}>{m.points >= 0 ? "+" : ""}{m.points}p</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 ) : (
                                   <span className="text-gray-300">–</span>
                                 )}
