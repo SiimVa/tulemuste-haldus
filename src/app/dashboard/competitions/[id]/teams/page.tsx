@@ -25,7 +25,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   const [form, setForm] = useState({ name: "", code: "", class: "" })
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: "", code: "", class: "" })
+  const [editForm, setEditForm] = useState<{ name: string; code: string; class: string; members: string[] }>({ name: "", code: "", class: "", members: [] })
   const [editSaving, setEditSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
@@ -64,7 +64,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
 
   function startEdit(team: Team) {
     setEditingId(team.id)
-    setEditForm({ name: team.name, code: team.code, class: team.class ?? "" })
+    setEditForm({ name: team.name, code: team.code, class: team.class ?? "", members: (team.members ?? []).map((m) => m.name) })
   }
 
   async function saveEdit(teamId: string) {
@@ -72,7 +72,12 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
     const res = await fetch(`/api/competitions/${competitionId}/teams/${teamId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editForm),
+      body: JSON.stringify({
+        name: editForm.name,
+        code: editForm.code,
+        class: editForm.class,
+        members: editForm.members.map((name) => name.trim()).filter(Boolean),
+      }),
     })
     if (res.ok) {
       const updated = await res.json()
@@ -307,6 +312,35 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                     <input type="text" value={editForm.class} onChange={(e) => setEditForm({ ...editForm, class: e.target.value })}
                       className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
+                </div>
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-500">Liikmed</label>
+                    <button type="button"
+                      onClick={() => setEditForm({ ...editForm, members: [...editForm.members, ""] })}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium">+ Lisa liige</button>
+                  </div>
+                  {editForm.members.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-1">Liikmeid pole. Lisa "+ Lisa liige" nupuga.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {editForm.members.map((m, mi) => (
+                        <div key={mi} className="flex items-center gap-2">
+                          <input type="text" value={m}
+                            onChange={(e) => {
+                              const upd = [...editForm.members]
+                              upd[mi] = e.target.value
+                              setEditForm({ ...editForm, members: upd })
+                            }}
+                            placeholder="Liikme nimi"
+                            className="flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          <button type="button"
+                            onClick={() => setEditForm({ ...editForm, members: editForm.members.filter((_, idx) => idx !== mi) })}
+                            className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => saveEdit(team.id)} disabled={editSaving}

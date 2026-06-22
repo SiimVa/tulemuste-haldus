@@ -21,17 +21,37 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const body = await req.json()
-    const team = await prisma.team.update({
-      where: { id: teamId },
-      data: {
-        name: body.name !== undefined ? body.name : undefined,
-        code: body.code !== undefined ? body.code : undefined,
-        class: body.class !== undefined ? (body.class || null) : undefined,
-        isHorsDeCompetition: body.isHorsDeCompetition !== undefined ? body.isHorsDeCompetition : undefined,
-        dnfFromElementOrder: body.dnfFromElementOrder !== undefined ? (body.dnfFromElementOrder === null ? null : Number(body.dnfFromElementOrder)) : undefined,
-        dnfReason: body.dnfReason !== undefined ? (body.dnfReason || null) : undefined,
-      },
-      include: { members: true },
+    const team = await prisma.$transaction(async (tx) => {
+      await tx.team.update({
+        where: { id: teamId },
+        data: {
+          name: body.name !== undefined ? body.name : undefined,
+          code: body.code !== undefined ? body.code : undefined,
+          class: body.class !== undefined ? (body.class || null) : undefined,
+          isHorsDeCompetition: body.isHorsDeCompetition !== undefined ? body.isHorsDeCompetition : undefined,
+          dnfFromElementOrder: body.dnfFromElementOrder !== undefined ? (body.dnfFromElementOrder === null ? null : Number(body.dnfFromElementOrder)) : undefined,
+          dnfReason: body.dnfReason !== undefined ? (body.dnfReason || null) : undefined,
+        },
+      })
+
+      // Liikmete asendamine (kui body.members on antud massiivina)
+      if (Array.isArray(body.members)) {
+        const valid = body.members
+          .map((m: unknown) =>
+            typeof m === "string"
+              ? { name: m.trim(), role: "COMPETITOR" }
+              : { name: String((m as { name?: string }).name ?? "").trim(), role: (m as { role?: string }).role || "COMPETITOR" }
+          )
+          .filter((m: { name: string }) => m.name !== "")
+        await tx.teamMember.deleteMany({ where: { teamId } })
+        if (valid.length > 0) {
+          await tx.teamMember.createMany({
+            data: valid.map((m: { name: string; role: string }) => ({ teamId, name: m.name, role: m.role })),
+          })
+        }
+      }
+
+      return tx.team.findUnique({ where: { id: teamId }, include: { members: true } })
     })
     return NextResponse.json(team)
   } catch (e) {
