@@ -110,7 +110,7 @@ function SectionFormUI({
 }: {
   form: SectionForm
   setForm: (f: SectionForm) => void
-  onSubmit: (e: React.FormEvent) => void
+  onSubmit: () => void
   onCancel: () => void
   saving: boolean
   submitLabel: string
@@ -125,7 +125,8 @@ function SectionFormUI({
   }
 
   return (
-    <form onSubmit={onSubmit} className="border-2 border-blue-200 rounded-xl p-4 space-y-4 bg-blue-50/30">
+    <div onKeyDown={e => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault() }}
+      className="border-2 border-blue-200 rounded-xl p-4 space-y-4 bg-blue-50/30">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-gray-800">{submitLabel === "Lisa hindamisosa" ? "Uus hindamisosa" : "Muuda hindamisosa"}</p>
         <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
@@ -245,11 +246,11 @@ function SectionFormUI({
         )}
       </div>
 
-      <button type="submit" disabled={saving || !form.name || (["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"].includes(form.calcType) && form.higherIsBetter === null)}
+      <button type="button" onClick={onSubmit} disabled={saving || !form.name || (["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"].includes(form.calcType) && form.higherIsBetter === null)}
         className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
         {saving ? "Salvestan..." : submitLabel}
       </button>
-    </form>
+    </div>
   )
 }
 
@@ -263,8 +264,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
   const [deleting, setDeleting] = useState<string | null>(null)
   const router = useRouter()
 
-  async function addSection(e: React.FormEvent) {
-    e.preventDefault()
+  async function addSection() {
     if (!newForm.name) return
     setSaving(true)
     try {
@@ -297,8 +297,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
     setShowAdd(false)
   }
 
-  async function saveEdit(e: React.FormEvent) {
-    e.preventDefault()
+  async function saveEdit() {
     if (!editingId || !editForm.name) return
     setSaving(true)
     try {
