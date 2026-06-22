@@ -26,6 +26,7 @@ const CALC_TYPES = [
   { value: "ABSOLUTE_PENALTY", label: "Absoluutsed karistuspunktid" },
   { value: "PERFORMANCE_BASED", label: "Soorituspõhine" },
   { value: "CUSTOM", label: "Korraldaja valem" },
+  { value: "DIRECT_ENTRY", label: "Vaba sisestus" },
 ]
 
 const CALC_LABELS: Record<string, string> = Object.fromEntries(CALC_TYPES.map(c => [c.value, c.label]))

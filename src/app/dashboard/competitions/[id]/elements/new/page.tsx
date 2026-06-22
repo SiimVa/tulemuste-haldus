@@ -847,6 +847,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
+        {/* Arvutusmeetod enne, sisendväljad pärast (flex-col-reverse pöörab järjekorra) */}
+        <div className="flex flex-col-reverse gap-6">
         {/* Sisendväljad (ainult tavaliste tüüpide jaoks, mitte PK/OTHER/DIRECT_ENTRY) */}
         {!isSpecialType && !isMiscType && type !== "PENALTY_BOX" && calcType !== "DIRECT_ENTRY" && (
           <div className="bg-white border rounded-xl p-5 space-y-4">
@@ -1183,6 +1185,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             )}
           </div>
         )}
+        </div>
 
         {/* Erandid */}
         {type !== "COUNTER_ACTION" && type !== "EQUIPMENT_CHECK" && type !== "OTHER" && type !== "PENALTY_BOX" && !(type === "LATENESS" && elementConfig.mode === "PER_INTERVAL") && (

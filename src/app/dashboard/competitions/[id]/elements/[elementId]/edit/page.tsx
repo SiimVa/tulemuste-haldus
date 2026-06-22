@@ -459,6 +459,8 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
+        {/* Arvutusmeetod enne, sisendväljad pärast (flex-col-reverse pöörab järjekorra) */}
+        <div className="flex flex-col-reverse gap-6">
         {/* Sisendväljad (ainult mitte-kombineeritud, mitte-DIRECT_ENTRY elementidel) */}
         {type !== "OTHER" && calcType !== "COMBINED" && calcType !== "DIRECT_ENTRY" && sections.length === 0 && (<div className="bg-white border rounded-xl p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Sisendväljad</h2>
@@ -674,6 +676,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
         </div>}
+        </div>
 
         {/* Erandid */}
         {type !== "OTHER" && <div className="bg-white border rounded-xl p-5 space-y-4">
