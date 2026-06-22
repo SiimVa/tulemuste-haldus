@@ -42,6 +42,7 @@ export type TeamElementStat = {
   exceptionLabel: string | null
   rawValues: Record<string, unknown>
   rawResultValue: string | number | null
+  miscEntries?: { description: string; points: number }[]
 }
 
 export type ElementStat = {
@@ -354,6 +355,15 @@ export default function AnalysisView({
                               <td className="px-4 py-3 text-right font-mono text-xs">
                                 {stat?.exceptionLabel ? (
                                   <span className="text-red-500">{stat.exceptionLabel}</span>
+                                ) : stat?.miscEntries && stat.miscEntries.length > 0 ? (
+                                  <div className="space-y-0.5">
+                                    {stat.miscEntries.map((m, mi) => (
+                                      <div key={mi} className="flex items-center justify-end gap-2">
+                                        <span className="text-gray-600 font-sans">{m.description}</span>
+                                        <span className={m.points >= 0 ? "text-green-600" : "text-red-600"}>{m.points >= 0 ? "+" : ""}{m.points}p</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 ) : (
                                   <span className="text-gray-700">{formatRawValue(stat?.rawResultValue ?? null, el.fields.find(f => f.isResultField)?.type ?? null)}</span>
                                 )}

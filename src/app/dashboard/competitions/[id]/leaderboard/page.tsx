@@ -23,12 +23,27 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
   const publicLeaderboardUrl = `${baseUrl}/public/${id}/leaderboard`
   const publicAnalysisUrl = `${baseUrl}/public/${id}/analysis`
 
-  const [teams, scores, penalties, elements] = await Promise.all([
+  const [teams, scores, penalties, elements, miscEntries] = await Promise.all([
     prisma.team.findMany({ where: { competitionId: id } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
     prisma.computedScore.findMany({ where: { element: { competitionId: id } } }),
     prisma.manualPenalty.findMany({ where: { competitionId: id } }),
     prisma.scoringElement.findMany({ where: { competitionId: id }, orderBy: { order: "asc" } }),
+    prisma.miscEntry.findMany({ where: { element: { competitionId: id, type: "OTHER" } }, select: { elementId: true, teamId: true, points: true, description: true } }),
   ])
+
+  // Muu-kirjete selgitused (element + tiim) → tooltip pingereas
+  const miscMap = new Map<string, { description: string; points: number }[]>()
+  for (const m of miscEntries) {
+    const key = `${m.elementId}:${m.teamId}`
+    const arr = miscMap.get(key) ?? []
+    arr.push({ description: m.description, points: m.points })
+    miscMap.set(key, arr)
+  }
+  const miscTitle = (elementId: string, teamId: string): string | undefined => {
+    const arr = miscMap.get(`${elementId}:${teamId}`)
+    if (!arr || arr.length === 0) return undefined
+    return arr.map((e) => `${e.description}: ${e.points >= 0 ? "+" : ""}${e.points}p`).join("\n")
+  }
 
   const allRows = teams.map((team) => {
     const teamScores = scores.filter((s) => s.teamId === team.id)
@@ -92,11 +107,15 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
       <td className="px-4 py-3">
         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>
       </td>
-      {elements.map((el) => (
-        <td key={el.id} className="px-3 py-3 text-right font-mono text-xs text-gray-600">
-          {row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"}
-        </td>
-      ))}
+      {elements.map((el) => {
+        const title = el.type === "OTHER" ? miscTitle(el.id, row.team.id) : undefined
+        return (
+          <td key={el.id} title={title}
+            className={`px-3 py-3 text-right font-mono text-xs text-gray-600 ${title ? "underline decoration-dotted decoration-gray-400 cursor-help" : ""}`}>
+            {row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"}
+          </td>
+        )
+      })}
       <td className="px-4 py-3 text-right font-mono text-xs text-orange-600">
         {row.manualTotal > 0
           ? isPlusMode ? `-${row.manualTotal.toFixed(1)}` : `+${row.manualTotal.toFixed(1)}`

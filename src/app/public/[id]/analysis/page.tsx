@@ -21,7 +21,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
   const isPlusMode = scoringMode === "PLUS"
 
-  const [teams, elements, allScores, penalties, results] = await Promise.all([
+  const [teams, elements, allScores, penalties, results, miscEntries] = await Promise.all([
     prisma.team.findMany({ where: { competitionId: id } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
     prisma.scoringElement.findMany({
       where: { competitionId: id },
@@ -34,7 +34,17 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       where: { element: { competitionId: id } },
       select: { teamId: true, elementId: true, exceptionLabel: true, values: true },
     }),
+    prisma.miscEntry.findMany({ where: { element: { competitionId: id, type: "OTHER" } }, select: { elementId: true, teamId: true, points: true, description: true } }),
   ])
+
+  // Muu-kirjete selgitused (element + tiim)
+  const miscMap = new Map<string, { description: string; points: number }[]>()
+  for (const m of miscEntries) {
+    const key = `${m.elementId}:${m.teamId}`
+    const arr = miscMap.get(key) ?? []
+    arr.push({ description: m.description, points: m.points })
+    miscMap.set(key, arr)
+  }
 
   // ── Total scores per team ──────────────────────────────────────────────
   const teamTotals = teams.map((team) => {
@@ -169,6 +179,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
         exceptionLabel: resultEntry?.exceptionLabel ?? null,
         rawValues: resultEntry?.exceptionLabel ? {} : rawValues,
         rawResultValue,
+        miscEntries: el.type === "OTHER" ? (miscMap.get(`${el.id}:${team.id}`) ?? []) : undefined,
       })
     }
   }
