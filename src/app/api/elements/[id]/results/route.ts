@@ -88,6 +88,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     exceptionPenalty = exc?.penalty ?? null
   }
 
+  // Kui erandit pole ja kõik lahtrid on tühjad → loe "sisestamata": kustuta kirje ja skoor
+  const hasAnyValue = values && Object.values(values).some((v) => String(v ?? "").trim() !== "")
+  if (!exceptionLabel && !hasAnyValue) {
+    await prisma.result.deleteMany({ where: { elementId, teamId } })
+    await prisma.computedScore.deleteMany({ where: { elementId, teamId } })
+    await recomputeScores(elementId)
+    return NextResponse.json({ deleted: true, teamId })
+  }
+
   const result = await prisma.result.upsert({
     where: { elementId_teamId: { elementId, teamId } },
     create: {

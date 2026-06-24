@@ -131,6 +131,12 @@ export function calculateScores(
     let rawValues: FieldValues = {}
     try { rawValues = JSON.parse(r.values || "{}") } catch {}
 
+    // Kui ühtegi väärtust pole sisestatud (kõik lahtrid tühjad) → ei loeta sisestatuks
+    const hasAnyValue = Object.values(rawValues).some((v) => String(v ?? "").trim() !== "")
+    if (!hasAnyValue) {
+      return { teamId: r.teamId, rawValue: null, allValues: {}, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC }
+    }
+
     const computed = computeFields(rawValues, fields)
     const rawValue = resultField
       ? (resultField.type === "TIME"

@@ -159,18 +159,21 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
 
     setSaving(false)
     if (res.ok) {
+      const data = await res.json().catch(() => ({}))
       const team = teams.find(t => t.id === selectedTeamId)
       setLastSaved(`${team?.name} — ${new Date().toLocaleTimeString("et-EE")}`)
       // Uuenda lokaalne results state koheselt (ilma lehe refreshita)
-      const newResult: ExistingResult = {
-        elementId: selectedElementId,
-        teamId: selectedTeamId,
-        values: exceptionLabel ? "{}" : JSON.stringify(formValues),
-        exceptionLabel: exceptionLabel || null,
-        updatedAt: new Date(),
-      }
       setResults(prev => {
         const filtered = prev.filter(r => !(r.elementId === selectedElementId && r.teamId === selectedTeamId))
+        // Kui server kustutas (kõik tühjad) → eemalda lokaalselt, ära lisa
+        if (data.deleted) return filtered
+        const newResult: ExistingResult = {
+          elementId: selectedElementId,
+          teamId: selectedTeamId,
+          values: exceptionLabel ? "{}" : JSON.stringify(formValues),
+          exceptionLabel: exceptionLabel || null,
+          updatedAt: new Date(),
+        }
         return [...filtered, newResult]
       })
       setSelectedTeamId(null)
