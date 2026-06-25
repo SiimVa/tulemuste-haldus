@@ -15,6 +15,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const hasSections = Array.isArray(sections) && sections.length > 0
 
+  // Kui order pole antud, pane element olemasolevate lõppu (väldi order=0 kokkupõrget)
+  let resolvedOrder = order
+  if (resolvedOrder == null) {
+    const last = await prisma.scoringElement.findFirst({
+      where: { competitionId },
+      orderBy: { order: "desc" },
+      select: { order: true },
+    })
+    resolvedOrder = (last?.order ?? -1) + 1
+  }
+
   try {
     // Step 1: Create element without sections (so we have the element.id for FieldDefinition.elementId)
     const element = await prisma.scoringElement.create({
@@ -23,7 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         name,
         code,
         type: type ?? "CHECKPOINT",
-        order: order ?? 0,
+        order: resolvedOrder,
         maxValue: hasSections ? null : (maxValue ?? null),
         config: config ? JSON.stringify(config) : "{}",
         fields: (!hasSections && Array.isArray(fields) && fields.length > 0)
