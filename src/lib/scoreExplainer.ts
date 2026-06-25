@@ -114,7 +114,9 @@ function explainCalc(
   maxValue: number,
   scoringMode: "PENALTY" | "PLUS",
   fields: FieldDef[],
-  resultField: FieldDef | undefined
+  resultField: FieldDef | undefined,
+  teamComputed?: Record<string, string | number>,
+  overrideRank?: number
 ): { explanation: string; rank?: number; totalTeams?: number } {
   const params: Record<string, unknown> = (() => {
     try { return JSON.parse(calcMethod.params) } catch { return {} }
@@ -139,16 +141,25 @@ function explainCalc(
     case "FIXED_RANKING": {
       if (rawValue === null || n === 0) return { explanation: `${score}p` }
       const sortedAsc = [...nonNull].sort((a, b) => a - b)
-      const rank = higherIsBetter
+      const computedRank = higherIsBetter
         ? n - sortedAsc.indexOf(rawValue)
         : sortedAsc.indexOf(rawValue) + 1
+      // Kasuta skoori-põhist kohta (arvestab viigilahendajaid) kui antud
+      const rank = overrideRank ?? computedRank
       const bestVal = higherIsBetter ? Math.max(...nonNull) : Math.min(...nonNull)
       const worstVal = higherIsBetter ? Math.min(...nonNull) : Math.max(...nonNull)
       const fieldType = resultField?.type ?? "NUMBER"
+      // Viigilahendajad (rankingPriority >= 2): näita nende välju ja väärtusi
+      const tiebreakers = fields
+        .filter(f => (f.rankingPriority ?? 0) >= 2)
+        .sort((a, b) => (a.rankingPriority ?? 0) - (b.rankingPriority ?? 0))
+      const tbStr = tiebreakers.length > 0 && teamComputed
+        ? ` | Viik: ${tiebreakers.map(f => `${f.label} ${fmt(teamComputed[f.name], f.type)}`).join(", ")}`
+        : ""
       return {
         rank,
         totalTeams: n,
-        explanation: `Koht ${rank}/${n} | ${resultField?.label ?? "Tulemus"}: ${fmt(rawValue, fieldType)} (parim: ${fmt(bestVal, fieldType)}, halvim: ${fmt(worstVal, fieldType)}) → ${score}p`,
+        explanation: `Koht ${rank}/${n} | ${resultField?.label ?? "Tulemus"}: ${fmt(rawValue, fieldType)} (parim: ${fmt(bestVal, fieldType)}, halvim: ${fmt(worstVal, fieldType)})${tbStr} → ${score}p`,
       }
     }
 
@@ -306,6 +317,20 @@ export function explainElementScores(
 
   const breakdowns: TeamBreakdown[] = []
 
+  // Skoori-põhine koht (arvestab viigilahendajaid) — tavaliste elementide jaoks
+  const rankByTeam = new Map<string, number>()
+  if (!hasSections) {
+    const ranked = results
+      .filter(r => !r.exceptionLabel)
+      .map(r => ({ teamId: r.teamId, score: scoreMap.get(r.teamId) ?? 0 }))
+      .sort((a, b) => (scoringMode === "PLUS" ? b.score - a.score : a.score - b.score))
+    let rk = 1
+    for (let i = 0; i < ranked.length; i++) {
+      if (i > 0 && ranked[i].score !== ranked[i - 1].score) rk = i + 1
+      rankByTeam.set(ranked[i].teamId, rk)
+    }
+  }
+
   // Pre-compute per-section scores so explainCalc can show the real contribution
   const sectionScoreMaps: Map<string, number>[] = hasSections && element.sections
     ? element.sections.map(section =>
@@ -363,7 +388,8 @@ export function explainElementScores(
           secMaxValue,
           scoringMode,
           section.fields,
-          resultField
+          resultField,
+          computed
         )
 
         const displayVals: Record<string, string> = {}
@@ -411,7 +437,7 @@ export function explainElementScores(
       })
 
     const { explanation, rank, totalTeams } = element.calcMethod
-      ? explainCalc(element.calcMethod, rawValue, allRawValues, score, maxValue, scoringMode, element.fields, resultField)
+      ? explainCalc(element.calcMethod, rawValue, allRawValues, score, maxValue, scoringMode, element.fields, resultField, computed, rankByTeam.get(result.teamId))
       : { explanation: `${score}p`, rank: undefined, totalTeams: undefined }
 
     const displayVals: Record<string, string> = {}
