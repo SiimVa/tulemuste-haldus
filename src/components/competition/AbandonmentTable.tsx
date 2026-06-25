@@ -90,6 +90,18 @@ export function AbandonmentTable({
     await addEntry(teamId, memberName, signed(magnitude))
   }
 
+  // Nimeta katkestanud liige (kui liikmeid pole nimekirjas)
+  async function addGeneric(teamId: string) {
+    let magnitude = penaltyPerMember
+    if (mode === "CUSTOM") {
+      const input = prompt("Karistus katkestanud liikme eest (p):", String(penaltyPerMember || ""))
+      if (input === null) return
+      magnitude = Number(input)
+      if (isNaN(magnitude)) return
+    }
+    await addEntry(teamId, "Katkestanud liige", signed(magnitude))
+  }
+
   async function toggleWholeTeam(teamId: string) {
     const existing = entryFor(teamId, WHOLE_TEAM)
     if (existing) {
@@ -118,6 +130,8 @@ export function AbandonmentTable({
         const total = teamEntries.reduce((s, e) => s + e.points, 0)
         const wholeTeamEntry = entryFor(team.id, WHOLE_TEAM)
         const competitors = team.members.filter((m) => m.role === "COMPETITOR")
+        const memberNames = new Set(competitors.map((m) => m.name))
+        const genericEntries = teamEntries.filter((e) => e.description !== WHOLE_TEAM && !memberNames.has(e.description))
         return (
           <div key={team.id} className="border rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50">
@@ -143,32 +157,45 @@ export function AbandonmentTable({
               </div>
             </div>
             <div className="px-4 py-2 divide-y">
-              {competitors.length === 0 ? (
-                <p className="text-xs text-gray-400 py-1">Liikmeid pole lisatud (lisa võistkondade lehel).</p>
-              ) : (
-                competitors.map((m, mi) => {
-                  const entry = entryFor(team.id, m.name)
-                  return (
-                    <div key={mi} className="flex items-center justify-between py-1.5 text-sm">
-                      <span className="text-gray-700">{m.name}</span>
-                      <div className="flex items-center gap-3">
-                        {entry && (
-                          <span className="font-mono text-xs text-red-600">{entry.points >= 0 ? "+" : ""}{entry.points}p</span>
-                        )}
-                        <button
-                          onClick={() => toggleMember(team.id, m.name)}
-                          disabled={busy !== null}
-                          className={`px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 ${
-                            entry ? "bg-rose-600 text-white hover:bg-rose-700" : "border text-gray-500 hover:bg-gray-50"
-                          }`}
-                        >
-                          {entry ? "✓ Katkestas" : "Katkestas"}
-                        </button>
-                      </div>
+              {competitors.map((m, mi) => {
+                const entry = entryFor(team.id, m.name)
+                return (
+                  <div key={mi} className="flex items-center justify-between py-1.5 text-sm">
+                    <span className="text-gray-700">{m.name}</span>
+                    <div className="flex items-center gap-3">
+                      {entry && (
+                        <span className="font-mono text-xs text-red-600">{entry.points >= 0 ? "+" : ""}{entry.points}p</span>
+                      )}
+                      <button
+                        onClick={() => toggleMember(team.id, m.name)}
+                        disabled={busy !== null}
+                        className={`px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 ${
+                          entry ? "bg-rose-600 text-white hover:bg-rose-700" : "border text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        {entry ? "✓ Katkestas" : "Katkestas"}
+                      </button>
                     </div>
-                  )
-                })
-              )}
+                  </div>
+                )
+              })}
+              {/* Nimeta katkestanud liikmed (kui nimekirja pole) */}
+              {genericEntries.map((e) => (
+                <div key={e.id} className="flex items-center justify-between py-1.5 text-sm">
+                  <span className="text-gray-700">Katkestanud liige <span className="text-gray-400 text-xs">(nimeta)</span></span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-red-600">{e.points >= 0 ? "+" : ""}{e.points}p</span>
+                    <button onClick={() => removeEntry(e.id)} disabled={busy !== null}
+                      className="text-red-400 hover:text-red-600 text-xs disabled:opacity-50">✕</button>
+                  </div>
+                </div>
+              ))}
+              <div className="py-1.5">
+                <button onClick={() => addGeneric(team.id)} disabled={busy !== null}
+                  className="text-xs text-rose-600 hover:text-rose-700 font-medium disabled:opacity-50">
+                  + Lisa katkestanud liige{competitors.length === 0 ? " (nimekirja pole)" : " (nimeta)"}
+                </button>
+              </div>
             </div>
           </div>
         )
