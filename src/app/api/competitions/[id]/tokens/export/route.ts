@@ -28,8 +28,10 @@ export async function GET(
   })
   if (!competition) return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
 
-  const origin = req.headers.get("origin") ?? req.headers.get("referer")?.replace(/\/[^/]*$/, "") ?? ""
-  const baseUrl = origin.replace(/\/$/, "")
+  // Ehita base URL host-päisest (skeem + host, ilma teeta) — origin/referer annaks vale tee
+  const host = req.headers.get("host") ?? "localhost:3000"
+  const proto = req.headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
+  const baseUrl = `${proto}://${host}`
 
   const elementOrderMap = new Map(competition.elements.map((el, i) => [el.id, i]))
   const teamOrderMap = new Map(
