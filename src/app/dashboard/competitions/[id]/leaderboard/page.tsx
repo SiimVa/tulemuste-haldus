@@ -102,6 +102,13 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
         {isDnf && row.team.dnfReason && (
           <span className="ml-2 text-xs text-red-400">{row.team.dnfReason}</span>
         )}
+        {row.team.dqFromElementOrder != null && (
+          <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium"
+            title={`Diskvalifitseeritud alates: ${elements.find(e => e.order === row.team.dqFromElementOrder)?.code ?? row.team.dqFromElementOrder}`}>DQ</span>
+        )}
+        {row.team.dnsFlag && (
+          <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">DNS</span>
+        )}
       </td>
       <td className="px-4 py-3">
         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>

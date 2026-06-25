@@ -174,6 +174,12 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-[160px]">
                       <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                       <span className="font-medium text-gray-900">{row.team.name}</span>
+                      {row.team.dqFromElementOrder != null && (
+                        <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">DQ</span>
+                      )}
+                      {row.team.dnsFlag && (
+                        <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">DNS</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>
@@ -213,6 +219,12 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         <td className="sticky left-24 z-10 bg-amber-50 border-r px-4 py-3 min-w-[160px]">
                           <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                           <span className="font-medium text-amber-700">{row.team.name}</span>
+                          {row.team.dqFromElementOrder != null && (
+                            <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">DQ</span>
+                          )}
+                          {row.team.dnsFlag && (
+                            <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">DNS</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>
