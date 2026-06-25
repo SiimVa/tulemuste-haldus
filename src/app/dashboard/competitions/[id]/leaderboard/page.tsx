@@ -23,6 +23,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
   const baseUrl = `${proto}://${host}`
   const publicLeaderboardUrl = `${baseUrl}/public/${id}/leaderboard`
   const publicAnalysisUrl = `${baseUrl}/public/${id}/analysis`
+  const publicDashboardUrl = `${baseUrl}/public/${id}/dashboard`
 
   const [teams, scores, penalties, elements, miscEntries] = await Promise.all([
     prisma.team.findMany({ where: { competitionId: id } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
@@ -169,6 +170,12 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
           <span className="flex-1 text-xs font-mono text-gray-600 bg-white border rounded px-2 py-1 truncate">{publicAnalysisUrl}</span>
           <CopyButton text={publicAnalysisUrl} />
           <a href={publicAnalysisUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline shrink-0">Ava</a>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-blue-800 font-medium w-20 shrink-0">Ülevaade</span>
+          <span className="flex-1 text-xs font-mono text-gray-600 bg-white border rounded px-2 py-1 truncate">{publicDashboardUrl}</span>
+          <CopyButton text={publicDashboardUrl} />
+          <a href={publicDashboardUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline shrink-0">Ava</a>
         </div>
       </div>
 
