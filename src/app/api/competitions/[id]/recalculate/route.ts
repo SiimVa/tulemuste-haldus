@@ -59,8 +59,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       continue
     }
 
-    // Muu element: summeeri MiscEntry kirjed tiimi kohta
-    if (element.type === "OTHER") {
+    // Muu / Katkestamine element: summeeri MiscEntry kirjed tiimi kohta
+    if (element.type === "OTHER" || element.type === "ABANDONMENT") {
       const entriesByTeam = new Map<string, number>()
       for (const entry of element.miscEntries) {
         entriesByTeam.set(entry.teamId, (entriesByTeam.get(entry.teamId) ?? 0) + entry.points)

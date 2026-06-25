@@ -120,6 +120,10 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
           } else {
             setElementConfig({ mode: "ONE_TIME" })
           }
+        } else if (el.type === "ABANDONMENT") {
+          let cfg: { mode?: string; penaltyPerMember?: number } = {}
+          try { cfg = JSON.parse(el.config ?? "{}") } catch {}
+          setElementConfig({ mode: cfg.mode ?? "FIXED", penaltyPerMember: cfg.penaltyPerMember ?? 10 })
         }
         const loadedSections = el.sections ?? []
         setSections(loadedSections)
@@ -196,6 +200,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
       code,
       type,
       directPointsEntry: isDirectEntry ? true : (type === "PENALTY_BOX" ? directPointsEntry : undefined),
+      config: elementConfig,
       maxValue: isCombined ? null : (maxValue !== "" ? Number(maxValue) : null),
       fields: isCombined ? undefined : isDirectEntry ? [
         { name: "tulemus", label: "Tulemus", type: "NUMBER", isResultField: true, rankingPriority: 1, order: 0 },
@@ -218,7 +223,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         penalty: isNaN(parseFloat(ex.penalty)) ? 0 : parseFloat(ex.penalty),
         order: i,
       })),
-      calcMethod: (type === "OTHER" || isCombined) ? undefined : isDirectEntry ? { type: "DIRECT_ENTRY", params: {}, customFormula: undefined } : {
+      calcMethod: (type === "OTHER" || type === "ABANDONMENT" || isCombined) ? undefined : isDirectEntry ? { type: "DIRECT_ENTRY", params: {}, customFormula: undefined } : {
         type: calcType,
         params:
           calcType === "RELATIVE_RANKING" ? { higherIsBetter: primaryDir, minPoints } :
@@ -286,6 +291,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
                 <option value="COUNTER_ACTION">Vastutegevus</option>
                 <option value="EQUIPMENT_CHECK">Varustuskontroll</option>
                 <option value="LATENESS">Hilinemine</option>
+                <option value="ABANDONMENT">Katkestamine</option>
                 <option value="MANUAL">Käsitsi sisestatav</option>
                 <option value="OTHER">Muu element</option>
               </select>
@@ -437,6 +443,38 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
+        {/* Katkestamise seaded */}
+        {type === "ABANDONMENT" && (
+          <div className="bg-white border rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium bg-rose-100 text-rose-700 px-2 py-0.5 rounded">KT</span>
+              <h2 className="font-semibold text-gray-900">Katkestamise seaded</h2>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Karistuse süsteem</label>
+              <select value={(elementConfig.mode as string) ?? "FIXED"}
+                onChange={e => setElementConfig({ ...elementConfig, mode: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
+                <option value="FIXED">Fikseeritud väärtus iga liikme kohta</option>
+                <option value="CUSTOM">Käsitsi määratav väärtus iga katkestamise kohta</option>
+              </select>
+            </div>
+            {((elementConfig.mode as string) ?? "FIXED") === "FIXED" && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Karistus ühe liikme katkestamise eest (p)</label>
+                <input type="number" min={0} step={0.5}
+                  value={(elementConfig.penaltyPerMember as number) ?? 10}
+                  onChange={e => setElementConfig({ ...elementConfig, penaltyPerMember: Number(e.target.value) })}
+                  onFocus={e => e.target.select()}
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+              </div>
+            )}
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+              Katkestamisi hallatakse elemendi lehel. Annab ainult karistuspunktid (ei muuda automaatselt staatust).
+            </p>
+          </div>
+        )}
+
         {/* Kombineeritud hindamine — sektsioone hallatakse siin */}
         {(calcType === "COMBINED" || sections.length > 0) && (
           <div className="bg-white border rounded-xl p-5 space-y-4">
@@ -462,7 +500,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         {/* Arvutusmeetod enne, sisendväljad pärast (flex-col-reverse pöörab järjekorra) */}
         <div className="flex flex-col-reverse gap-6">
         {/* Sisendväljad (ainult mitte-kombineeritud, mitte-DIRECT_ENTRY elementidel) */}
-        {type !== "OTHER" && calcType !== "COMBINED" && calcType !== "DIRECT_ENTRY" && sections.length === 0 && (<div className="bg-white border rounded-xl p-5 space-y-4">
+        {type !== "OTHER" && type !== "ABANDONMENT" && calcType !== "COMBINED" && calcType !== "DIRECT_ENTRY" && sections.length === 0 && (<div className="bg-white border rounded-xl p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Sisendväljad</h2>
           <p className="text-xs text-gray-500">Määra järjekord, mille alusel pingerida moodustatakse. 1 = esmane, 2+ = viigi lahendaja.</p>
 
@@ -558,7 +596,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         </div>)}
 
         {/* Arvutusmeetod */}
-        {type !== "OTHER" && sections.length === 0 && <div className="bg-white border rounded-xl p-5 space-y-4">
+        {type !== "OTHER" && type !== "ABANDONMENT" && sections.length === 0 && <div className="bg-white border rounded-xl p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Arvutusmeetod</h2>
           <div className="space-y-2">
             {CALC_TYPES.map(ct => (
@@ -679,7 +717,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {/* Erandid */}
-        {type !== "OTHER" && <div className="bg-white border rounded-xl p-5 space-y-4">
+        {type !== "OTHER" && type !== "ABANDONMENT" && <div className="bg-white border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Erandid</h2>
             <button type="button" onClick={addException}

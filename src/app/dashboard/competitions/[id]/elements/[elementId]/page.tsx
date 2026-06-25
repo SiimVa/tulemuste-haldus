@@ -10,6 +10,7 @@ import { ExportMenu } from "@/components/ExportMenu"
 import { ElementCancelButton } from "@/components/competition/ElementCancelButton"
 import { ElementDeleteButton } from "@/components/competition/ElementDeleteButton"
 import { MiscEntriesTable } from "@/components/competition/MiscEntriesTable"
+import { AbandonmentTable } from "@/components/competition/AbandonmentTable"
 import { ElementSectionsManager } from "@/components/competition/ElementSectionsManager"
 import { ResultsImportTrigger } from "@/components/competition/ResultsImportTrigger"
 import { RecalcButton } from "@/components/competition/RecalcButton"
@@ -55,6 +56,7 @@ export default async function ElementPage({
 
   const teams = (await prisma.team.findMany({
     where: { competitionId },
+    include: { members: true },
   })).sort((a, b) => naturalCompare(a.code, b.code))
 
   const breakdowns = explainElementScores(
@@ -320,6 +322,32 @@ export default async function ElementPage({
           />
         </div>
       )}
+
+      {/* Katkestamine: liikmete/võistkonna katkestamise haldus */}
+      {element.type === "ABANDONMENT" && (() => {
+        let cfg: { mode?: string; penaltyPerMember?: number } = {}
+        try { cfg = JSON.parse(element.config || "{}") } catch {}
+        return (
+          <div className="bg-white border rounded-xl p-5 mb-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Katkestamised</h3>
+            <AbandonmentTable
+              competitionId={competitionId}
+              elementId={element.id}
+              scoringMode={element.competition.scoringMode as "PENALTY" | "PLUS"}
+              mode={(cfg.mode as "FIXED" | "CUSTOM") ?? "FIXED"}
+              penaltyPerMember={cfg.penaltyPerMember ?? 10}
+              teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, members: t.members.map(m => ({ name: m.name, role: m.role })) }))}
+              initialEntries={element.miscEntries.map(e => ({
+                id: e.id,
+                teamId: e.teamId,
+                team: e.team,
+                points: e.points,
+                description: e.description,
+              }))}
+            />
+          </div>
+        )
+      })()}
 
       {/* Arvutuste ülevaade — korraldajale kontrolliks */}
       {breakdowns.length > 0 && (

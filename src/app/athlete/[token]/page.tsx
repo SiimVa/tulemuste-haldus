@@ -92,16 +92,17 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
               const result = resultMap.get(el.id)
               const miscList = miscByElement.get(el.id) ?? []
 
-              // Muu element — kuva MiscEntry kirjed
-              if (el.type === "OTHER") {
+              // Muu / Katkestamine element — kuva MiscEntry kirjed
+              if (el.type === "OTHER" || el.type === "ABANDONMENT") {
                 const total = miscList.reduce((s, e) => s + e.points, 0)
+                const isAbandon = el.type === "ABANDONMENT"
                 return (
                   <div key={el.id} className="bg-white border rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <span className="font-mono text-xs text-gray-400 mr-1">[{el.code}]</span>
                         <span className="font-semibold text-gray-900">{el.name}</span>
-                        <span className="ml-2 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">Muu</span>
+                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${isAbandon ? "bg-rose-100 text-rose-700" : "bg-teal-100 text-teal-700"}`}>{isAbandon ? "Katkestamine" : "Muu"}</span>
                       </div>
                       <span className={`text-sm font-mono font-semibold ${total >= 0 ? "text-green-700" : "text-red-700"}`}>
                         {total >= 0 ? "+" : ""}{total}p

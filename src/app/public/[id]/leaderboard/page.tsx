@@ -26,16 +26,20 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
     prisma.computedScore.findMany({ where: { element: { competitionId: id } } }),
     prisma.manualPenalty.findMany({ where: { competitionId: id } }),
     prisma.scoringElement.findMany({ where: { competitionId: id }, orderBy: { order: "asc" } }),
-    prisma.miscEntry.findMany({ where: { element: { competitionId: id, type: "OTHER" } }, select: { elementId: true, teamId: true, points: true, description: true } }),
+    prisma.miscEntry.findMany({ where: { element: { competitionId: id, type: { in: ["OTHER", "ABANDONMENT"] } } }, select: { elementId: true, teamId: true, points: true, description: true, element: { select: { type: true } } } }),
   ])
 
-  // Muu-kirjete selgitused (element + tiim) → popover pingereas
+  // Muu/Katkestamise kirjete selgitused (element + tiim) → popover pingereas
   const miscMap = new Map<string, { description: string; points: number }[]>()
+  const memberAbandonTeamIds = new Set<string>()
   for (const m of miscEntries) {
     const key = `${m.elementId}:${m.teamId}`
     const arr = miscMap.get(key) ?? []
     arr.push({ description: m.description, points: m.points })
     miscMap.set(key, arr)
+    if (m.element.type === "ABANDONMENT" && m.description !== "Kogu võistkond") {
+      memberAbandonTeamIds.add(m.teamId)
+    }
   }
 
   const allRows = teams.map((team) => {
@@ -180,13 +184,16 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                       {row.team.dnsFlag && (
                         <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">DNS</span>
                       )}
+                      {memberAbandonTeamIds.has(row.team.id) && (
+                        <span className="ml-1.5 text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium" title="Üks või mitu liiget katkestas">👤 katk.</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>
                     </td>
                     {elements.map((el) => {
                       const cellValue = row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"
-                      const entries = el.type === "OTHER" ? (miscMap.get(`${el.id}:${row.team.id}`) ?? []) : []
+                      const entries = (el.type === "OTHER" || el.type === "ABANDONMENT") ? (miscMap.get(`${el.id}:${row.team.id}`) ?? []) : []
                       if (entries.length > 0) {
                         return <MiscScoreCell key={el.id} value={cellValue} entries={entries}
                           className="px-3 py-3 text-right font-mono text-xs text-gray-600" />
@@ -225,13 +232,16 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                           {row.team.dnsFlag && (
                             <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">DNS</span>
                           )}
+                          {memberAbandonTeamIds.has(row.team.id) && (
+                            <span className="ml-1.5 text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium" title="Üks või mitu liiget katkestas">👤 katk.</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>
                         </td>
                         {elements.map((el) => {
                           const cellValue = row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"
-                          const entries = el.type === "OTHER" ? (miscMap.get(`${el.id}:${row.team.id}`) ?? []) : []
+                          const entries = (el.type === "OTHER" || el.type === "ABANDONMENT") ? (miscMap.get(`${el.id}:${row.team.id}`) ?? []) : []
                           if (entries.length > 0) {
                             return <MiscScoreCell key={el.id} value={cellValue} entries={entries}
                               className="px-3 py-3 text-right font-mono text-xs text-gray-600" />

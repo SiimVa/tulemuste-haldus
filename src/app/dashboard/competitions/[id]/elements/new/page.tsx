@@ -64,6 +64,7 @@ const ELEMENT_TYPES = [
   { value: "COUNTER_ACTION", label: "VT – Vastutegevus", badge: "VT", color: "bg-red-100 text-red-700" },
   { value: "EQUIPMENT_CHECK", label: "VA – Varustuskontroll", badge: "VA", color: "bg-yellow-100 text-yellow-700" },
   { value: "LATENESS", label: "HL – Hilinemine", badge: "HL", color: "bg-purple-100 text-purple-700" },
+  { value: "ABANDONMENT", label: "KT – Katkestamine", badge: "KT", color: "bg-rose-100 text-rose-700" },
   { value: "MANUAL", label: "Käsitsi sisestatav", badge: "KS", color: "bg-gray-100 text-gray-600" },
   { value: "OTHER", label: "Muu element", badge: "MU", color: "bg-teal-100 text-teal-700" },
 ]
@@ -127,6 +128,13 @@ function getTypeDefaults(type: string, defs: CompDefs): {
         fields: [], exceptions: [],
         calcType: "RELATIVE_RANKING", customFormula: "",
         higherIsBetter: null, maxValue: "", config: {},
+      }
+    case "ABANDONMENT":
+      return {
+        fields: [], exceptions: [],
+        calcType: "RELATIVE_RANKING", customFormula: "",
+        higherIsBetter: null, maxValue: "",
+        config: { mode: "FIXED", penaltyPerMember: 10 },
       }
     default: // CHECKPOINT, MANUAL
       return {
@@ -443,7 +451,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
       exceptions: exceptions.map((ex, i) => ({
         label: ex.label, penalty: parseFloat(ex.penalty), order: i,
       })),
-      calcMethod: isCombined ? undefined : (type === "OTHER" ? undefined : pkOverride ? pkOverride.calcMethod : isDirectEntry ? { type: "DIRECT_ENTRY", params: {}, customFormula: undefined } : (() => {
+      calcMethod: isCombined ? undefined : ((type === "OTHER" || type === "ABANDONMENT") ? undefined : pkOverride ? pkOverride.calcMethod : isDirectEntry ? { type: "DIRECT_ENTRY", params: {}, customFormula: undefined } : (() => {
         const primaryDir = fields.find(f => f.rankingPriority === 1)?.fieldHigherIsBetter ?? false
         return {
         type: calcType,
@@ -499,7 +507,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
   }
 
   const isSpecialType = ["COUNTER_ACTION", "EQUIPMENT_CHECK", "LATENESS"].includes(type)
-  const isMiscType = type === "OTHER"
+  const isMiscType = type === "OTHER" || type === "ABANDONMENT"
   const canCombine = !isSpecialType && !isMiscType && type !== "PENALTY_BOX"
   const isCombinedMode = calcType === "COMBINED" && canCombine
 
@@ -838,11 +846,43 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         )}
 
         {/* Muu elemendi info */}
-        {isMiscType && (
+        {type === "OTHER" && (
           <div className="bg-teal-50 border border-teal-200 rounded-xl p-4">
             <p className="text-sm font-medium text-teal-800 mb-1">Muu element</p>
             <p className="text-xs text-teal-700">
               Siin saab lisada ettenägematuid kirjeid (nt trahvid, lisapunktid jms). Kirjeid hallatakse elemendi lehel pärast loomist — igale võistkonnale saab lisada mitu kirjet koos selgitusega ja punktidega.
+            </p>
+          </div>
+        )}
+
+        {/* Katkestamise seaded */}
+        {type === "ABANDONMENT" && (
+          <div className="bg-white border rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium bg-rose-100 text-rose-700 px-2 py-0.5 rounded">KT</span>
+              <h2 className="font-semibold text-gray-900">Katkestamise seaded</h2>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Karistuse süsteem</label>
+              <select value={(elementConfig.mode as string) ?? "FIXED"}
+                onChange={e => setElementConfig({ ...elementConfig, mode: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
+                <option value="FIXED">Fikseeritud väärtus iga liikme kohta</option>
+                <option value="CUSTOM">Käsitsi määratav väärtus iga katkestamise kohta</option>
+              </select>
+            </div>
+            {((elementConfig.mode as string) ?? "FIXED") === "FIXED" && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Karistus ühe liikme katkestamise eest (p)</label>
+                <input type="number" min={0} step={0.5}
+                  value={(elementConfig.penaltyPerMember as number) ?? 10}
+                  onChange={e => setElementConfig({ ...elementConfig, penaltyPerMember: Number(e.target.value) })}
+                  onFocus={e => e.target.select()}
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500" />
+              </div>
+            )}
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+              Katkestamisi hallatakse elemendi lehel pärast loomist — saab märkida üksikuid liikmeid või kogu võistkonna katkestanuks. Annab ainult karistuspunktid (ei muuda automaatselt staatust).
             </p>
           </div>
         )}
@@ -1188,7 +1228,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* Erandid */}
-        {type !== "COUNTER_ACTION" && type !== "EQUIPMENT_CHECK" && type !== "OTHER" && type !== "PENALTY_BOX" && !(type === "LATENESS" && elementConfig.mode === "PER_INTERVAL") && (
+        {type !== "COUNTER_ACTION" && type !== "EQUIPMENT_CHECK" && type !== "OTHER" && type !== "ABANDONMENT" && type !== "PENALTY_BOX" && !(type === "LATENESS" && elementConfig.mode === "PER_INTERVAL") && (
           <div className="bg-white border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-900">Erandid</h2>
