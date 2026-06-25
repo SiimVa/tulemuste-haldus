@@ -348,7 +348,7 @@ export async function POST(
 }
 
 async function recomputeElementScores(elementId: string, competitionId: string) {
-  const { calculateScores } = await import("@/lib/calculators")
+  const { calculateScores, withEffectiveHC } = await import("@/lib/calculators")
 
   const element = await prisma.scoringElement.findUnique({
     where: { id: elementId },
@@ -423,7 +423,7 @@ async function recomputeElementScores(elementId: string, competitionId: string) 
         exceptions: [] as { label: string; penalty: number }[],
         maxValue: section.maxValue,
       }
-      const sectionScored = calculateScores(mockElement, normalResults, competitionConfig)
+      const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), competitionConfig)
       for (const s of sectionScored) {
         teamScores.set(s.teamId, Math.round(((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints) * 1000) / 1000)
       }
@@ -437,7 +437,7 @@ async function recomputeElementScores(elementId: string, competitionId: string) 
 
     scored = [...teamScores.entries()].map(([teamId, penaltyPoints]) => ({ teamId, penaltyPoints }))
   } else {
-    const calcScored = calculateScores(element, activeResults, competitionConfig)
+    const calcScored = calculateScores(element, withEffectiveHC(activeResults, element.order), competitionConfig)
     scored = calcScored.map((s) => ({
       teamId: s.teamId,
       penaltyPoints: Math.round((s.penaltyPoints + (miscByTeam.get(s.teamId) ?? 0)) * 1000) / 1000,

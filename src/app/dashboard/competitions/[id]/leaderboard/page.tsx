@@ -55,12 +55,15 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
     .filter((r) => r.team.dnfFromElementOrder != null)
     .sort((a, b) => a.team.name.localeCompare(b.team.name))
 
+  const isHC = (t: { isHorsDeCompetition: boolean; hcFromElementOrder?: number | null }) =>
+    t.isHorsDeCompetition || t.hcFromElementOrder != null
+
   const inComp = allRows
-    .filter((r) => !r.team.isHorsDeCompetition && r.team.dnfFromElementOrder == null)
+    .filter((r) => !isHC(r.team) && r.team.dnfFromElementOrder == null)
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
   const horsComp = allRows
-    .filter((r) => r.team.isHorsDeCompetition && r.team.dnfFromElementOrder == null)
+    .filter((r) => isHC(r.team) && r.team.dnfFromElementOrder == null)
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
   const classRank: Record<string, number> = {}

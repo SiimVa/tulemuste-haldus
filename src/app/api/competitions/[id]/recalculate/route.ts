@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { calculateScores } from "@/lib/calculators"
+import { calculateScores, withEffectiveHC } from "@/lib/calculators"
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -129,7 +129,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
           maxValue: section.maxValue,
         }
 
-        const sectionScored = calculateScores(mockElement, normalResults, config)
+        const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), config)
 
         for (const s of sectionScored) {
           teamScores.set(s.teamId, Math.round(((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints) * 1000) / 1000)
@@ -178,7 +178,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       return dnfOrder == null || element.order < dnfOrder
     })
 
-    const scored = calculateScores(element, activeResults, config)
+    const scored = calculateScores(element, withEffectiveHC(activeResults, element.order), config)
 
     const dnfScores = results
       .filter((r) => {

@@ -11,6 +11,7 @@ type Team = {
   isHorsDeCompetition: boolean
   dnfFromElementOrder?: number | null
   dnfReason?: string | null
+  hcFromElementOrder?: number | null
   members: { name: string; role: string }[]
 }
 
@@ -33,6 +34,10 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   const [dnfOrder, setDnfOrder] = useState<string>("")
   const [dnfReason, setDnfReason] = useState("")
   const [dnfSaving, setDnfSaving] = useState(false)
+  const [hcTeamId, setHcTeamId] = useState<string | null>(null)
+  const [hcWhole, setHcWhole] = useState(false)
+  const [hcOrder, setHcOrder] = useState<string>("")
+  const [hcSaving, setHcSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function loadTeams() {
@@ -87,16 +92,31 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
     setEditSaving(false)
   }
 
-  async function toggleHC(team: Team) {
-    const res = await fetch(`/api/competitions/${competitionId}/teams/${team.id}`, {
+  function openHc(team: Team) {
+    setHcTeamId(team.id)
+    setHcWhole(team.isHorsDeCompetition)
+    setHcOrder(team.hcFromElementOrder != null ? String(team.hcFromElementOrder) : "")
+  }
+
+  async function saveHc() {
+    if (!hcTeamId) return
+    setHcSaving(true)
+    const res = await fetch(`/api/competitions/${competitionId}/teams/${hcTeamId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isHorsDeCompetition: !team.isHorsDeCompetition }),
+      body: JSON.stringify({
+        isHorsDeCompetition: hcWhole,
+        // Kui kogu võistlus AV, siis "alates" pole vaja
+        hcFromElementOrder: hcWhole ? null : (hcOrder !== "" ? Number(hcOrder) : null),
+      }),
     })
     if (res.ok) {
       const updated = await res.json()
-      setTeams(teams.map((t) => (t.id === team.id ? { ...t, ...updated } : t)))
+      setTeams(teams.map((t) => (t.id === hcTeamId ? { ...t, ...updated } : t)))
+      setHcTeamId(null)
+      await fetch(`/api/competitions/${competitionId}/recalculate`, { method: "POST" }).catch(() => {})
     }
+    setHcSaving(false)
   }
 
   function openDnf(team: Team) {
@@ -284,6 +304,50 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
         </div>
       )}
 
+      {/* Arvestusväline modal */}
+      {hcTeamId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="font-semibold text-gray-900 mb-1">Arvestusväline</h3>
+            <p className="text-sm text-gray-500 mb-4">Võistkond: <strong>{teams.find(t => t.id === hcTeamId)?.name}</strong></p>
+            <div className="space-y-4">
+              <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" checked={hcWhole} onChange={e => setHcWhole(e.target.checked)} className="mt-0.5 accent-amber-600" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Kogu võistlus arvestusväline</p>
+                  <p className="text-xs text-gray-500">Võistkonda ei arvestata üheski elemendis pingerea kohtade jaoks.</p>
+                </div>
+              </label>
+              <div className={hcWhole ? "opacity-40 pointer-events-none" : ""}>
+                <label className="text-xs text-gray-500 mb-1 block">Arvestusväline alates elemendist</label>
+                <select value={hcOrder} onChange={e => setHcOrder(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  <option value="">— Ei ole (terve võistlus arvestussisene) —</option>
+                  {elements.map(el => (
+                    <option key={el.id} value={String(el.order)}>
+                      [{el.code}] {el.name} (järj. {el.order})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Enne valitud elementi arvestatakse tulemus sees, alates sellest elemendist arvutatakse eraldi (arvestusväline).
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={saveHc} disabled={hcSaving}
+                className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50">
+                {hcSaving ? "Salvestan..." : "Salvesta"}
+              </button>
+              <button onClick={() => setHcTeamId(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                Tühista
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-gray-400 text-sm">Laen...</p>
       ) : teams.length === 0 ? (
@@ -371,6 +435,11 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                   {team.isHorsDeCompetition && team.dnfFromElementOrder == null && (
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">AV</span>
                   )}
+                  {!team.isHorsDeCompetition && team.hcFromElementOrder != null && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                      AV alates {(() => { const el = elements.find(e => e.order === team.hcFromElementOrder); return el ? `[${el.code}]` : `järj. ${team.hcFromElementOrder}` })()}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-gray-400 mr-2">{team.members?.length ?? 0} liiget</span>
@@ -387,10 +456,10 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                       KAT
                     </button>
                   )}
-                  <button onClick={() => toggleHC(team)}
-                    title={team.isHorsDeCompetition ? "Märgi arvestussiseseks" : "Märgi arvestusväliseks"}
+                  <button onClick={() => openHc(team)}
+                    title="Arvestusväline (kogu võistlus või alates elemendist)"
                     className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                      team.isHorsDeCompetition ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "text-gray-400 hover:bg-gray-100"
+                      team.isHorsDeCompetition || team.hcFromElementOrder != null ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "text-gray-400 hover:bg-gray-100"
                     }`}>
                     AV
                   </button>

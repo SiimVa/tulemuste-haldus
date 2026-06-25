@@ -31,6 +31,25 @@ interface CompetitionConfig {
   defaultPKMaxValue: number
 }
 
+// ─── Arvestusväline alates elemendist X ──────────────────────────────────────
+// Tagastab tulemused, kus iga tiimi isHorsDeCompetition on efektiivne selle
+// elemendi kohta: kui tiim on kogu võistluse arvestusväline VÕI tema
+// hcFromElementOrder on määratud ja elemendi järjekord >= sellest.
+export function withEffectiveHC<T extends { team: { isHorsDeCompetition?: boolean; hcFromElementOrder?: number | null } }>(
+  results: T[],
+  elementOrder: number | null | undefined
+): T[] {
+  return results.map((r) => ({
+    ...r,
+    team: {
+      ...r.team,
+      isHorsDeCompetition:
+        (r.team.isHorsDeCompetition ?? false) ||
+        (r.team.hcFromElementOrder != null && elementOrder != null && elementOrder >= r.team.hcFromElementOrder),
+    },
+  }))
+}
+
 // ─── Aeg → sekundid (formaat h:mm:ss või mm:ss) ──────────────────────────────
 export function parseTimeToSeconds(value: string | number): number {
   if (typeof value === "number") return value

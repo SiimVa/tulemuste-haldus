@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { calculateScores } from "@/lib/calculators"
+import { calculateScores, withEffectiveHC } from "@/lib/calculators"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 
 // GET – kõik tulemused selle elemendi jaoks
@@ -190,7 +190,7 @@ async function recomputeScores(elementId: string) {
         exceptions: [] as { label: string; penalty: number }[],
         maxValue: section.maxValue,
       }
-      const sectionScored = calculateScores(mockElement, normalResults, competitionConfig)
+      const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), competitionConfig)
       for (const s of sectionScored) {
         teamScores.set(s.teamId, Math.round(((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints) * 1000) / 1000)
       }
@@ -205,7 +205,7 @@ async function recomputeScores(elementId: string) {
     scored = [...teamScores.entries()].map(([teamId, penaltyPoints]) => ({ teamId, penaltyPoints }))
   } else {
     // Tavaline element
-    const calcScored = calculateScores(element, results, competitionConfig)
+    const calcScored = calculateScores(element, withEffectiveHC(results, element.order), competitionConfig)
     scored = calcScored.map(s => ({
       teamId: s.teamId,
       penaltyPoints: Math.round((s.penaltyPoints + (miscByTeam.get(s.teamId) ?? 0)) * 1000) / 1000,

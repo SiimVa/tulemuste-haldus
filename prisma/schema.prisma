@@ -182,6 +182,9 @@ model Team {
   createdAt           DateTime    @default(now())
   dnfFromElementOrder Int?
   dnfReason           String?
+  hcFromElementOrder  Int?        // Arvestusväline alates selle järjekorraga elemendist (null = pole)
+  dqFromElementOrder  Int?        // Diskvalifitseeritud alates elemendist (ainult märge pingereas)
+  dnsFlag             Boolean     @default(false) // Ei startinud (ainult märge pingereas)
 
   members         TeamMember[]
   results         Result[]

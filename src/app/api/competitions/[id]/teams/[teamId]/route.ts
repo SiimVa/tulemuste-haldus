@@ -31,6 +31,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           isHorsDeCompetition: body.isHorsDeCompetition !== undefined ? body.isHorsDeCompetition : undefined,
           dnfFromElementOrder: body.dnfFromElementOrder !== undefined ? (body.dnfFromElementOrder === null ? null : Number(body.dnfFromElementOrder)) : undefined,
           dnfReason: body.dnfReason !== undefined ? (body.dnfReason || null) : undefined,
+          hcFromElementOrder: body.hcFromElementOrder !== undefined ? (body.hcFromElementOrder === null ? null : Number(body.hcFromElementOrder)) : undefined,
+          dqFromElementOrder: body.dqFromElementOrder !== undefined ? (body.dqFromElementOrder === null ? null : Number(body.dqFromElementOrder)) : undefined,
+          dnsFlag: body.dnsFlag !== undefined ? Boolean(body.dnsFlag) : undefined,
         },
       })
 

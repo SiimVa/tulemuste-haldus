@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { calculateScores } from "@/lib/calculators"
+import { calculateScores, withEffectiveHC } from "@/lib/calculators"
 
 async function checkAccess(competitionId: string, userId: string, role: string) {
   if (role === "ADMIN") return true
@@ -125,7 +125,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       defaultPKMaxValue: element.competition.defaultPKMaxValue,
     }
 
-    const scored = calculateScores(element, results, competitionConfig)
+    const scored = calculateScores(element, withEffectiveHC(results, element.order), competitionConfig)
     await prisma.$transaction(
       scored.map((s) =>
         prisma.computedScore.upsert({

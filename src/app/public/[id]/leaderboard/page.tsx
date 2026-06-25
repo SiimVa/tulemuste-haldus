@@ -48,12 +48,15 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
     return { team, total: Math.round(total * 1000) / 1000, kpTotal, manualTotal, byElement }
   })
 
+  const isHC = (t: { isHorsDeCompetition: boolean; hcFromElementOrder?: number | null }) =>
+    t.isHorsDeCompetition || t.hcFromElementOrder != null
+
   const inComp = allRows
-    .filter((r) => !r.team.isHorsDeCompetition)
+    .filter((r) => !isHC(r.team))
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
   const horsComp = allRows
-    .filter((r) => r.team.isHorsDeCompetition)
+    .filter((r) => isHC(r.team))
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
   const classRank: Record<string, number> = {}
