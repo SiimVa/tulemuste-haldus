@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { AutoRefresh } from "@/components/AutoRefresh"
 import { MiscScoreCell } from "@/components/competition/MiscScoreCell"
+import { LeaderboardHighlighter } from "@/components/public/LeaderboardHighlighter"
 
 export const dynamic = "force-dynamic"
 
@@ -98,17 +99,20 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               </Link>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2 flex items-center gap-2">
-            <span>Uuendatud: {updatedAt}</span>
-            <span>·</span>
-            <AutoRefresh intervalSeconds={30} />
-          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-gray-400 flex items-center gap-2">
+              <span>Uuendatud: {updatedAt}</span>
+              <span>·</span>
+              <AutoRefresh intervalSeconds={30} />
+            </p>
+            <LeaderboardHighlighter competitionId={id} teams={teams.map(t => ({ id: t.id, code: t.code, name: t.name }))} />
+          </div>
         </div>
 
         {/* Mobiilivaade: kompaktsed kaardid (koht + võistkond + kokku) */}
         <div className="md:hidden space-y-2">
           {inCompRows.map((row) => (
-            <div key={row.team.id} className="bg-white border rounded-xl shadow-sm px-3 py-2.5 flex items-center gap-3">
+            <div key={row.team.id} data-lb-team={row.team.id} className="bg-white border rounded-xl shadow-sm px-3 py-2.5 flex items-center gap-3">
               <span className="text-lg font-bold text-gray-900 w-7 text-center shrink-0">{row.rank}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
@@ -131,7 +135,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
             <>
               <p className="px-1 pt-2 text-xs font-semibold text-amber-700 tracking-wide uppercase">Arvestusvälised</p>
               {horsCompRows.map((row) => (
-                <div key={row.team.id} className="bg-amber-50/60 border rounded-xl shadow-sm px-3 py-2.5 flex items-center gap-3">
+                <div key={row.team.id} data-lb-team={row.team.id} className="bg-amber-50/60 border rounded-xl shadow-sm px-3 py-2.5 flex items-center gap-3">
                   <span className="text-xs text-amber-600 font-medium w-7 text-center shrink-0">AV</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -172,7 +176,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               </thead>
               <tbody className="divide-y">
                 {inCompRows.map((row) => (
-                  <tr key={row.team.id} className="hover:bg-gray-50">
+                  <tr key={row.team.id} data-lb-team={row.team.id} className="hover:bg-gray-50">
                     <td className="sticky left-0 z-10 bg-white w-12 px-2 py-3 font-bold text-gray-900 text-center">{row.rank}</td>
                     <td className="sticky left-12 z-10 bg-white w-12 px-2 py-3 text-gray-400 text-xs text-center">{row.classRank}</td>
                     <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-40">
@@ -220,7 +224,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                       </td>
                     </tr>
                     {horsCompRows.map((row) => (
-                      <tr key={row.team.id} className="hover:bg-gray-50 bg-amber-50/40">
+                      <tr key={row.team.id} data-lb-team={row.team.id} className="hover:bg-gray-50 bg-amber-50/40">
                         <td className="sticky left-0 z-10 bg-amber-50 w-12 px-2 py-3 text-xs text-amber-600 font-medium text-center">AV</td>
                         <td className="sticky left-12 z-10 bg-amber-50 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
                         <td className="sticky left-24 z-10 bg-amber-50 border-r px-4 py-3 min-w-40">
