@@ -43,6 +43,7 @@ export type TeamElementStat = {
   rawValues: Record<string, unknown>
   rawResultValue: string | number | null
   miscEntries?: { description: string; points: number }[]
+  fieldDisplay?: Record<string, string>  // vormindatud väärtus iga välja kohta (sh arvutatud)
 }
 
 export type ElementStat = {
@@ -51,6 +52,8 @@ export type ElementStat = {
   bestRawValue: number | null
   worstRawValue: number | null
   resultFieldType: string | null
+  totalCount?: number       // kõik kirjed (sh erandid)
+  performedCount?: number   // ainult sooritused (erandita, väärtusega)
 }
 
 interface Props {
@@ -167,7 +170,8 @@ export default function AnalysisView({
     : []
 
   const kpElStat = getElStat(selectedElementId)
-  const inputFields = selectedElement?.fields.filter(f => f.type !== "COMPUTED") ?? []
+  // KP võrdluses näita KÕIKI välju (sh arvutatud tulemus ja viigilahendajad)
+  const kpFields = selectedElement?.fields ?? []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -332,7 +336,9 @@ export default function AnalysisView({
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-center">Üldkoht</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-center">Klassist</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Keskmine</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-500">Positsioon</th>
+                          <th className="px-4 py-3 text-xs font-medium text-gray-500" title="Suhteline koht: parim koht = 100%, viimane = 0%. Valem: (osalejaid − koht) / (osalejaid − 1).">
+                            Positsioon <span className="text-gray-300">ⓘ</span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -444,23 +450,33 @@ export default function AnalysisView({
             {selectedElement && (
               <>
                 {/* Element stats bar */}
-                {kpElStat && (kpElStat.avgRawValue !== null || kpElStat.bestRawValue !== null) && (
+                {kpElStat && (
                   <div className="bg-white border rounded-xl p-4 mb-5 flex flex-wrap gap-6">
+                    {kpElStat.bestRawValue !== null && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Parim tulemus</p>
+                        <p className="font-bold text-green-600">{formatAvgRaw(kpElStat.bestRawValue, kpElStat.resultFieldType)}</p>
+                      </div>
+                    )}
+                    {kpElStat.avgRawValue !== null && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Keskmine tulemus</p>
+                        <p className="font-bold text-gray-700">{formatAvgRaw(kpElStat.avgRawValue, kpElStat.resultFieldType)}</p>
+                      </div>
+                    )}
+                    {kpElStat.worstRawValue !== null && (
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5">Halvim tulemus</p>
+                        <p className="font-bold text-orange-500">{formatAvgRaw(kpElStat.worstRawValue, kpElStat.resultFieldType)}</p>
+                      </div>
+                    )}
                     <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Parim tulemus</p>
-                      <p className="font-bold text-green-600">{formatAvgRaw(kpElStat.bestRawValue, kpElStat.resultFieldType)}</p>
+                      <p className="text-xs text-gray-400 mb-0.5" title="Kõik sisestatud kirjed, sh erandid (nt ei läbinud)">Tulemuste arv</p>
+                      <p className="font-bold text-gray-700">{kpElStat.totalCount ?? kpStats.length}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Keskmine tulemus</p>
-                      <p className="font-bold text-gray-700">{formatAvgRaw(kpElStat.avgRawValue, kpElStat.resultFieldType)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Halvim tulemus</p>
-                      <p className="font-bold text-orange-500">{formatAvgRaw(kpElStat.worstRawValue, kpElStat.resultFieldType)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Tulemuste arv</p>
-                      <p className="font-bold text-gray-700">{kpStats.length}</p>
+                      <p className="text-xs text-gray-400 mb-0.5" title="Ainult need, kes sooritasid (erandita)">Sooritused</p>
+                      <p className="font-bold text-gray-700">{kpElStat.performedCount ?? "–"}</p>
                     </div>
                   </div>
                 )}
@@ -484,15 +500,18 @@ export default function AnalysisView({
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Klass</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Võistkond</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Klass</th>
-                          {inputFields.map((f) => (
-                            <th key={f.name} className={`px-4 py-3 text-xs font-medium ${f.isResultField ? "text-blue-600" : "text-gray-500"} text-right`}>
+                          {kpFields.map((f) => (
+                            <th key={f.name} className={`px-4 py-3 text-xs font-medium ${f.isResultField ? "text-blue-600" : f.type === "COMPUTED" ? "text-indigo-500" : "text-gray-500"} text-right`}>
                               {f.label}
                               {f.isResultField && <span className="ml-1 text-blue-400">★</span>}
+                              {!f.isResultField && f.type === "COMPUTED" && <span className="ml-1 text-indigo-400" title="Arvutatud väli">∑</span>}
                             </th>
                           ))}
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Erand</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Karistus</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-500">Positsioon</th>
+                          <th className="px-4 py-3 text-xs font-medium text-gray-500" title="Suhteline koht: parim koht = 100%, viimane = 0%. Valem: (osalejaid − koht) / (osalejaid − 1).">
+                            Positsioon <span className="text-gray-300">ⓘ</span>
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -523,12 +542,12 @@ export default function AnalysisView({
                                   <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{team.class}</span>
                                 )}
                               </td>
-                              {inputFields.map((f) => (
-                                <td key={f.name} className={`px-4 py-3 text-right font-mono text-xs ${f.isResultField ? "font-semibold text-gray-800" : "text-gray-500"}`}>
+                              {kpFields.map((f) => (
+                                <td key={f.name} className={`px-4 py-3 text-right font-mono text-xs ${f.isResultField ? "font-semibold text-gray-800" : f.type === "COMPUTED" ? "text-indigo-600" : "text-gray-500"}`}>
                                   {stat?.exceptionLabel ? (
                                     <span className="text-gray-300">—</span>
                                   ) : (
-                                    formatRawValue(
+                                    stat?.fieldDisplay?.[f.name] ?? formatRawValue(
                                       stat?.rawValues?.[f.name] !== undefined ? (stat.rawValues[f.name] as string | number) : null,
                                       f.type
                                     )
@@ -566,7 +585,7 @@ export default function AnalysisView({
                         })}
                         {kpStats.length === 0 && (
                           <tr>
-                            <td colSpan={6 + inputFields.length} className="px-4 py-8 text-center text-gray-400 text-sm">
+                            <td colSpan={6 + kpFields.length} className="px-4 py-8 text-center text-gray-400 text-sm">
                               Sellel elemendil pole tulemusi sisestatud
                             </td>
                           </tr>

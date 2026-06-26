@@ -2,9 +2,21 @@ import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
 import AnalysisView, { AnalysisTeam, AnalysisElement, TeamElementStat, ElementStat } from "@/components/public/AnalysisView"
-import { parseTimeToSeconds } from "@/lib/calculators"
+import { parseTimeToSeconds, computeFields } from "@/lib/calculators"
 
 export const dynamic = "force-dynamic"
+
+// Vormindab välja väärtuse kuvamiseks (TIME → h:mm:ss, arvud korralikult)
+function fmtFieldValue(v: unknown, type: string): string {
+  if (v === undefined || v === null || v === "") return "–"
+  if (type === "TIME" || type === "TIME_RANGE") {
+    const s = typeof v === "number" ? v : parseTimeToSeconds(String(v))
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60)
+    return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`
+  }
+  const n = parseFloat(String(v))
+  return isNaN(n) ? String(v) : (Number.isInteger(n) ? String(n) : Math.round(n * 100) / 100 + "")
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -26,7 +38,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     prisma.scoringElement.findMany({
       where: { competitionId: id },
       orderBy: { order: "asc" },
-      include: { fields: { orderBy: { order: "asc" } } },
+      include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
     }),
     prisma.computedScore.findMany({ where: { element: { competitionId: id } } }),
     prisma.manualPenalty.findMany({ where: { competitionId: id } }),
@@ -136,15 +148,27 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
         : parseFloat(String(raw))
       if (!isNaN(num)) rawNumbers.push(num)
     }
+    // Tulemusvälja suund (suurem = parem?) — calcMethod params + välja meta
+    let higherIsBetter = false
+    try { higherIsBetter = Boolean(JSON.parse(el.calcMethod?.params ?? "{}").higherIsBetter) } catch {}
+    if (resultField?.meta) {
+      try { const m = JSON.parse(resultField.meta); if (typeof m.higherIsBetter === "boolean") higherIsBetter = m.higherIsBetter } catch {}
+    }
+
     const avgRaw = rawNumbers.length > 0
       ? Math.round((rawNumbers.reduce((a, b) => a + b, 0) / rawNumbers.length) * 100) / 100
       : null
     const bestRaw = rawNumbers.length > 0
-      ? (isPlusMode || resultField?.type === "TIME" ? Math.max(...rawNumbers) : Math.min(...rawNumbers))
+      ? (higherIsBetter ? Math.max(...rawNumbers) : Math.min(...rawNumbers))
       : null
     const worstRaw = rawNumbers.length > 0
-      ? (isPlusMode || resultField?.type === "TIME" ? Math.min(...rawNumbers) : Math.max(...rawNumbers))
+      ? (higherIsBetter ? Math.min(...rawNumbers) : Math.max(...rawNumbers))
       : null
+
+    // Loendurid: kõik kirjed (sh erandid) vs sooritused (erandita)
+    const resultsForEl = results.filter(r => r.elementId === el.id)
+    const totalCount = resultsForEl.length
+    const performedCount = resultsForEl.filter(r => !r.exceptionLabel).length
 
     elementStats.push({
       elementId: el.id,
@@ -152,6 +176,8 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       bestRawValue: bestRaw,
       worstRawValue: worstRaw,
       resultFieldType: resultField?.type ?? null,
+      totalCount,
+      performedCount,
     })
 
     // Per-team stats for this element
@@ -168,6 +194,15 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
         if (v !== undefined && v !== null && v !== "") rawResultValue = v as string | number
       }
 
+      // Vormindatud väärtus iga välja kohta (sh arvutatud väljad)
+      const fieldDisplay: Record<string, string> = {}
+      if (!resultEntry?.exceptionLabel && Object.keys(rawValues).length > 0) {
+        const computedAll = computeFields(rawValues as Record<string, string | number>, el.fields as Parameters<typeof computeFields>[1])
+        for (const f of el.fields) {
+          fieldDisplay[f.name] = fmtFieldValue(computedAll[f.name], f.type)
+        }
+      }
+
       teamElementStats.push({
         teamId: team.id,
         elementId: el.id,
@@ -179,6 +214,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
         exceptionLabel: resultEntry?.exceptionLabel ?? null,
         rawValues: resultEntry?.exceptionLabel ? {} : rawValues,
         rawResultValue,
+        fieldDisplay,
         miscEntries: el.type === "OTHER" ? (miscMap.get(`${el.id}:${team.id}`) ?? []) : undefined,
       })
     }
@@ -207,7 +243,6 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     code: el.code,
     isCancelled: el.isCancelled,
     fields: el.fields
-      .filter((f) => f.type !== "COMPUTED")
       .map((f) => ({ name: f.name, label: f.label, type: f.type, isResultField: f.isResultField })),
   }))
 
