@@ -61,7 +61,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
     if (!el || !el.revealPointsToAthletes) return null
     const score = scoreByElement.get(elementId)
     if (score === undefined) return null
-    return formatAthletePoints(score, el.maxValue ?? defaultMax, pointsMode, pointsRanges)
+    return formatAthletePoints(score, el.maxValue ?? defaultMax, pointsMode, pointsRanges, scoringMode)
   }
 
   // Kogusumma + koht (kui lubatud)
@@ -88,7 +88,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
     const classIdx = classRanked.findIndex(r => r.id === team.id)
     const sumMax = elements.filter(e => !e.isCancelled).reduce((s, e) => s + (e.maxValue ?? defaultMax), 0)
     totalBlock = {
-      totalLabel: formatAthletePoints(myTotal, sumMax, pointsMode, pointsRanges) ?? `${myTotal}p`,
+      totalLabel: formatAthletePoints(myTotal, sumMax, pointsMode, pointsRanges, scoringMode) ?? `${myTotal}p`,
       rank: rankIdx >= 0 ? rankIdx + 1 : null,
       totalTeams: ranked.length,
       classRank: classIdx >= 0 ? classIdx + 1 : null,
@@ -219,7 +219,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
                       <span className="font-semibold text-gray-900">{el.name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {(() => { const pl = pointsLabel(el.id); return pl ? <span className="text-sm font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{pl}</span> : null })()}
+                      {!result.exceptionLabel && (() => { const pl = pointsLabel(el.id); return pl ? <span className="text-sm font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{pl}</span> : null })()}
                       {result.exceptionLabel && (
                         <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
                           {result.exceptionLabel}
