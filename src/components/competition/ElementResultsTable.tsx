@@ -172,7 +172,7 @@ export function ElementResultsTable({ element, teams }: Props) {
             ? (rank !== null ? rank : <span className="text-amber-600 font-medium text-xs">AV</span>)
             : "–"}
         </td>
-        <td className={`sticky left-10 z-10 ${stickyBg} border-r px-4 py-2.5 min-w-[160px]`}>
+        <td className={`sticky left-10 z-10 ${stickyBg} border-r px-4 py-2.5 min-w-40`}>
           <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
           <span className={`font-medium ${isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
           {isHC && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">AV</span>}
@@ -343,7 +343,7 @@ export function ElementResultsTable({ element, teams }: Props) {
           <thead>
             <tr className="bg-gray-50 text-left">
               <th className="sticky left-0 z-20 bg-gray-50 w-10 px-2 py-2.5 text-xs font-medium text-gray-500 text-center">#</th>
-              <th className="sticky left-10 z-20 bg-gray-50 border-r px-4 py-2.5 text-xs font-medium text-gray-500 min-w-[160px]">Võistkond</th>
+              <th className="sticky left-10 z-20 bg-gray-50 border-r px-4 py-2.5 text-xs font-medium text-gray-500 min-w-40">Võistkond</th>
               {isDirectEntry ? (
                 <th className="px-4 py-2.5 text-xs font-medium text-gray-500" colSpan={inputFields.length + computedFields.length}>Kokku punktid</th>
               ) : (

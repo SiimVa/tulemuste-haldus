@@ -155,7 +155,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                 <tr className="bg-gray-50 text-left border-b">
                   <th className="sticky left-0 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Üld</th>
                   <th className="sticky left-12 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Klass</th>
-                  <th className="sticky left-24 z-20 bg-gray-50 border-r px-4 py-3 text-xs font-medium text-gray-500 min-w-[160px]">Võistkond</th>
+                  <th className="sticky left-24 z-20 bg-gray-50 border-r px-4 py-3 text-xs font-medium text-gray-500 min-w-40">Võistkond</th>
                   <th className="px-4 py-3 text-xs font-medium text-gray-500">Klass</th>
                   {elements.map((el) => (
                     <th key={el.id} className="px-3 py-3 text-xs font-medium text-right">
@@ -175,7 +175,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                   <tr key={row.team.id} className="hover:bg-gray-50">
                     <td className="sticky left-0 z-10 bg-white w-12 px-2 py-3 font-bold text-gray-900 text-center">{row.rank}</td>
                     <td className="sticky left-12 z-10 bg-white w-12 px-2 py-3 text-gray-400 text-xs text-center">{row.classRank}</td>
-                    <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-[160px]">
+                    <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-40">
                       <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                       <span className="font-medium text-gray-900">{row.team.name}</span>
                       {row.team.dqFromElementOrder != null && (
@@ -223,7 +223,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                       <tr key={row.team.id} className="hover:bg-gray-50 bg-amber-50/40">
                         <td className="sticky left-0 z-10 bg-amber-50 w-12 px-2 py-3 text-xs text-amber-600 font-medium text-center">AV</td>
                         <td className="sticky left-12 z-10 bg-amber-50 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
-                        <td className="sticky left-24 z-10 bg-amber-50 border-r px-4 py-3 min-w-[160px]">
+                        <td className="sticky left-24 z-10 bg-amber-50 border-r px-4 py-3 min-w-40">
                           <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                           <span className="font-medium text-amber-700">{row.team.name}</span>
                           {row.team.dqFromElementOrder != null && (

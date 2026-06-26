@@ -504,7 +504,7 @@ export default function AnalysisView({
                           const isMe = team.id === selectedTeamId
 
                           return (
-                            <tr key={team.id} className={`${isMe ? "bg-blue-50 outline outline-2 outline-blue-200 outline-offset-[-2px]" : isTop ? "bg-green-50/40 hover:bg-green-50" : isBottom ? "bg-red-50/30 hover:bg-red-50/50" : isHC ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-gray-50"}`}>
+                            <tr key={team.id} className={`${isMe ? "bg-blue-50 outline-2 outline-blue-200 -outline-offset-2" : isTop ? "bg-green-50/40 hover:bg-green-50" : isBottom ? "bg-red-50/30 hover:bg-red-50/50" : isHC ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-gray-50"}`}>
                               <td className="px-4 py-3 font-bold text-gray-700">
                                 {isHC ? <span className="text-amber-600 font-medium text-xs">AV</span> : (stat?.rank ?? idx + 1)}
                               </td>
