@@ -201,16 +201,16 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
       </p>
 
       <div className="bg-white border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[75vh]">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="sticky left-0 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Üld</th>
-                <th className="sticky left-12 z-20 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Klass</th>
-                <th className="sticky left-24 z-20 bg-gray-50 border-r px-4 py-3 text-xs font-medium text-gray-500 min-w-40">Võistkond</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">Klass</th>
+                <th className="sticky left-0 top-0 z-30 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Üld</th>
+                <th className="sticky left-12 top-0 z-30 bg-gray-50 w-12 px-2 py-3 text-xs font-medium text-gray-500 text-center">Klass</th>
+                <th className="sticky left-24 top-0 z-30 bg-gray-50 border-r px-4 py-3 text-xs font-medium text-gray-500 min-w-40">Võistkond</th>
+                <th className="sticky top-0 z-20 bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500">Klass</th>
                 {elements.map((el) => (
-                  <th key={el.id} className="px-3 py-3 text-xs font-medium text-right">
+                  <th key={el.id} className="sticky top-0 z-20 bg-gray-50 px-3 py-3 text-xs font-medium text-right">
                     {el.isCancelled ? (
                       <span className="line-through text-gray-300" title="Tühistatud">{el.code}</span>
                     ) : (
@@ -218,8 +218,8 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
                     )}
                   </th>
                 ))}
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Lisaär.</th>
-                <th className="sticky right-0 z-20 bg-gray-50 border-l px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
+                <th className="sticky top-0 z-20 bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500 text-right">Lisaär.</th>
+                <th className="sticky right-0 top-0 z-30 bg-gray-50 border-l px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
               </tr>
             </thead>
             <tbody className="divide-y">
