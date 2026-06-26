@@ -36,6 +36,7 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
     { href: `/dashboard/competitions/${id}/elements/new`, label: "+ Element" },
     { href: `/dashboard/competitions/${id}/teams`, label: "Võistkonnad" },
     { href: `/dashboard/competitions/${id}/access`, label: "Juurdepääs" },
+    { href: `/dashboard/competitions/${id}/athlete-view`, label: "Sportlaste vaade" },
     { href: `/dashboard/competitions/${id}/leaderboard`, label: "Pingerida" },
     { href: `/dashboard/competitions/${id}/overview`, label: "Statistika" },
     { href: `/dashboard/competitions/${id}/settings`, label: "Seaded" },
