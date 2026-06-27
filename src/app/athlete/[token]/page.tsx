@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { formatAthletePoints, parseRanges, type AthletePointsMode } from "@/lib/athletePoints"
+import { AthleteResultCards, type ResultCard } from "@/components/athlete/AthleteResultCards"
 
 export const dynamic = "force-dynamic"
 
@@ -33,7 +34,11 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
       where: { teamId: team.id },
       include: {
         element: {
-          select: { id: true, name: true, code: true, order: true, type: true, fields: { orderBy: { order: "asc" } } },
+          select: {
+            id: true, name: true, code: true, order: true, type: true,
+            fields: { orderBy: { order: "asc" } },
+            calcMethod: { select: { type: true, params: true, customFormula: true } },
+          },
         },
       },
     }),
@@ -52,17 +57,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
     prisma.computedScore.findMany({ where: { teamId: team.id }, select: { elementId: true, penaltyPoints: true } }),
   ])
 
-  // Elemendi punktide kuvamine (kui lubatud)
   const scoreByElement = new Map(myScores.map(s => [s.elementId, s.penaltyPoints]))
-  const elementById = new Map(elements.map(el => [el.id, el]))
-  function pointsLabel(elementId: string): string | null {
-    if (pointsMode === "HIDDEN") return null
-    const el = elementById.get(elementId)
-    if (!el || el.isCancelled || !el.revealPointsToAthletes) return null
-    const score = scoreByElement.get(elementId)
-    if (score === undefined) return null
-    return formatAthletePoints(score, el.maxValue ?? defaultMax, pointsMode, pointsRanges, scoringMode)
-  }
 
   // Kogusumma + koht (kui lubatud)
   let totalBlock: { totalLabel: string; rank: number | null; totalTeams: number; classRank: number | null; classTotal: number } | null = null
@@ -116,6 +111,39 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
     .filter(el => activeElementIds.has(el.id))
     .sort((a, b) => a.order - b.order)
 
+  // Ehita kaardid kliendikomponendile (simulaatoriga)
+  const cards: ResultCard[] = activeElements.flatMap((el): ResultCard[] => {
+    if (el.type === "OTHER" || el.type === "ABANDONMENT") {
+      return [{
+        id: el.id, code: el.code, name: el.name, type: el.type,
+        isCancelled: el.isCancelled, maxValue: el.maxValue ?? defaultMax, revealPointsToAthletes: el.revealPointsToAthletes,
+        exceptionLabel: null, realScore: scoreByElement.get(el.id) ?? null,
+        fields: [], inputFields: [], values: {}, calcType: null, customFormula: null, calcParams: {},
+        misc: (miscByElement.get(el.id) ?? []).map(e => ({ id: e.id, description: e.description, points: e.points })),
+      }]
+    }
+    const result = resultMap.get(el.id)
+    if (!result) return []
+    let values: Record<string, string> = {}
+    try { values = JSON.parse(result.values) } catch {}
+    const cm = result.element.calcMethod
+    let calcParams: Record<string, unknown> = {}
+    try { calcParams = JSON.parse(cm?.params ?? "{}") } catch {}
+    return [{
+      id: el.id, code: el.code, name: el.name, type: el.type,
+      isCancelled: el.isCancelled, maxValue: el.maxValue ?? defaultMax, revealPointsToAthletes: el.revealPointsToAthletes,
+      exceptionLabel: result.exceptionLabel ?? null,
+      realScore: scoreByElement.get(el.id) ?? null,
+      fields: result.element.fields.map(f => ({ name: f.name, type: f.type, isResultField: f.isResultField, rankingPriority: f.rankingPriority, formula: f.formula, order: f.order })),
+      inputFields: result.element.fields.filter(f => f.type !== "COMPUTED").map(f => ({ name: f.name, label: f.label, type: f.type })),
+      values,
+      calcType: cm?.type ?? null,
+      customFormula: cm?.customFormula ?? null,
+      calcParams,
+      misc: [],
+    }]
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
@@ -157,104 +185,19 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
           </div>
         )}
 
-        {activeElements.length === 0 ? (
+        {cards.length === 0 ? (
           <div className="text-center py-10 text-gray-400 bg-white border rounded-xl">
             <p className="text-2xl mb-2">📋</p>
             <p>Tulemusi pole veel sisestatud</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {activeElements.map(el => {
-              const result = resultMap.get(el.id)
-              const miscList = miscByElement.get(el.id) ?? []
-
-              // Muu / Katkestamine element — kuva MiscEntry kirjed
-              if (el.type === "OTHER" || el.type === "ABANDONMENT") {
-                const total = miscList.reduce((s, e) => s + e.points, 0)
-                const isAbandon = el.type === "ABANDONMENT"
-                const revealMisc = pointsMode !== "HIDDEN" && el.revealPointsToAthletes && !el.isCancelled
-                return (
-                  <div key={el.id} className={`bg-white border rounded-xl p-4 ${el.isCancelled ? "opacity-60" : ""}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <span className="font-mono text-xs text-gray-400 mr-1">[{el.code}]</span>
-                        <span className={`font-semibold ${el.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>{el.name}</span>
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${isAbandon ? "bg-rose-100 text-rose-700" : "bg-teal-100 text-teal-700"}`}>{isAbandon ? "Katkestamine" : "Muu"}</span>
-                        {el.isCancelled && <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">Tühistatud</span>}
-                      </div>
-                      {revealMisc && (
-                        <span className={`text-sm font-mono font-semibold ${total >= 0 ? "text-green-700" : "text-red-700"}`}>
-                          {total >= 0 ? "+" : ""}{total}p
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      {miscList.map(entry => (
-                        <div key={entry.id} className="flex items-center justify-between text-sm py-1 border-t first:border-t-0">
-                          <span className="text-gray-600">{entry.description}</span>
-                          {revealMisc && (
-                            <span className={`font-mono font-medium ${entry.points >= 0 ? "text-green-600" : "text-red-600"}`}>
-                              {entry.points >= 0 ? "+" : ""}{entry.points}p
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              }
-
-              // Tavaline element — kuva Result väljad
-              if (!result) return null
-              let values: Record<string, string> = {}
-              try { values = JSON.parse(result.values) } catch {}
-
-              const resultEl = result.element
-              const inputFields = resultEl.fields.filter(f => f.type !== "COMPUTED")
-
-              return (
-                <div key={el.id} className={`bg-white border rounded-xl p-4 ${el.isCancelled ? "opacity-60" : ""}`}>
-                  <div className="flex items-center justify-between mb-3 gap-2">
-                    <div>
-                      <span className="font-mono text-xs text-gray-400 mr-1">[{el.code}]</span>
-                      <span className={`font-semibold ${el.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>{el.name}</span>
-                      {el.isCancelled && <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">Tühistatud</span>}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!result.exceptionLabel && (() => { const pl = pointsLabel(el.id); return pl ? <span className="text-sm font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{pl}</span> : null })()}
-                      {result.exceptionLabel && (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
-                          {result.exceptionLabel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {!result.exceptionLabel && inputFields.map(field => {
-                    let display = "–"
-                    if (field.type === "TIME_RANGE") {
-                      const toSec = (v: string) => { const p = String(v).trim().split(":"); return p.length === 3 ? +p[0]*3600 + +p[1]*60 + +p[2] : p.length === 2 ? +p[0]*60 + +p[1] : 0 }
-                      const st = toSec(values[field.name + "_start"] ?? "")
-                      const en = toSec(values[field.name + "_end"] ?? "")
-                      if (values[field.name + "_start"] && values[field.name + "_end"]) {
-                        const dur = en >= st ? en - st : en + 86400 - st
-                        const h = Math.floor(dur/3600), m = Math.floor((dur%3600)/60), s = dur%60
-                        display = `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
-                      }
-                    } else {
-                      display = values[field.name] ?? "–"
-                    }
-                    return (
-                      <div key={field.id} className="flex items-center justify-between text-sm py-1 border-t first:border-t-0">
-                        <span className="text-gray-500">{field.label}</span>
-                        <span className="font-mono font-medium text-gray-900">{display}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
+          <AthleteResultCards
+            cards={cards}
+            scoringMode={scoringMode}
+            pointsMode={pointsMode}
+            pointsRanges={pointsRanges}
+            defaultMax={defaultMax}
+          />
         )}
       </main>
     </div>
