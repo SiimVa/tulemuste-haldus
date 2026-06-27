@@ -58,7 +58,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
   function pointsLabel(elementId: string): string | null {
     if (pointsMode === "HIDDEN") return null
     const el = elementById.get(elementId)
-    if (!el || !el.revealPointsToAthletes) return null
+    if (!el || el.isCancelled || !el.revealPointsToAthletes) return null
     const score = scoreByElement.get(elementId)
     if (score === undefined) return null
     return formatAthletePoints(score, el.maxValue ?? defaultMax, pointsMode, pointsRanges, scoringMode)
@@ -172,14 +172,15 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
               if (el.type === "OTHER" || el.type === "ABANDONMENT") {
                 const total = miscList.reduce((s, e) => s + e.points, 0)
                 const isAbandon = el.type === "ABANDONMENT"
-                const revealMisc = pointsMode !== "HIDDEN" && el.revealPointsToAthletes
+                const revealMisc = pointsMode !== "HIDDEN" && el.revealPointsToAthletes && !el.isCancelled
                 return (
-                  <div key={el.id} className="bg-white border rounded-xl p-4">
+                  <div key={el.id} className={`bg-white border rounded-xl p-4 ${el.isCancelled ? "opacity-60" : ""}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <span className="font-mono text-xs text-gray-400 mr-1">[{el.code}]</span>
-                        <span className="font-semibold text-gray-900">{el.name}</span>
+                        <span className={`font-semibold ${el.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>{el.name}</span>
                         <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${isAbandon ? "bg-rose-100 text-rose-700" : "bg-teal-100 text-teal-700"}`}>{isAbandon ? "Katkestamine" : "Muu"}</span>
+                        {el.isCancelled && <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">Tühistatud</span>}
                       </div>
                       {revealMisc && (
                         <span className={`text-sm font-mono font-semibold ${total >= 0 ? "text-green-700" : "text-red-700"}`}>
@@ -212,11 +213,12 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
               const inputFields = resultEl.fields.filter(f => f.type !== "COMPUTED")
 
               return (
-                <div key={el.id} className="bg-white border rounded-xl p-4">
+                <div key={el.id} className={`bg-white border rounded-xl p-4 ${el.isCancelled ? "opacity-60" : ""}`}>
                   <div className="flex items-center justify-between mb-3 gap-2">
                     <div>
                       <span className="font-mono text-xs text-gray-400 mr-1">[{el.code}]</span>
-                      <span className="font-semibold text-gray-900">{el.name}</span>
+                      <span className={`font-semibold ${el.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>{el.name}</span>
+                      {el.isCancelled && <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-medium">Tühistatud</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {!result.exceptionLabel && (() => { const pl = pointsLabel(el.id); return pl ? <span className="text-sm font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{pl}</span> : null })()}
