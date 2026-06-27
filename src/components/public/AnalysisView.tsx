@@ -47,6 +47,8 @@ export type TeamElementStat = {
   fieldDisplay?: Record<string, string>  // vormindatud väärtus iga välja kohta (sh arvutatud)
 }
 
+export type FieldStat = { name: string; label: string; type: string; best: number | null; avg: number | null; worst: number | null }
+
 export type ElementStat = {
   elementId: string
   avgRawValue: number | null
@@ -55,6 +57,7 @@ export type ElementStat = {
   resultFieldType: string | null
   totalCount?: number       // kõik kirjed (sh erandid)
   performedCount?: number   // ainult sooritused (erandita, väärtusega)
+  fieldStats?: FieldStat[]  // parim/keskmine/halvim iga välja kohta (tulemusväli + viigilahendajad)
 }
 
 interface Props {
@@ -321,9 +324,9 @@ export default function AnalysisView({
                   <div className="px-5 py-4 border-b">
                     <h3 className="font-semibold text-gray-900">KP kaupa</h3>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-auto max-h-[70vh]">
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 z-10 bg-gray-50">
                         <tr className="bg-gray-50 text-left border-b">
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Element</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Tulemus</th>
@@ -447,33 +450,43 @@ export default function AnalysisView({
               <>
                 {/* Element stats bar */}
                 {kpElStat && (
-                  <div className="bg-white border rounded-xl p-4 mb-5 flex flex-wrap gap-6">
-                    {kpElStat.bestRawValue !== null && (
+                  <div className="bg-white border rounded-xl p-4 mb-5 space-y-4">
+                    {/* Loendurid */}
+                    <div className="flex flex-wrap gap-6">
                       <div>
-                        <p className="text-xs text-gray-400 mb-0.5">Parim tulemus</p>
-                        <p className="font-bold text-green-600">{formatAvgRaw(kpElStat.bestRawValue, kpElStat.resultFieldType)}</p>
+                        <p className="text-xs text-gray-400 mb-0.5" title="Kõik sisestatud kirjed, sh erandid (nt ei läbinud)">Tulemuste arv</p>
+                        <p className="font-bold text-gray-700">{kpElStat.totalCount ?? kpStats.length}</p>
                       </div>
-                    )}
-                    {kpElStat.avgRawValue !== null && (
                       <div>
-                        <p className="text-xs text-gray-400 mb-0.5">Keskmine tulemus</p>
-                        <p className="font-bold text-gray-700">{formatAvgRaw(kpElStat.avgRawValue, kpElStat.resultFieldType)}</p>
+                        <p className="text-xs text-gray-400 mb-0.5" title="Ainult need, kes sooritasid (erandita)">Sooritused</p>
+                        <p className="font-bold text-gray-700">{kpElStat.performedCount ?? "–"}</p>
                       </div>
-                    )}
-                    {kpElStat.worstRawValue !== null && (
-                      <div>
-                        <p className="text-xs text-gray-400 mb-0.5">Halvim tulemus</p>
-                        <p className="font-bold text-orange-500">{formatAvgRaw(kpElStat.worstRawValue, kpElStat.resultFieldType)}</p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5" title="Kõik sisestatud kirjed, sh erandid (nt ei läbinud)">Tulemuste arv</p>
-                      <p className="font-bold text-gray-700">{kpElStat.totalCount ?? kpStats.length}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5" title="Ainult need, kes sooritasid (erandita)">Sooritused</p>
-                      <p className="font-bold text-gray-700">{kpElStat.performedCount ?? "–"}</p>
-                    </div>
+                    {/* Parim / keskmine / halvim iga välja kohta */}
+                    {kpElStat.fieldStats && kpElStat.fieldStats.some(fs => fs.best !== null) && (
+                      <div className="overflow-x-auto border-t pt-3">
+                        <table className="text-sm">
+                          <thead className="sticky top-0 z-10 bg-gray-50">
+                            <tr className="text-gray-400">
+                              <th className="text-left font-medium pr-6 pb-1 text-xs">Väli</th>
+                              <th className="text-right font-medium px-4 pb-1 text-xs">Parim</th>
+                              <th className="text-right font-medium px-4 pb-1 text-xs">Keskmine</th>
+                              <th className="text-right font-medium px-4 pb-1 text-xs">Halvim</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {kpElStat.fieldStats.filter(fs => fs.best !== null).map(fs => (
+                              <tr key={fs.name}>
+                                <td className="text-left text-gray-700 pr-6 py-0.5">{fs.label}</td>
+                                <td className="text-right font-bold text-green-600 font-mono px-4 py-0.5">{formatAvgRaw(fs.best, fs.type)}</td>
+                                <td className="text-right font-bold text-gray-700 font-mono px-4 py-0.5">{formatAvgRaw(fs.avg, fs.type)}</td>
+                                <td className="text-right font-bold text-orange-500 font-mono px-4 py-0.5">{formatAvgRaw(fs.worst, fs.type)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -488,9 +501,9 @@ export default function AnalysisView({
                       <span className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">TÜHISTATUD — kõik tulemused 0p</span>
                     )}
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-auto max-h-[70vh]">
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 z-10 bg-gray-50">
                         <tr className="bg-gray-50 text-left border-b">
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Koht</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 w-10">Klass</th>

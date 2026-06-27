@@ -146,47 +146,46 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       }
     }
 
-    // Raw value averages (result field only)
-    const rawNumbers: number[] = []
-    for (const r of results.filter(r => r.elementId === el.id && !r.exceptionLabel)) {
-      if (!resultField) continue
-      let vals: Record<string, unknown> = {}
+    // Per-välja statistika (tulemusväli + viigilahendajad), kasutab ARVUTATUD väärtusi → COMPUTED töötab
+    const calcHigher = (() => { try { return Boolean(JSON.parse(el.calcMethod?.params ?? "{}").higherIsBetter) } catch { return false } })()
+    const fieldsForStats = el.fields
+      .filter(f => f.isResultField || f.rankingPriority != null)
+      .sort((a, b) => (a.isResultField ? 0 : (a.rankingPriority ?? 99)) - (b.isResultField ? 0 : (b.rankingPriority ?? 99)))
+    const nonExc = results.filter(r => r.elementId === el.id && !r.exceptionLabel)
+    const computedByResult = nonExc.map(r => {
+      let vals: Record<string, string | number> = {}
       try { vals = JSON.parse(r.values ?? "{}") } catch {}
-      const raw = vals[resultField.name]
-      if (raw === undefined || raw === null || raw === "") continue
-      const num = resultField.type === "TIME"
-        ? parseTimeToSeconds(String(raw))
-        : parseFloat(String(raw))
-      if (!isNaN(num)) rawNumbers.push(num)
-    }
-    // Tulemusvälja suund (suurem = parem?) — calcMethod params + välja meta
-    let higherIsBetter = false
-    try { higherIsBetter = Boolean(JSON.parse(el.calcMethod?.params ?? "{}").higherIsBetter) } catch {}
-    if (resultField?.meta) {
-      try { const m = JSON.parse(resultField.meta); if (typeof m.higherIsBetter === "boolean") higherIsBetter = m.higherIsBetter } catch {}
-    }
-
-    const avgRaw = rawNumbers.length > 0
-      ? Math.round((rawNumbers.reduce((a, b) => a + b, 0) / rawNumbers.length) * 100) / 100
-      : null
-    const bestRaw = rawNumbers.length > 0
-      ? (higherIsBetter ? Math.max(...rawNumbers) : Math.min(...rawNumbers))
-      : null
-    const worstRaw = rawNumbers.length > 0
-      ? (higherIsBetter ? Math.min(...rawNumbers) : Math.max(...rawNumbers))
-      : null
+      return computeFields(vals, el.fields as Parameters<typeof computeFields>[1])
+    })
+    const fieldStats = fieldsForStats.map(f => {
+      let fHigher = calcHigher
+      try { if (f.meta) { const m = JSON.parse(f.meta); if (typeof m.higherIsBetter === "boolean") fHigher = m.higherIsBetter } } catch {}
+      const nums = computedByResult
+        .map(c => c[f.name])
+        .filter(v => v !== undefined && v !== null && !isNaN(Number(v)))
+        .map(Number)
+      if (nums.length === 0) return { name: f.name, label: f.label, type: f.type, best: null, avg: null, worst: null }
+      return {
+        name: f.name, label: f.label, type: f.type,
+        best: fHigher ? Math.max(...nums) : Math.min(...nums),
+        avg: Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 100) / 100,
+        worst: fHigher ? Math.min(...nums) : Math.max(...nums),
+      }
+    })
+    const resultStat = fieldStats.find(fs => el.fields.find(ff => ff.name === fs.name)?.isResultField) ?? fieldStats[0] ?? null
 
     // Loendurid: kõik kirjed (sh erandid) vs sooritused (erandita)
     const resultsForEl = results.filter(r => r.elementId === el.id)
     const totalCount = resultsForEl.length
-    const performedCount = resultsForEl.filter(r => !r.exceptionLabel).length
+    const performedCount = nonExc.length
 
     elementStats.push({
       elementId: el.id,
-      avgRawValue: avgRaw,
-      bestRawValue: bestRaw,
-      worstRawValue: worstRaw,
+      avgRawValue: resultStat?.avg ?? null,
+      bestRawValue: resultStat?.best ?? null,
+      worstRawValue: resultStat?.worst ?? null,
       resultFieldType: resultField?.type ?? null,
+      fieldStats,
       totalCount,
       performedCount,
     })
