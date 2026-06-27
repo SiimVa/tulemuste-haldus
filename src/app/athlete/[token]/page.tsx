@@ -197,6 +197,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
             pointsMode={pointsMode}
             pointsRanges={pointsRanges}
             defaultMax={defaultMax}
+            allowSimulate={false}
           />
         )}
       </main>

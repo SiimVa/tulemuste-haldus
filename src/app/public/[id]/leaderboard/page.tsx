@@ -109,43 +109,76 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
           </div>
         </div>
 
-        {/* Mobiilivaade: kompaktsed kaardid (koht + võistkond + kokku) */}
+        {/* Mobiilivaade: kompaktsed kaardid (vajuta → elementide punktid) */}
         <div className="md:hidden space-y-2">
+          <p className="text-xs text-gray-400 px-1">Vajuta võistkonnale, et näha elementide punkte</p>
           {inCompRows.map((row) => (
-            <div key={row.team.id} data-lb-team={row.team.id} className="bg-white border rounded-xl shadow-sm px-3 py-2.5 flex items-center gap-3">
-              <span className="text-lg font-bold text-gray-900 w-7 text-center shrink-0">{row.rank}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
-                  <span className="font-medium text-gray-900 truncate">{row.team.name}</span>
+            <details key={row.team.id} data-lb-team={row.team.id} className="group bg-white border rounded-xl shadow-sm">
+              <summary className="px-3 py-2.5 flex items-center gap-3 cursor-pointer list-none">
+                <span className="text-lg font-bold text-gray-900 w-7 text-center shrink-0">{row.rank}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                    <span className="font-medium text-gray-900 truncate">{row.team.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class} · {row.classRank}.</span>
+                    {row.manualTotal > 0 && (
+                      <span className="text-xs font-mono text-orange-600">Lisaär. {isPlusMode ? "-" : "+"}{row.manualTotal.toFixed(1)}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class} · {row.classRank}.</span>
-                  {row.manualTotal > 0 && (
-                    <span className="text-xs font-mono text-orange-600">
-                      Lisaär. {isPlusMode ? "-" : "+"}{row.manualTotal.toFixed(1)}
+                <span className="font-bold text-gray-900 font-mono text-base shrink-0">{row.total.toFixed(2)}</span>
+                <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
+              </summary>
+              <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                {elements.map((el) => (
+                  <div key={el.id} className="flex items-center justify-between text-xs gap-2">
+                    <span className="text-gray-500 truncate">
+                      <span className="font-mono text-gray-400 mr-1">{el.code}</span>
+                      <span className={el.isCancelled ? "line-through text-gray-300" : ""}>{el.name}</span>
                     </span>
-                  )}
-                </div>
+                    <span className="font-mono text-gray-700 shrink-0">{row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"}</span>
+                  </div>
+                ))}
+                {row.manualTotal > 0 && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Lisaär.</span>
+                    <span className="font-mono text-orange-600">{isPlusMode ? "-" : "+"}{row.manualTotal.toFixed(1)}</span>
+                  </div>
+                )}
               </div>
-              <span className="font-bold text-gray-900 font-mono text-base shrink-0">{row.total.toFixed(2)}</span>
-            </div>
+            </details>
           ))}
           {horsCompRows.length > 0 && (
             <>
               <p className="px-1 pt-2 text-xs font-semibold text-amber-700 tracking-wide uppercase">Arvestusvälised</p>
               {horsCompRows.map((row) => (
-                <div key={row.team.id} data-lb-team={row.team.id} className="bg-amber-50/60 border rounded-xl shadow-sm px-3 py-2.5 flex items-center gap-3">
-                  <span className="text-xs text-amber-600 font-medium w-7 text-center shrink-0">AV</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
-                      <span className="font-medium text-amber-700 truncate">{row.team.name}</span>
+                <details key={row.team.id} data-lb-team={row.team.id} className="group bg-amber-50/60 border rounded-xl shadow-sm">
+                  <summary className="px-3 py-2.5 flex items-center gap-3 cursor-pointer list-none">
+                    <span className="text-xs text-amber-600 font-medium w-7 text-center shrink-0">AV</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                        <span className="font-medium text-amber-700 truncate">{row.team.name}</span>
+                      </div>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-0.5 inline-block">{row.class}</span>
                     </div>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-0.5 inline-block">{row.class}</span>
+                    <span className="font-bold text-amber-700 font-mono text-base shrink-0">{row.total.toFixed(2)}</span>
+                    <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
+                  </summary>
+                  <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                    {elements.map((el) => (
+                      <div key={el.id} className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-gray-500 truncate">
+                          <span className="font-mono text-gray-400 mr-1">{el.code}</span>
+                          <span className={el.isCancelled ? "line-through text-gray-300" : ""}>{el.name}</span>
+                        </span>
+                        <span className="font-mono text-gray-700 shrink-0">{row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"}</span>
+                      </div>
+                    ))}
                   </div>
-                  <span className="font-bold text-amber-700 font-mono text-base shrink-0">{row.total.toFixed(2)}</span>
-                </div>
+                </details>
               ))}
             </>
           )}

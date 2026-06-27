@@ -34,6 +34,8 @@ type Props = {
   pointsMode: AthletePointsMode
   pointsRanges: RangeBucket[]
   defaultMax: number
+  allowSimulate?: boolean   // kas näidata "Simuleeri" lülitit (vaikimisi true)
+  forceReveal?: boolean     // ignoreeri nähtavusseadeid (nt avalikus analüüsis on kõik niikuinii nähtav)
 }
 
 function durationDisplay(values: Record<string, string>, name: string): string {
@@ -45,9 +47,10 @@ function durationDisplay(values: Record<string, string>, name: string): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
-export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRanges, defaultMax }: Props) {
-  const [simulate, setSimulate] = useState(false)
+export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRanges, defaultMax, allowSimulate = true, forceReveal = false }: Props) {
+  const [simulateOn, setSimulateOn] = useState(false)
   const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>({})
+  const simulate = allowSimulate && simulateOn
 
   function setVal(elId: string, field: string, value: string) {
     setOverrides((prev) => ({ ...prev, [elId]: { ...(prev[elId] ?? {}), [field]: value } }))
@@ -59,18 +62,20 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
   return (
     <>
       {/* Simuleeri lüliti */}
-      <div className="bg-white border rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-gray-900">Simulaator</p>
-          <p className="text-xs text-gray-500">Muuda oma tulemusi ja vaata, kuidas punktid muutuksid</p>
+      {allowSimulate && (
+        <div className="bg-white border rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Simulaator</p>
+            <p className="text-xs text-gray-500">Muuda tulemusi ja vaata, kuidas punktid muutuksid</p>
+          </div>
+          <button
+            onClick={() => setSimulateOn((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${simulate ? "bg-purple-600 text-white hover:bg-purple-700" : "border text-gray-600 hover:bg-gray-50"}`}
+          >
+            {simulate ? "Simulatsioon sees" : "Simuleeri"}
+          </button>
         </div>
-        <button
-          onClick={() => setSimulate((v) => !v)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${simulate ? "bg-purple-600 text-white hover:bg-purple-700" : "border text-gray-600 hover:bg-gray-50"}`}
-        >
-          {simulate ? "Simulatsioon sees" : "Simuleeri"}
-        </button>
-      </div>
+      )}
 
       {simulate && (
         <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
@@ -87,7 +92,7 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
           if (card.type === "OTHER" || card.type === "ABANDONMENT") {
             const total = card.misc.reduce((s, e) => s + e.points, 0)
             const isAbandon = card.type === "ABANDONMENT"
-            const revealMisc = pointsMode !== "HIDDEN" && card.revealPointsToAthletes && !card.isCancelled
+            const revealMisc = (forceReveal || (pointsMode !== "HIDDEN" && card.revealPointsToAthletes)) && !card.isCancelled
             return (
               <div key={card.id} className={`bg-white border rounded-xl p-4 ${card.isCancelled ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between mb-3">
@@ -121,7 +126,7 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
 
           // Tavaline element
           const cur = { ...card.values, ...(overrides[card.id] ?? {}) }
-          const revealed = pointsMode !== "HIDDEN" && card.revealPointsToAthletes && !card.isCancelled
+          const revealed = (forceReveal || (pointsMode !== "HIDDEN" && card.revealPointsToAthletes)) && !card.isCancelled
           const simScore = (!card.exceptionLabel && !card.isCancelled)
             ? simulateElementScore({
                 calcType: card.calcType, customFormula: card.customFormula, calcParams: card.calcParams,

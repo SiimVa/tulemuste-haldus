@@ -257,6 +257,20 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       .map((f) => ({ name: f.name, label: f.label, type: f.type, isResultField: f.isResultField })),
   }))
 
+  // Simulaatori jaoks: elementide arvutuskonfiguratsioon (väljad + calcMethod)
+  const defaultMax = competition.defaultKPMaxValue
+  const simElements = elements.map((el) => {
+    let calcParams: Record<string, unknown> = {}
+    try { calcParams = JSON.parse(el.calcMethod?.params ?? "{}") } catch {}
+    return {
+      id: el.id, code: el.code, name: el.name, type: el.type,
+      isCancelled: el.isCancelled, maxValue: el.maxValue ?? defaultMax, revealPointsToAthletes: el.revealPointsToAthletes ?? false,
+      calcType: el.calcMethod?.type ?? null, customFormula: el.calcMethod?.customFormula ?? null, calcParams,
+      fields: el.fields.map((f) => ({ name: f.name, type: f.type, isResultField: f.isResultField, rankingPriority: f.rankingPriority, formula: f.formula, order: f.order })),
+      inputFields: el.fields.filter((f) => f.type !== "COMPUTED").map((f) => ({ name: f.name, label: f.label, type: f.type })),
+    }
+  })
+
   return (
     <AnalysisView
       competitionId={id}
@@ -266,6 +280,8 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       elements={analysisElements}
       teamElementStats={teamElementStats}
       elementStats={elementStats}
+      simElements={simElements}
+      defaultMax={defaultMax}
     />
   )
 }

@@ -2,6 +2,22 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { AthleteResultCards, type ResultCard } from "@/components/athlete/AthleteResultCards"
+
+export type SimElementConfig = {
+  id: string
+  code: string
+  name: string
+  type: string
+  isCancelled: boolean
+  maxValue: number
+  revealPointsToAthletes: boolean
+  calcType: string | null
+  customFormula: string | null
+  calcParams: Record<string, unknown>
+  fields: { name: string; type: string; isResultField: boolean; rankingPriority: number | null; formula: string | null; order: number }[]
+  inputFields: { name: string; label: string; type: string }[]
+}
 
 export type AnalysisTeam = {
   id: string
@@ -68,6 +84,8 @@ interface Props {
   elements: AnalysisElement[]
   teamElementStats: TeamElementStat[]
   elementStats: ElementStat[]
+  simElements: SimElementConfig[]
+  defaultMax: number
 }
 
 // Seconds → h:mm:ss
@@ -106,7 +124,7 @@ function ScoreBar({ pct, isGood }: { pct: number; isGood: boolean }) {
   )
 }
 
-type Tab = "team" | "kp"
+type Tab = "team" | "kp" | "sim"
 
 export default function AnalysisView({
   competitionId,
@@ -116,6 +134,8 @@ export default function AnalysisView({
   elements,
   teamElementStats,
   elementStats,
+  simElements,
+  defaultMax,
 }: Props) {
   const [tab, setTab] = useState<Tab>("team")
   const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? "")
@@ -171,6 +191,27 @@ export default function AnalysisView({
   // KP võrdluses näita KÕIKI välju (sh arvutatud tulemus ja viigilahendajad)
   const kpFields = selectedElement?.fields ?? []
 
+  // ── Simulaatori andmed (valitud võistkonna kaardid) ──────────────────────
+  const simCards: ResultCard[] = selectedTeamId
+    ? simElements.flatMap((se): ResultCard[] => {
+        if (se.type === "OTHER" || se.type === "ABANDONMENT") return []
+        const stat = getStat(selectedTeamId, se.id)
+        if (!stat) return []
+        const hasData = stat.score != null || (stat.rawValues && Object.keys(stat.rawValues).length > 0)
+        if (!hasData) return []
+        const values: Record<string, string> = {}
+        for (const [k, v] of Object.entries(stat.rawValues ?? {})) values[k] = String(v ?? "")
+        return [{
+          id: se.id, code: se.code, name: se.name, type: se.type,
+          isCancelled: se.isCancelled, maxValue: se.maxValue, revealPointsToAthletes: se.revealPointsToAthletes,
+          exceptionLabel: stat.exceptionLabel, realScore: stat.score,
+          fields: se.fields, inputFields: se.inputFields, values,
+          calcType: se.calcType, customFormula: se.customFormula, calcParams: se.calcParams,
+          misc: [],
+        }]
+      })
+    : []
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -198,6 +239,12 @@ export default function AnalysisView({
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "kp" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
           >
             KP võrdlus
+          </button>
+          <button
+            onClick={() => setTab("sim")}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "sim" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            Simulaator
           </button>
         </div>
 
@@ -606,6 +653,40 @@ export default function AnalysisView({
                 </p>
               </>
             )}
+          </>
+        )}
+
+        {/* ── SIMULAATOR TAB ── */}
+        {tab === "sim" && (
+          <>
+            <div className="bg-white border rounded-xl p-4 mb-5">
+              <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
+              <select
+                value={selectedTeamId}
+                onChange={(e) => setSelectedTeamId(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>[{t.code}] {t.name}{t.isHorsDeCompetition ? " (AV)" : ""}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-2">Muuda võistkonna tulemusi ja vaata, kuidas elemendi punktid muutuksid. Muudatused on ainult selles vaates — andmebaasi ei salvestata.</p>
+            </div>
+            <div className="space-y-4">
+              {simCards.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8 bg-white border rounded-xl">Valitud võistkonnal pole simuleeritavaid tulemusi</p>
+              ) : (
+                <AthleteResultCards
+                  cards={simCards}
+                  scoringMode={scoringMode}
+                  pointsMode="EXACT"
+                  pointsRanges={[]}
+                  defaultMax={defaultMax}
+                  allowSimulate
+                  forceReveal
+                />
+              )}
+            </div>
           </>
         )}
 
