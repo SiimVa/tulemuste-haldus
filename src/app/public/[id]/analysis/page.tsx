@@ -115,6 +115,17 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       rankMap.set(sorted[i].teamId, rank)
     }
 
+    // Positsioon (%): kui suure osa võistkondadest see tiim edestas.
+    // 100% = parim, 0% = halvim. Sama tulemus = sama %. (Sõltumatu viikgruppide suurusest.)
+    const nEl = sorted.length
+    const percentileMap = new Map<string, number>()
+    for (const s of elScores) {
+      const beaten = elScores.filter((o) =>
+        isPlusMode ? o.penaltyPoints < s.penaltyPoints : o.penaltyPoints > s.penaltyPoints
+      ).length
+      percentileMap.set(s.teamId, nEl > 1 ? Math.round((beaten / (nEl - 1)) * 100) : 100)
+    }
+
     // Class rank in element (in-comp teams only)
     const classRankInElMap = new Map<string, number>()
     const classOutOfMap = new Map<string, number>()
@@ -208,6 +219,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
         elementId: el.id,
         score: scoreEntry?.penaltyPoints ?? null,
         rank: scoreEntry ? (rankMap.get(team.id) ?? null) : null,
+        percentile: scoreEntry ? (percentileMap.get(team.id) ?? null) : null,
         classRank: !team.isHorsDeCompetition && scoreEntry ? (classRankInElMap.get(team.id) ?? null) : null,
         outOf: elScores.length,
         classOutOf: !team.isHorsDeCompetition ? (classOutOfMap.get(team.id) ?? 0) : 0,

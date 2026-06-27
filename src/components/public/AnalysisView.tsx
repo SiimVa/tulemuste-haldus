@@ -36,6 +36,7 @@ export type TeamElementStat = {
   elementId: string
   score: number | null
   rank: number | null
+  percentile: number | null  // 0–100, kui suure osa võistkondadest edestati (sama tulemus = sama %)
   classRank: number | null
   outOf: number
   classOutOf: number
@@ -129,18 +130,12 @@ export default function AnalysisView({
     return elementStats.find((s) => s.elementId === elementId)
   }
 
-  // Rank 1 = 100%, rank N = 0%
-  function rankToPercentile(rank: number, outOf: number) {
-    if (outOf <= 1) return 100
-    return Math.round(((outOf - rank) / (outOf - 1)) * 100)
-  }
-
   // ── Team tab data ──────────────────────────────────────────────────────
   const myStats = selectedTeam
     ? elements.map((el) => {
         const stat = getStat(selectedTeamId, el.id)
         const elStat = getElStat(el.id)
-        const pct = stat?.rank != null && stat.outOf > 0 ? rankToPercentile(stat.rank, stat.outOf) : null
+        const pct = stat?.percentile ?? null
         return { el, stat, elStat, pct }
       }).filter((x) => x.stat !== undefined)
     : []
@@ -336,16 +331,14 @@ export default function AnalysisView({
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-center">Üldkoht</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-center">Klassist</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Keskmine</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-500" title="Suhteline koht: parim koht = 100%, viimane = 0%. Valem: (osalejaid − koht) / (osalejaid − 1).">
-                            Positsioon <span className="text-gray-300">ⓘ</span>
-                          </th>
+                          <th className="px-4 py-3 text-xs font-medium text-gray-500">Positsioon</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {elements.map((el) => {
                           const stat = getStat(selectedTeamId, el.id)
                           const elStat = getElStat(el.id)
-                          const pct = stat?.rank != null && stat.outOf > 0 ? rankToPercentile(stat.rank, stat.outOf) : null
+                          const pct = stat?.percentile ?? null
                           const isTop = pct !== null && pct >= 80
                           const isBottom = pct !== null && pct <= 20
 
@@ -408,6 +401,9 @@ export default function AnalysisView({
                     </table>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-2 px-1">
+                  <strong>Positsioon</strong> näitab, kui suure osa võistkondadest see tiim igas elemendis edestas: 100% = parim, 0% = halvim. Sama tulemus = sama %.
+                </p>
               </>
             )}
           </>
@@ -509,14 +505,12 @@ export default function AnalysisView({
                           ))}
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Erand</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Karistus</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-500" title="Suhteline koht: parim koht = 100%, viimane = 0%. Valem: (osalejaid − koht) / (osalejaid − 1).">
-                            Positsioon <span className="text-gray-300">ⓘ</span>
-                          </th>
+                          <th className="px-4 py-3 text-xs font-medium text-gray-500">Positsioon</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {kpStats.map(({ team, stat }, idx) => {
-                          const pct = stat?.rank != null && stat.outOf > 0 ? rankToPercentile(stat.rank, stat.outOf) : null
+                          const pct = stat?.percentile ?? null
                           const isTop = pct !== null && pct >= 80
                           const isBottom = pct !== null && pct <= 20
                           const isHC = team.isHorsDeCompetition
@@ -594,6 +588,9 @@ export default function AnalysisView({
                     </table>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-2 px-1">
+                  <strong>Positsioon</strong> näitab, kui suure osa võistkondadest see tiim selles elemendis edestas: 100% = parim, 0% = halvim. Sama tulemusega võistkonnad saavad sama protsendi. Erandid (nt &quot;ei läbinud&quot;) loevad halvimaks tulemuseks.
+                </p>
               </>
             )}
           </>
