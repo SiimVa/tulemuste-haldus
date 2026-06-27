@@ -1,4 +1,13 @@
 import { CalcMethod, Result, FieldDefinition } from "@prisma/client"
+
+// Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
+export type ScoreInput = {
+  teamId: string
+  values: string
+  exceptionLabel: string | null
+  exceptionPenalty: number | null
+  team: { id: string; isHorsDeCompetition?: boolean }
+}
 import { evaluate } from "mathjs"
 
 type CalcType = "RELATIVE_RANKING" | "ABSOLUTE_TIME" | "ABSOLUTE_POINTS" | "CUSTOM" | "ABSOLUTE_PENALTY" | "FIXED_RANKING" | "VALUE_BASED" | "PERFORMANCE_BASED" | "DIRECT_ENTRY"
@@ -120,7 +129,7 @@ export function computeFields(
 // ─── Peamine arvutusfunktsioon ────────────────────────────────────────────────
 export function calculateScores(
   element: ElementWithConfig,
-  results: (Result & { team: { id: string; isHorsDeCompetition?: boolean } })[],
+  results: ScoreInput[],
   competition: CompetitionConfig = { scoringMode: "PENALTY", defaultKPMaxValue: 30, defaultPKMaxValue: 30 }
 ): ScoredEntry[] {
   const { scoringMode } = competition

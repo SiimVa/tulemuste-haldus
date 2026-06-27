@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { AthleteResultCards, type ResultCard } from "@/components/athlete/AthleteResultCards"
+import { SimulatorPanel, type SimEl, type Standing } from "@/components/public/SimulatorPanel"
 
 export type SimElementConfig = {
   id: string
@@ -191,9 +191,9 @@ export default function AnalysisView({
   // KP võrdluses näita KÕIKI välju (sh arvutatud tulemus ja viigilahendajad)
   const kpFields = selectedElement?.fields ?? []
 
-  // ── Simulaatori andmed (valitud võistkonna kaardid) ──────────────────────
-  const simCards: ResultCard[] = selectedTeamId
-    ? simElements.flatMap((se): ResultCard[] => {
+  // ── Simulaatori andmed (valitud võistkond) ───────────────────────────────
+  const simPanelElements: SimEl[] = selectedTeamId
+    ? simElements.flatMap((se): SimEl[] => {
         if (se.type === "OTHER" || se.type === "ABANDONMENT") return []
         const stat = getStat(selectedTeamId, se.id)
         if (!stat) return []
@@ -203,14 +203,21 @@ export default function AnalysisView({
         for (const [k, v] of Object.entries(stat.rawValues ?? {})) values[k] = String(v ?? "")
         return [{
           id: se.id, code: se.code, name: se.name, type: se.type,
-          isCancelled: se.isCancelled, maxValue: se.maxValue, revealPointsToAthletes: se.revealPointsToAthletes,
-          exceptionLabel: stat.exceptionLabel, realScore: stat.score,
-          fields: se.fields, inputFields: se.inputFields, values,
-          calcType: se.calcType, customFormula: se.customFormula, calcParams: se.calcParams,
-          misc: [],
+          isCancelled: se.isCancelled, maxValue: se.maxValue,
+          inputFields: se.inputFields, values,
+          realScore: stat.score, exceptionLabel: stat.exceptionLabel,
         }]
       })
     : []
+  const simTeam = teams.find((t) => t.id === selectedTeamId)
+  const simInitial: Standing = {
+    total: simTeam?.totalScore ?? 0,
+    rank: simTeam?.overallRank ?? null,
+    totalTeams: simTeam?.totalInComp ?? 0,
+    classRank: simTeam?.classRank ?? null,
+    classTotal: simTeam?.classTotal ?? 0,
+    avgPercentile,
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -672,21 +679,20 @@ export default function AnalysisView({
               </select>
               <p className="text-xs text-gray-400 mt-2">Muuda võistkonna tulemusi ja vaata, kuidas elemendi punktid muutuksid. Muudatused on ainult selles vaates — andmebaasi ei salvestata.</p>
             </div>
-            <div className="space-y-4">
-              {simCards.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8 bg-white border rounded-xl">Valitud võistkonnal pole simuleeritavaid tulemusi</p>
-              ) : (
-                <AthleteResultCards
-                  cards={simCards}
-                  scoringMode={scoringMode}
-                  pointsMode="EXACT"
-                  pointsRanges={[]}
-                  defaultMax={defaultMax}
-                  allowSimulate
-                  forceReveal
-                />
-              )}
-            </div>
+            {simPanelElements.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8 bg-white border rounded-xl">Valitud võistkonnal pole simuleeritavaid tulemusi</p>
+            ) : (
+              <SimulatorPanel
+                competitionId={competitionId}
+                teamId={selectedTeamId}
+                teamName={simTeam?.name ?? ""}
+                teamCode={simTeam?.code ?? ""}
+                teamClass={simTeam?.class ?? null}
+                scoringMode={scoringMode}
+                elements={simPanelElements}
+                initial={simInitial}
+              />
+            )}
           </>
         )}
 
