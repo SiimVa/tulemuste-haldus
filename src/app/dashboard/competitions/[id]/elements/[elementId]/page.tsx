@@ -16,6 +16,8 @@ import { ResultsImportTrigger } from "@/components/competition/ResultsImportTrig
 import { RecalcButton } from "@/components/competition/RecalcButton"
 import { explainElementScores } from "@/lib/scoreExplainer"
 
+export const dynamic = "force-dynamic"
+
 export default async function ElementPage({
   params,
 }: {
