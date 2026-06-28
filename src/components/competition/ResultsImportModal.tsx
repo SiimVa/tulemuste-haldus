@@ -88,6 +88,15 @@ export function ResultsImportModal({ elementId, competitionId, elementName, onCl
     setImporting(false)
   }
 
+  // Peale edukat importi lae leht uuesti, et tulemused kohe kuvada
+  function handleClose() {
+    if (importResult && importResult.summary.imported > 0) {
+      window.location.reload()
+    } else {
+      onClose()
+    }
+  }
+
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
@@ -115,7 +124,7 @@ export function ResultsImportModal({ elementId, competitionId, elementName, onCl
             <p className="text-sm text-gray-500">{elementName}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none"
           >
             ×
@@ -329,7 +338,7 @@ export function ResultsImportModal({ elementId, competitionId, elementName, onCl
               )}
 
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
               >
                 Sulge
