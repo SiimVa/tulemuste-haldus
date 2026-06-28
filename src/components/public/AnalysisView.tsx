@@ -163,7 +163,8 @@ export default function AnalysisView({
       }).filter((x) => x.stat !== undefined)
     : []
 
-  const ranked = [...myStats].filter((x) => x.pct !== null).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))
+  // Tühistatud KP-d välja: kõigil 0 → ei ole kellegi tugevus ega nõrkus
+  const ranked = [...myStats].filter((x) => x.pct !== null && !x.el.isCancelled).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))
   const strengths = ranked.slice(0, 3)
   const weaknesses = [...ranked].reverse().slice(0, 3)
 
