@@ -385,7 +385,7 @@ export default function AnalysisView({
                         <tr className="bg-gray-50 text-left border-b">
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Element</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Tulemus</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Karistus</th>
+                          <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">{isPlusMode ? "Punktid" : "Karistus"}</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-center">Üldkoht</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-center">Klassist</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Keskmine</th>
@@ -572,7 +572,7 @@ export default function AnalysisView({
                             </th>
                           ))}
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Erand</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">Karistus</th>
+                          <th className="px-4 py-3 text-xs font-medium text-gray-500 text-right">{isPlusMode ? "Punktid" : "Karistus"}</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-500">Positsioon</th>
                         </tr>
                       </thead>
