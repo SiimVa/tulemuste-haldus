@@ -56,12 +56,17 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
   const isHC = (t: { isHorsDeCompetition: boolean; hcFromElementOrder?: number | null }) =>
     t.isHorsDeCompetition || t.hcFromElementOrder != null
 
+  const dnfRows = allRows
+    .filter((r) => r.team.dnfFromElementOrder != null)
+    .sort((a, b) => a.team.name.localeCompare(b.team.name))
+    .map((entry) => ({ ...entry, rank: null, classRank: null, class: entry.team.class ?? "–" }))
+
   const inComp = allRows
-    .filter((r) => !isHC(r.team))
+    .filter((r) => !isHC(r.team) && r.team.dnfFromElementOrder == null)
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
   const horsComp = allRows
-    .filter((r) => isHC(r.team))
+    .filter((r) => isHC(r.team) && r.team.dnfFromElementOrder == null)
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
   const classRank: Record<string, number> = {}
@@ -165,6 +170,38 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-0.5 inline-block">{row.class}</span>
                     </div>
                     <span className="font-bold text-amber-700 font-mono text-base shrink-0">{row.total.toFixed(2)}</span>
+                    <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
+                  </summary>
+                  <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                    {elements.map((el) => (
+                      <div key={el.id} className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-gray-500 truncate">
+                          <span className="font-mono text-gray-400 mr-1">{el.code}</span>
+                          <span className={el.isCancelled ? "line-through text-gray-300" : ""}>{el.name}</span>
+                        </span>
+                        <span className="font-mono text-gray-700 shrink-0">{row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </>
+          )}
+          {dnfRows.length > 0 && (
+            <>
+              <p className="px-1 pt-2 text-xs font-semibold text-gray-500 tracking-wide uppercase">Katkestanud</p>
+              {dnfRows.map((row) => (
+                <details key={row.team.id} data-lb-team={row.team.id} className="group bg-gray-50 border rounded-xl shadow-sm">
+                  <summary className="px-3 py-2.5 flex items-center gap-3 cursor-pointer list-none">
+                    <span className="text-xs text-gray-400 font-medium w-7 text-center shrink-0">KAT</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                        <span className="font-medium text-gray-500 truncate">{row.team.name}</span>
+                      </div>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-0.5 inline-block">{row.class}</span>
+                    </div>
+                    <span className="font-bold text-gray-400 font-mono text-sm shrink-0">KAT</span>
                     <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
                   </summary>
                   <div className="px-3 pb-3 pt-2 border-t space-y-1">
@@ -294,6 +331,51 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         </td>
                         <td className="sticky right-0 z-10 bg-amber-50 border-l px-4 py-3 text-right">
                           <span className="font-bold text-amber-700 font-mono">{row.total.toFixed(2)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+                {dnfRows.length > 0 && (
+                  <>
+                    <tr>
+                      <td colSpan={6 + elements.length} className="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-500 tracking-wide uppercase">
+                        Katkestanud
+                      </td>
+                    </tr>
+                    {dnfRows.map((row) => (
+                      <tr key={row.team.id} data-lb-team={row.team.id} className="hover:bg-gray-50 bg-gray-50/60">
+                        <td className="sticky left-0 z-10 bg-gray-100 w-12 px-2 py-3 text-xs text-gray-400 font-medium text-center">KAT</td>
+                        <td className="sticky left-12 z-10 bg-gray-100 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
+                        <td className="sticky left-24 z-10 bg-gray-100 border-r px-4 py-3 min-w-40">
+                          <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                          <span className="font-medium text-gray-500">{row.team.name}</span>
+                          {row.team.dnfReason && (
+                            <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">{row.team.dnfReason}</span>
+                          )}
+                          {memberAbandonTeamIds.has(row.team.id) && (
+                            <span className="ml-1.5 text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium" title="Üks või mitu liiget katkestas">👤 katk.</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class}</span>
+                        </td>
+                        {elements.map((el) => {
+                          const cellValue = row.byElement[el.id] !== undefined ? row.byElement[el.id].toFixed(1) : "–"
+                          const entries = (el.type === "OTHER" || el.type === "ABANDONMENT") ? (miscMap.get(`${el.id}:${row.team.id}`) ?? []) : []
+                          if (entries.length > 0) {
+                            return <MiscScoreCell key={el.id} value={cellValue} entries={entries}
+                              className="px-3 py-3 text-right font-mono text-xs text-gray-500" />
+                          }
+                          return (
+                            <td key={el.id} className="px-3 py-3 text-right font-mono text-xs text-gray-500">
+                              {cellValue}
+                            </td>
+                          )
+                        })}
+                        <td className="px-4 py-3 text-right font-mono text-xs text-gray-400">–</td>
+                        <td className="sticky right-0 z-10 bg-gray-100 border-l px-4 py-3 text-right">
+                          <span className="font-bold text-gray-400 font-mono">KAT</span>
                         </td>
                       </tr>
                     ))}
