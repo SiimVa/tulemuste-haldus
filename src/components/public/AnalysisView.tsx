@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { SimulatorPanel, type SimEl, type Standing } from "@/components/public/SimulatorPanel"
 
@@ -141,6 +141,20 @@ export default function AnalysisView({
   const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? "")
   const [selectedElementId, setSelectedElementId] = useState<string>(elements[0]?.id ?? "")
 
+  // "Minu võistkond" valik on jagatud pingerea vaatega (sama localStorage võti),
+  // nii et valitud VK kandub vaadete vahel kaasa.
+  const teamStorageKey = `lb-myteam-${competitionId}`
+  useEffect(() => {
+    const saved = localStorage.getItem(teamStorageKey)
+    if (saved && teams.some((t) => t.id === saved)) setSelectedTeamId(saved)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function chooseTeam(id: string) {
+    setSelectedTeamId(id)
+    if (id) localStorage.setItem(teamStorageKey, id)
+  }
+
   const isPlusMode = scoringMode === "PLUS"
   const selectedTeam = teams.find((t) => t.id === selectedTeamId)
   const selectedElement = elements.find((e) => e.id === selectedElementId)
@@ -264,7 +278,7 @@ export default function AnalysisView({
               <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
               <select
                 value={selectedTeamId}
-                onChange={(e) => setSelectedTeamId(e.target.value)}
+                onChange={(e) => chooseTeam(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 {teams.filter(t => !t.isHorsDeCompetition).length > 0 && (
@@ -488,7 +502,7 @@ export default function AnalysisView({
                 <label className="text-xs font-medium text-gray-500 block mb-2">Minu võistkond</label>
                 <select
                   value={selectedTeamId}
-                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  onChange={(e) => chooseTeam(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   {teams.filter(t => !t.isHorsDeCompetition).map((t) => (
@@ -671,7 +685,7 @@ export default function AnalysisView({
               <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
               <select
                 value={selectedTeamId}
-                onChange={(e) => setSelectedTeamId(e.target.value)}
+                onChange={(e) => chooseTeam(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 {teams.map((t) => (
