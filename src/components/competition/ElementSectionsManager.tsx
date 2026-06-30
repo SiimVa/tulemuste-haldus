@@ -82,6 +82,17 @@ function sectionToForm(s: Section): SectionForm {
   }
 }
 
+function buildSectionFieldsBody(form: SectionForm) {
+  return form.fields.filter(f => f.name && f.label).map(f => ({
+    ...f,
+    validation: Object.keys(f.validation).length ? f.validation : undefined,
+    // Vaba sisestuse osa: salvesta suund tulemusväljale, et analüüs näitaks parima/halvima õigesti
+    meta: (form.calcType === "DIRECT_ENTRY" && f.rankingPriority === 1)
+      ? JSON.stringify({ higherIsBetter: form.higherIsBetter ?? false })
+      : undefined,
+  }))
+}
+
 function buildCalcMethodBody(form: SectionForm) {
   return {
     type: form.calcType,
@@ -92,6 +103,8 @@ function buildCalcMethodBody(form: SectionForm) {
         ? { higherIsBetter: form.higherIsBetter ?? false }
         : form.calcType === "ABSOLUTE_POINTS"
         ? { higherIsBetter: true }
+        : form.calcType === "DIRECT_ENTRY"
+        ? { higherIsBetter: form.higherIsBetter ?? false }
         : form.calcType === "PERFORMANCE_BASED"
         ? { totalElements: form.totalElements }
         : {},
@@ -238,6 +251,22 @@ function SectionFormUI({
             <span className="text-xs text-gray-400">(tulemusväljale sisestatakse õigete arv)</span>
           </div>
         )}
+        {form.calcType === "DIRECT_ENTRY" && (
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Tulemuse suund (parima/halvima kuvamiseks)</p>
+            <div className="flex rounded-lg border overflow-hidden text-xs">
+              <button type="button" onClick={() => setForm({ ...form, higherIsBetter: false })}
+                className={`flex-1 py-1.5 px-3 transition-colors ${form.higherIsBetter !== true ? "bg-blue-600 text-white font-medium" : "text-gray-600 hover:bg-gray-50 bg-white"}`}>
+                Väiksem = parem
+              </button>
+              <button type="button" onClick={() => setForm({ ...form, higherIsBetter: true })}
+                className={`flex-1 py-1.5 px-3 border-l transition-colors ${form.higherIsBetter === true ? "bg-blue-600 text-white font-medium" : "text-gray-600 hover:bg-gray-50 bg-white"}`}>
+                Suurem = parem
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Mõjutab parima/halvima ja positsiooni kuvamist analüüsis, mitte summat.</p>
+          </div>
+        )}
         {(form.calcType === "CUSTOM" || form.calcType === "ABSOLUTE_PENALTY") && (
           <input type="text" value={form.customFormula}
             onChange={e => setForm({ ...form, customFormula: e.target.value })}
@@ -274,7 +303,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
         body: JSON.stringify({
           name: newForm.name,
           maxValue: newForm.maxValue !== "" ? Number(newForm.maxValue) : null,
-          fields: newForm.fields.filter(f => f.name && f.label).map(f => ({ ...f, validation: Object.keys(f.validation).length ? f.validation : undefined })),
+          fields: buildSectionFieldsBody(newForm),
           calcMethod: buildCalcMethodBody(newForm),
         }),
       })
@@ -307,7 +336,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
         body: JSON.stringify({
           name: editForm.name,
           maxValue: editForm.maxValue !== "" ? Number(editForm.maxValue) : null,
-          fields: editForm.fields.filter(f => f.name && f.label).map(f => ({ ...f, validation: Object.keys(f.validation).length ? f.validation : undefined })),
+          fields: buildSectionFieldsBody(editForm),
           calcMethod: buildCalcMethodBody(editForm),
         }),
       })

@@ -38,7 +38,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     prisma.scoringElement.findMany({
       where: { competitionId: id },
       orderBy: { order: "asc" },
-      include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
+      include: { fields: { orderBy: { order: "asc" } }, calcMethod: true, sections: { include: { calcMethod: true } } },
     }),
     prisma.computedScore.findMany({ where: { element: { competitionId: id } } }),
     prisma.manualPenalty.findMany({ where: { competitionId: id } }),
@@ -108,9 +108,16 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     // hindamissüsteemist — nii kuvatakse parim/halvim ja pingerida õiges suunas.
     const cmParams = (() => { try { return JSON.parse(el.calcMethod?.params ?? "{}") } catch { return {} } })()
     const isDirectEntry = el.calcMethod?.type === "DIRECT_ENTRY"
+    // Kombineeritud element: kui kõik osad on vaba sisestus sama suunaga, kasuta seda suunda
+    const sectionHigher = (() => {
+      const secs = el.sections ?? []
+      if (secs.length === 0 || !secs.every((s) => s.calcMethod?.type === "DIRECT_ENTRY")) return null
+      const dirs = secs.map((s) => { try { return Boolean(JSON.parse(s.calcMethod?.params ?? "{}").higherIsBetter) } catch { return false } })
+      return dirs.every((d) => d === dirs[0]) ? dirs[0] : null
+    })()
     const elHigher = isDirectEntry
       ? (typeof cmParams.higherIsBetter === "boolean" ? cmParams.higherIsBetter : isPlusMode)
-      : isPlusMode
+      : (sectionHigher != null ? sectionHigher : isPlusMode)
 
     // Overall rank in element
     const sorted = [...elScores].sort((a, b) =>

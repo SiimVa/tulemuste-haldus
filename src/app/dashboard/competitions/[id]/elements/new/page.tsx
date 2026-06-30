@@ -473,6 +473,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           name: f.name, label: f.label, type: f.type,
           isResultField: f.rankingPriority === 1, rankingPriority: f.rankingPriority,
           order: i,
+          meta: (s.calcType === "DIRECT_ENTRY" && f.rankingPriority === 1) ? JSON.stringify({ higherIsBetter: s.higherIsBetter ?? false }) : undefined,
         })),
         calcMethod: {
           type: s.calcType,
@@ -481,6 +482,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               ? { higherIsBetter: s.higherIsBetter ?? false, minPoints: s.minPoints }
               : s.calcType === "ABSOLUTE_POINTS"
               ? { higherIsBetter: true }
+              : s.calcType === "DIRECT_ENTRY"
+              ? { higherIsBetter: s.higherIsBetter ?? false }
               : s.calcType === "PERFORMANCE_BASED"
               ? { totalElements: s.totalElements }
               : {},
@@ -1219,6 +1222,22 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                             onFocus={e => e.target.select()}
                             className="w-20 px-2 py-1 border rounded text-xs" />
                           <span className="text-xs text-gray-400">(tulemusväljale sisestatakse õigete arv)</span>
+                        </div>
+                      )}
+                      {s.calcType === "DIRECT_ENTRY" && (
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Tulemuse suund (parima/halvima kuvamiseks)</p>
+                          <div className="flex rounded-lg border overflow-hidden text-xs">
+                            <button type="button" onClick={() => updateSection(si, "higherIsBetter", false)}
+                              className={`flex-1 py-1.5 px-2 transition-colors ${s.higherIsBetter !== true ? "bg-indigo-600 text-white font-medium" : "text-gray-600 hover:bg-gray-50"}`}>
+                              ↓ Väiksem = parem
+                            </button>
+                            <button type="button" onClick={() => updateSection(si, "higherIsBetter", true)}
+                              className={`flex-1 py-1.5 px-2 border-l transition-colors ${s.higherIsBetter === true ? "bg-indigo-600 text-white font-medium" : "text-gray-600 hover:bg-gray-50"}`}>
+                              ↑ Suurem = parem
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">Mõjutab parima/halvima ja positsiooni kuvamist analüüsis, mitte summat.</p>
                         </div>
                       )}
                       {(s.calcType === "CUSTOM" || s.calcType === "ABSOLUTE_PENALTY") && (

@@ -10,7 +10,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json()
   const { name, maxValue, calcMethod, fields } = body
 
-  type FieldInput = { name: string; label: string; type: string; order?: number; isResultField?: boolean; rankingPriority?: number | null; formula?: string }
+  type FieldInput = { name: string; label: string; type: string; order?: number; isResultField?: boolean; rankingPriority?: number | null; formula?: string; meta?: string }
 
   await prisma.$transaction(async (tx) => {
     await tx.elementSection.update({
@@ -51,6 +51,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             isResultField: f.rankingPriority === 1 || (f.isResultField ?? false),
             rankingPriority: f.rankingPriority ?? null,
             formula: f.formula ?? null,
+            meta: f.meta ?? null,
             validation: f.validation && Object.keys(f.validation).length ? JSON.stringify(f.validation) : null,
           })),
         })
