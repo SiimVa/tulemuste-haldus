@@ -162,7 +162,17 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     }
 
     // Per-välja statistika (tulemusväli + viigilahendajad), kasutab ARVUTATUD väärtusi → COMPUTED töötab
-    const calcHigher = isDirectEntry ? elHigher : (() => { try { return Boolean(JSON.parse(el.calcMethod?.params ?? "{}").higherIsBetter) } catch { return false } })()
+    // calcHigher = tooresväärtuse "parem" suund (parima/halvima kuvamiseks). Mõnel meetodil
+    // on suund fikseeritud (ABSOLUTE_POINTS, PERFORMANCE_BASED = alati suurem parem; ABSOLUTE_TIME
+    // = väiksem parem), muidu kasutame elemendi enda seadistust.
+    const calcType = el.calcMethod?.type
+    const calcHigher = isDirectEntry
+      ? elHigher
+      : (calcType === "ABSOLUTE_POINTS" || calcType === "PERFORMANCE_BASED")
+        ? true
+        : calcType === "ABSOLUTE_TIME"
+          ? false
+          : Boolean(cmParams.higherIsBetter)
     const fieldsForStats = el.fields
       .filter(f => f.isResultField || f.rankingPriority != null)
       .sort((a, b) => (a.isResultField ? 0 : (a.rankingPriority ?? 99)) - (b.isResultField ? 0 : (b.rankingPriority ?? 99)))

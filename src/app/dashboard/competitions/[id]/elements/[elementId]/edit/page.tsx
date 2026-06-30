@@ -51,6 +51,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
   const [totalElements, setTotalElements] = useState(10)
   const [directPointsEntry, setDirectPointsEntry] = useState(false)
   const [directHigherIsBetter, setDirectHigherIsBetter] = useState(false)
+  const [customHigherIsBetter, setCustomHigherIsBetter] = useState(false)
   const [elementConfig, setElementConfig] = useState<Record<string, unknown>>({})
   const [sections, setSections] = useState<Section[]>([])
   const [scoringMode, setScoringMode] = useState<"PENALTY" | "PLUS">("PENALTY")
@@ -99,6 +100,9 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
             }
             if (el.calcMethod.type === "DIRECT_ENTRY") {
               setDirectHigherIsBetter(typeof p.higherIsBetter === "boolean" ? p.higherIsBetter : (el.competition?.scoringMode === "PLUS"))
+            }
+            if (el.calcMethod.type === "CUSTOM") {
+              setCustomHigherIsBetter(typeof p.higherIsBetter === "boolean" ? p.higherIsBetter : (el.competition?.scoringMode === "PLUS"))
             }
           } catch { /* ignore */ }
         }
@@ -234,6 +238,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
           calcType === "FIXED_RANKING" ? { higherIsBetter: primaryDir, fixedPoints: fixedPoints.map(Number), minPoints } :
           calcType === "VALUE_BASED" ? { higherIsBetter: primaryDir, minPoints } :
           calcType === "PERFORMANCE_BASED" ? { totalElements } :
+          calcType === "CUSTOM" ? { higherIsBetter: customHigherIsBetter } :
           { higherIsBetter: primaryDir },
         customFormula: (calcType === "CUSTOM" || calcType === "ABSOLUTE_PENALTY") ? customFormula : undefined,
       },
@@ -710,6 +715,13 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
               </label>
               <input type="text" value={customFormula} onChange={e => setCustomFormula(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="text-sm font-medium text-gray-700 mb-1 mt-3 block">Tulemuse suund (parima/halvima kuvamiseks)</label>
+              <select value={customHigherIsBetter ? "true" : "false"} onChange={e => setCustomHigherIsBetter(e.target.value === "true")}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="false">Väiksem on parem</option>
+                <option value="true">Suurem on parem</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Määrab, kumb tulemusväärtus loetakse paremaks tulemuste analüüsis. Ei mõjuta summat.</p>
             </div>
           )}
           {calcType === "DIRECT_ENTRY" && (
