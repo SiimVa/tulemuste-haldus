@@ -168,6 +168,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
   const [minPoints, setMinPoints] = useState(0)
   const [fixedPoints, setFixedPoints] = useState<string[]>([])
   const [totalElements, setTotalElements] = useState(10)
+  const [directHigherIsBetter, setDirectHigherIsBetter] = useState(false)
   const [elementConfig, setElementConfig] = useState<Record<string, unknown>>({})
   const [compDefs, setCompDefs] = useState<CompDefs | null>(null)
   const [loading, setLoading] = useState(false)
@@ -206,6 +207,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           defaultRankingMinPoints: data.defaultRankingMinPoints ?? 0,
         }
         setCompDefs(defs)
+        setDirectHigherIsBetter(defs.scoringMode === "PLUS")
         // Rakenda CHECKPOINT vaikeväärtused
         const td = getTypeDefaults("CHECKPOINT", defs)
         setFields(td.fields)
@@ -434,7 +436,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
       maxValue: isCombined ? null : (pkOverride ? pkOverride.maxValue : (maxValue !== "" ? Number(maxValue) : null)),
       config: pkOverride ? pkOverride.config : elementConfig,
       fields: isCombined ? [] : (pkOverride ? pkOverride.fields : isDirectEntry ? [
-        { name: "tulemus", label: "Tulemus", type: "NUMBER", isResultField: true, rankingPriority: 1, order: 0 },
+        { name: "tulemus", label: "Tulemus", type: "NUMBER", isResultField: true, rankingPriority: 1, order: 0, meta: JSON.stringify({ higherIsBetter: directHigherIsBetter }) },
       ] : fields.map((f, i) => ({
         name: f.name, label: f.label, type: f.type,
         isResultField: f.rankingPriority === 1, rankingPriority: f.rankingPriority,
@@ -451,7 +453,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
       exceptions: exceptions.map((ex, i) => ({
         label: ex.label, penalty: parseFloat(ex.penalty), order: i,
       })),
-      calcMethod: isCombined ? undefined : ((type === "OTHER" || type === "ABANDONMENT") ? undefined : pkOverride ? pkOverride.calcMethod : isDirectEntry ? { type: "DIRECT_ENTRY", params: {}, customFormula: undefined } : (() => {
+      calcMethod: isCombined ? undefined : ((type === "OTHER" || type === "ABANDONMENT") ? undefined : pkOverride ? pkOverride.calcMethod : isDirectEntry ? { type: "DIRECT_ENTRY", params: { higherIsBetter: directHigherIsBetter }, customFormula: undefined } : (() => {
         const primaryDir = fields.find(f => f.rankingPriority === 1)?.fieldHigherIsBetter ?? false
         return {
         type: calcType,
@@ -1095,8 +1097,19 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               </div>
             )}
             {calcType === "DIRECT_ENTRY" && (
-              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
-                Kohtunik sisestab arvu otse — positiivne = plussipunktid, negatiivne = karistuspunktid. Sisestatud väärtus läheb tulemusse muutmata.
+              <div className="space-y-3">
+                <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
+                  Kohtunik sisestab arvu otse — positiivne = plussipunktid, negatiivne = karistuspunktid. Sisestatud väärtus läheb tulemusse muutmata.
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Tulemuse suund (parima/halvima kuvamiseks)</label>
+                  <select value={directHigherIsBetter ? "true" : "false"} onChange={e => setDirectHigherIsBetter(e.target.value === "true")}
+                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="false">Väiksem on parem</option>
+                    <option value="true">Suurem on parem</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Määrab, kumb suund loetakse paremaks tulemuste analüüsis (parim, halvim, positsioon). Ei mõjuta summat.</p>
+                </div>
               </div>
             )}
             {isCombinedMode && (

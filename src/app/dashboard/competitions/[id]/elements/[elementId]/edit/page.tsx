@@ -50,6 +50,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
   const [fixedPoints, setFixedPoints] = useState<string[]>([])
   const [totalElements, setTotalElements] = useState(10)
   const [directPointsEntry, setDirectPointsEntry] = useState(false)
+  const [directHigherIsBetter, setDirectHigherIsBetter] = useState(false)
   const [elementConfig, setElementConfig] = useState<Record<string, unknown>>({})
   const [sections, setSections] = useState<Section[]>([])
   const [scoringMode, setScoringMode] = useState<"PENALTY" | "PLUS">("PENALTY")
@@ -95,6 +96,9 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
                   ? { ...f, fieldHigherIsBetter: p.higherIsBetter }
                   : f
               ))
+            }
+            if (el.calcMethod.type === "DIRECT_ENTRY") {
+              setDirectHigherIsBetter(typeof p.higherIsBetter === "boolean" ? p.higherIsBetter : (el.competition?.scoringMode === "PLUS"))
             }
           } catch { /* ignore */ }
         }
@@ -203,7 +207,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
       config: elementConfig,
       maxValue: isCombined ? null : (maxValue !== "" ? Number(maxValue) : null),
       fields: isCombined ? undefined : isDirectEntry ? [
-        { name: "tulemus", label: "Tulemus", type: "NUMBER", isResultField: true, rankingPriority: 1, order: 0 },
+        { name: "tulemus", label: "Tulemus", type: "NUMBER", isResultField: true, rankingPriority: 1, order: 0, meta: JSON.stringify({ higherIsBetter: directHigherIsBetter }) },
       ] : fields.map((f, i) => ({
         name: f.name, label: f.label, type: f.type,
         isResultField: f.rankingPriority === 1,
@@ -223,7 +227,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         penalty: isNaN(parseFloat(ex.penalty)) ? 0 : parseFloat(ex.penalty),
         order: i,
       })),
-      calcMethod: (type === "OTHER" || type === "ABANDONMENT" || isCombined) ? undefined : isDirectEntry ? { type: "DIRECT_ENTRY", params: {}, customFormula: undefined } : {
+      calcMethod: (type === "OTHER" || type === "ABANDONMENT" || isCombined) ? undefined : isDirectEntry ? { type: "DIRECT_ENTRY", params: { higherIsBetter: directHigherIsBetter }, customFormula: undefined } : {
         type: calcType,
         params:
           calcType === "RELATIVE_RANKING" ? { higherIsBetter: primaryDir, minPoints } :
@@ -709,8 +713,19 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
           {calcType === "DIRECT_ENTRY" && (
-            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
-              Kohtunik sisestab arvu otse — positiivne = plussipunktid, negatiivne = karistuspunktid. Sisestatud väärtus läheb tulemusse muutmata.
+            <div className="space-y-3">
+              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
+                Kohtunik sisestab arvu otse — positiivne = plussipunktid, negatiivne = karistuspunktid. Sisestatud väärtus läheb tulemusse muutmata.
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Tulemuse suund (parima/halvima kuvamiseks)</label>
+                <select value={directHigherIsBetter ? "true" : "false"} onChange={e => setDirectHigherIsBetter(e.target.value === "true")}
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="false">Väiksem on parem</option>
+                  <option value="true">Suurem on parem</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Määrab, kumb suund loetakse paremaks tulemuste analüüsis (parim, halvim, positsioon). Ei mõjuta summat.</p>
+              </div>
             </div>
           )}
         </div>}

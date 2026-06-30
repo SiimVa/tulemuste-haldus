@@ -104,9 +104,17 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     const elScores = allScores.filter((s) => s.elementId === el.id)
     const resultField = el.fields.find((f) => f.isResultField)
 
+    // Vaba sisestus (DIRECT_ENTRY): suund tuleb elemendi enda seadistusest, mitte üldisest
+    // hindamissüsteemist — nii kuvatakse parim/halvim ja pingerida õiges suunas.
+    const cmParams = (() => { try { return JSON.parse(el.calcMethod?.params ?? "{}") } catch { return {} } })()
+    const isDirectEntry = el.calcMethod?.type === "DIRECT_ENTRY"
+    const elHigher = isDirectEntry
+      ? (typeof cmParams.higherIsBetter === "boolean" ? cmParams.higherIsBetter : isPlusMode)
+      : isPlusMode
+
     // Overall rank in element
     const sorted = [...elScores].sort((a, b) =>
-      isPlusMode ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints
+      elHigher ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints
     )
     const rankMap = new Map<string, number>()
     let rank = 1
@@ -121,7 +129,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     const percentileMap = new Map<string, number>()
     for (const s of elScores) {
       const beaten = elScores.filter((o) =>
-        isPlusMode ? o.penaltyPoints < s.penaltyPoints : o.penaltyPoints > s.penaltyPoints
+        elHigher ? o.penaltyPoints < s.penaltyPoints : o.penaltyPoints > s.penaltyPoints
       ).length
       percentileMap.set(s.teamId, nEl > 1 ? Math.round((beaten / (nEl - 1)) * 100) : 100)
     }
@@ -136,7 +144,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       )
       const classScores = elScores.filter(s => classTeamIds.has(s.teamId))
       const classSorted = [...classScores].sort((a, b) =>
-        isPlusMode ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints
+        elHigher ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints
       )
       let cr = 1
       for (let i = 0; i < classSorted.length; i++) {
@@ -147,7 +155,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     }
 
     // Per-välja statistika (tulemusväli + viigilahendajad), kasutab ARVUTATUD väärtusi → COMPUTED töötab
-    const calcHigher = (() => { try { return Boolean(JSON.parse(el.calcMethod?.params ?? "{}").higherIsBetter) } catch { return false } })()
+    const calcHigher = isDirectEntry ? elHigher : (() => { try { return Boolean(JSON.parse(el.calcMethod?.params ?? "{}").higherIsBetter) } catch { return false } })()
     const fieldsForStats = el.fields
       .filter(f => f.isResultField || f.rankingPriority != null)
       .sort((a, b) => (a.isResultField ? 0 : (a.rankingPriority ?? 99)) - (b.isResultField ? 0 : (b.rankingPriority ?? 99)))
