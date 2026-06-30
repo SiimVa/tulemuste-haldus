@@ -18,6 +18,22 @@ function fmtFieldValue(v: unknown, type: string): string {
   return isNaN(n) ? String(v) : (Number.isInteger(n) ? String(n) : Math.round(n * 100) / 100 + "")
 }
 
+// Tooresväärtuse "parem" suund analüüsi parima/halvima kuvamiseks ühe arvutusmeetodi kohta.
+// Mõnel meetodil on suund fikseeritud, mõnel tuleb elemendi/osa seadistusest.
+function rawHigherDir(calcType: string | undefined | null, params: { higherIsBetter?: boolean }, isPlusMode: boolean): boolean {
+  switch (calcType) {
+    case "ABSOLUTE_POINTS":
+    case "PERFORMANCE_BASED":
+      return true
+    case "ABSOLUTE_TIME":
+      return false
+    case "DIRECT_ENTRY":
+      return typeof params.higherIsBetter === "boolean" ? params.higherIsBetter : isPlusMode
+    default:
+      return Boolean(params.higherIsBetter)
+  }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const comp = await prisma.competition.findUnique({ where: { id }, select: { name: true } })
@@ -108,11 +124,20 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     // hindamissüsteemist — nii kuvatakse parim/halvim ja pingerida õiges suunas.
     const cmParams = (() => { try { return JSON.parse(el.calcMethod?.params ?? "{}") } catch { return {} } })()
     const isDirectEntry = el.calcMethod?.type === "DIRECT_ENTRY"
-    // Kombineeritud element: kui kõik osad on vaba sisestus sama suunaga, kasuta seda suunda
+    // Kombineeritud element: iga osa tulemusväli saab suuna OMA osa arvutusmeetodist
+    // (nt soorituspõhine osa = suurem parem, aja osa = väiksem parem).
+    const sectionDirMap = new Map<string, boolean>()
+    for (const sec of (el.sections ?? [])) {
+      let sp: { higherIsBetter?: boolean } = {}
+      try { sp = JSON.parse(sec.calcMethod?.params ?? "{}") } catch {}
+      sectionDirMap.set(sec.id, rawHigherDir(sec.calcMethod?.type, sp, isPlusMode))
+    }
+    // Pingerea/positsiooni suund: vaba sisestus, sh kombineeritud kui KÕIK osad on
+    // vaba sisestus sama suunaga (siis pole punktid hindamissüsteemiks normaliseeritud).
     const sectionHigher = (() => {
       const secs = el.sections ?? []
       if (secs.length === 0 || !secs.every((s) => s.calcMethod?.type === "DIRECT_ENTRY")) return null
-      const dirs = secs.map((s) => { try { return Boolean(JSON.parse(s.calcMethod?.params ?? "{}").higherIsBetter) } catch { return false } })
+      const dirs = secs.map((s) => sectionDirMap.get(s.id) ?? false)
       return dirs.every((d) => d === dirs[0]) ? dirs[0] : null
     })()
     const elHigher = isDirectEntry
@@ -162,17 +187,8 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     }
 
     // Per-välja statistika (tulemusväli + viigilahendajad), kasutab ARVUTATUD väärtusi → COMPUTED töötab
-    // calcHigher = tooresväärtuse "parem" suund (parima/halvima kuvamiseks). Mõnel meetodil
-    // on suund fikseeritud (ABSOLUTE_POINTS, PERFORMANCE_BASED = alati suurem parem; ABSOLUTE_TIME
-    // = väiksem parem), muidu kasutame elemendi enda seadistust.
-    const calcType = el.calcMethod?.type
-    const calcHigher = isDirectEntry
-      ? elHigher
-      : (calcType === "ABSOLUTE_POINTS" || calcType === "PERFORMANCE_BASED")
-        ? true
-        : calcType === "ABSOLUTE_TIME"
-          ? false
-          : Boolean(cmParams.higherIsBetter)
+    // calcHigher = tooresväärtuse "parem" suund elemendi tasemel (parima/halvima kuvamiseks).
+    const calcHigher = rawHigherDir(el.calcMethod?.type, cmParams, isPlusMode)
     const fieldsForStats = el.fields
       .filter(f => f.isResultField || f.rankingPriority != null)
       .sort((a, b) => (a.isResultField ? 0 : (a.rankingPriority ?? 99)) - (b.isResultField ? 0 : (b.rankingPriority ?? 99)))
@@ -183,7 +199,8 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       return computeFields(vals, el.fields as Parameters<typeof computeFields>[1])
     })
     const fieldStats = fieldsForStats.map(f => {
-      let fHigher = calcHigher
+      // Kombineeritud osa väli → osa suund; muidu elemendi suund. Välja meta tühistab mõlemad.
+      let fHigher = (f.sectionId != null && sectionDirMap.has(f.sectionId)) ? sectionDirMap.get(f.sectionId)! : calcHigher
       try { if (f.meta) { const m = JSON.parse(f.meta); if (typeof m.higherIsBetter === "boolean") fHigher = m.higherIsBetter } } catch {}
       const nums = computedByResult
         .map(c => c[f.name])
