@@ -25,6 +25,7 @@ export type AnalysisTeam = {
   code: string
   class: string | null
   isHorsDeCompetition: boolean
+  isDnf: boolean
   totalScore: number
   overallRank: number | null
   totalInComp: number
@@ -177,8 +178,9 @@ export default function AnalysisView({
       }).filter((x) => x.stat !== undefined)
     : []
 
-  // Tühistatud KP-d välja: kõigil 0 → ei ole kellegi tugevus ega nõrkus
-  const ranked = [...myStats].filter((x) => x.pct !== null && !x.el.isCancelled).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))
+  // Tühistatud KP-d ja erandiga sooritused välja: erandi (nt "ei läbinud") puhul ei
+  // tea võistkond, kui hästi tal läinud oleks → see pole päris tugevus ega nõrkus.
+  const ranked = [...myStats].filter((x) => x.pct !== null && !x.el.isCancelled && !x.stat?.exceptionLabel).sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0))
   const strengths = ranked.slice(0, 3)
   const weaknesses = [...ranked].reverse().slice(0, 3)
 
@@ -314,7 +316,10 @@ export default function AnalysisView({
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selectedTeam.class}</span>
                         )}
                         {selectedTeam.isHorsDeCompetition && (
-                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">AV</span>
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Arvestusväline</span>
+                        )}
+                        {selectedTeam.isDnf && (
+                          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-medium">Katkestanud</span>
                         )}
                       </div>
                       <p className="text-gray-500 text-sm mt-1.5">
@@ -596,12 +601,13 @@ export default function AnalysisView({
                           const isTop = pct !== null && pct >= 80
                           const isBottom = pct !== null && pct <= 20
                           const isHC = team.isHorsDeCompetition
+                          const isDnf = team.isDnf
                           const isMe = team.id === selectedTeamId
 
                           return (
-                            <tr key={team.id} className={`${isMe ? "bg-blue-50 outline-2 outline-blue-200 -outline-offset-2" : isTop ? "bg-green-50/40 hover:bg-green-50" : isBottom ? "bg-red-50/30 hover:bg-red-50/50" : isHC ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-gray-50"}`}>
+                            <tr key={team.id} className={`${isMe ? "bg-blue-50 outline-2 outline-blue-200 -outline-offset-2" : isDnf ? "bg-gray-50 hover:bg-gray-100" : isTop ? "bg-green-50/40 hover:bg-green-50" : isBottom ? "bg-red-50/30 hover:bg-red-50/50" : isHC ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-gray-50"}`}>
                               <td className="px-4 py-3 font-bold text-gray-700">
-                                {isHC ? <span className="text-amber-600 font-medium text-xs">AV</span> : (stat?.rank ?? idx + 1)}
+                                {isDnf ? <span className="text-gray-400 font-medium text-xs">KAT</span> : isHC ? <span className="text-amber-600 font-medium text-xs">AV</span> : (stat?.rank ?? idx + 1)}
                               </td>
                               <td className="px-4 py-3 text-gray-500 text-xs">
                                 {stat?.classRank != null && stat.classOutOf > 0
@@ -610,8 +616,10 @@ export default function AnalysisView({
                               </td>
                               <td className="px-4 py-3">
                                 <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
-                                <span className={`font-medium ${isMe ? "text-blue-700" : isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
+                                <span className={`font-medium ${isMe ? "text-blue-700" : isDnf ? "text-gray-500" : isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
                                 {isMe && <span className="ml-1.5 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">mina</span>}
+                                {isDnf && <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">katkestanud</span>}
+                                {!isDnf && isHC && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">arvestusväline</span>}
                               </td>
                               <td className="px-4 py-3">
                                 {team.class && (

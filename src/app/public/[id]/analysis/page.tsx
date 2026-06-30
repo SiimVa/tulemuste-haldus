@@ -74,6 +74,10 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     miscMap.set(key, arr)
   }
 
+  // Arvestusväline = käsitsi märgitud VÕI teatud elemendist alates (nagu pingereas)
+  const isHCteam = (t: { isHorsDeCompetition: boolean; hcFromElementOrder: number | null }) =>
+    t.isHorsDeCompetition || t.hcFromElementOrder != null
+
   // ── Total scores per team ──────────────────────────────────────────────
   const teamTotals = teams.map((team) => {
     const teamScores = allScores.filter((s) => s.teamId === team.id)
@@ -81,7 +85,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
     const kpTotal = teamScores.reduce((s, x) => s + x.penaltyPoints, 0)
     const manualTotal = teamPenalties.reduce((s, x) => s + x.points, 0)
     const total = Math.round((isPlusMode ? kpTotal - manualTotal : kpTotal + manualTotal) * 1000) / 1000
-    return { teamId: team.id, total, isHC: team.isHorsDeCompetition }
+    return { teamId: team.id, total, isHC: isHCteam(team) }
   })
 
   // Overall rank (in-competition only)
@@ -104,7 +108,7 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
   // Count total per class
   const classTotals: Record<string, number> = {}
   teams.forEach((t) => {
-    if (t.isHorsDeCompetition) return
+    if (isHCteam(t)) return
     const cls = t.class ?? "–"
     classTotals[cls] = (classTotals[cls] ?? 0) + 1
   })
@@ -155,24 +159,22 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       rankMap.set(sorted[i].teamId, rank)
     }
 
-    // Positsioon (%): kui suure osa võistkondadest see tiim edestas.
-    // 100% = parim, 0% = halvim. Sama tulemus = sama %. (Sõltumatu viikgruppide suurusest.)
+    // Positsioon (%): koha-põhine. Parim (sh viigis esimene) = 100%, halvim = 0%.
+    // Kui kõigil sama tulemus → kõik on jagatud 1. kohal → kõik 100%.
     const nEl = sorted.length
     const percentileMap = new Map<string, number>()
     for (const s of elScores) {
-      const beaten = elScores.filter((o) =>
-        elHigher ? o.penaltyPoints < s.penaltyPoints : o.penaltyPoints > s.penaltyPoints
-      ).length
-      percentileMap.set(s.teamId, nEl > 1 ? Math.round((beaten / (nEl - 1)) * 100) : 100)
+      const r = rankMap.get(s.teamId) ?? 1
+      percentileMap.set(s.teamId, nEl > 1 ? Math.round(((nEl - r) / (nEl - 1)) * 100) : 100)
     }
 
     // Class rank in element (in-comp teams only)
     const classRankInElMap = new Map<string, number>()
     const classOutOfMap = new Map<string, number>()
-    const classes = [...new Set(teams.filter(t => !t.isHorsDeCompetition).map(t => t.class ?? "–"))]
+    const classes = [...new Set(teams.filter(t => !isHCteam(t)).map(t => t.class ?? "–"))]
     for (const cls of classes) {
       const classTeamIds = new Set(
-        teams.filter(t => !t.isHorsDeCompetition && (t.class ?? "–") === cls).map(t => t.id)
+        teams.filter(t => !isHCteam(t) && (t.class ?? "–") === cls).map(t => t.id)
       )
       const classScores = elScores.filter(s => classTeamIds.has(s.teamId))
       const classSorted = [...classScores].sort((a, b) =>
@@ -261,9 +263,9 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
         score: scoreEntry?.penaltyPoints ?? null,
         rank: scoreEntry ? (rankMap.get(team.id) ?? null) : null,
         percentile: scoreEntry ? (percentileMap.get(team.id) ?? null) : null,
-        classRank: !team.isHorsDeCompetition && scoreEntry ? (classRankInElMap.get(team.id) ?? null) : null,
+        classRank: !isHCteam(team) && scoreEntry ? (classRankInElMap.get(team.id) ?? null) : null,
         outOf: elScores.length,
-        classOutOf: !team.isHorsDeCompetition ? (classOutOfMap.get(team.id) ?? 0) : 0,
+        classOutOf: !isHCteam(team) ? (classOutOfMap.get(team.id) ?? 0) : 0,
         exceptionLabel: resultEntry?.exceptionLabel ?? null,
         rawValues: resultEntry?.exceptionLabel ? {} : rawValues,
         rawResultValue,
@@ -281,7 +283,8 @@ export default async function PublicAnalysisPage({ params }: { params: Promise<{
       name: team.name,
       code: team.code,
       class: team.class,
-      isHorsDeCompetition: team.isHorsDeCompetition,
+      isHorsDeCompetition: isHCteam(team),
+      isDnf: team.dnfFromElementOrder != null,
       totalScore: total,
       overallRank: overallRankMap.get(team.id) ?? null,
       totalInComp,
