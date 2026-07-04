@@ -21,13 +21,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { elementId } = await params
 
   const body = await req.json()
-  const { teamId, points, description } = body
+  const { teamId, points, description, reason, abandonElementId, abandonTime } = body
   if (!teamId || points == null || !description) {
     return NextResponse.json({ error: "Puudulikud andmed" }, { status: 400 })
   }
 
   const entry = await prisma.miscEntry.create({
-    data: { elementId, teamId, points: Number(points), description },
+    data: {
+      elementId, teamId, points: Number(points), description,
+      reason: reason || null,
+      abandonElementId: abandonElementId || null,
+      abandonTime: abandonTime || null,
+    },
     include: { team: { select: { id: true, name: true, code: true } } },
   })
   return NextResponse.json(entry)

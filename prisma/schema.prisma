@@ -272,6 +272,9 @@ model MiscEntry {
   team        Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
   points      Float
   description String
+  reason           String?  // Katkestanud liikme põhjus (valikuline)
+  abandonElementId String?  // Millisel KP-l/elemendil liige katkestas (valikuline)
+  abandonTime      String?  // Katkestamise kellaaeg (valikuline)
   createdAt   DateTime       @default(now())
 }
 

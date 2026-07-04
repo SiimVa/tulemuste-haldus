@@ -61,6 +61,13 @@ export default async function ElementPage({
     include: { members: true },
   })).sort((a, b) => naturalCompare(a.code, b.code))
 
+  // Katkestamise KP valikuks: kõik kontrollpunktid (v.a Muu/Katkestamine tüübid)
+  const kpOptions = await prisma.scoringElement.findMany({
+    where: { competitionId, type: { notIn: ["OTHER", "ABANDONMENT"] } },
+    select: { id: true, code: true, name: true },
+    orderBy: { order: "asc" },
+  })
+
   const breakdowns = explainElementScores(
     {
       type: element.type,
@@ -335,16 +342,21 @@ export default async function ElementPage({
             <AbandonmentTable
               competitionId={competitionId}
               elementId={element.id}
+              elementOrder={element.order}
               scoringMode={element.competition.scoringMode as "PENALTY" | "PLUS"}
               mode={(cfg.mode as "FIXED" | "CUSTOM") ?? "FIXED"}
               penaltyPerMember={cfg.penaltyPerMember ?? 10}
-              teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, members: t.members.map(m => ({ name: m.name, role: m.role })) }))}
+              teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, dnfFromElementOrder: t.dnfFromElementOrder, members: t.members.map(m => ({ name: m.name, role: m.role })) }))}
+              elements={kpOptions}
               initialEntries={element.miscEntries.map(e => ({
                 id: e.id,
                 teamId: e.teamId,
                 team: e.team,
                 points: e.points,
                 description: e.description,
+                reason: e.reason,
+                abandonElementId: e.abandonElementId,
+                abandonTime: e.abandonTime,
               }))}
             />
           </div>
