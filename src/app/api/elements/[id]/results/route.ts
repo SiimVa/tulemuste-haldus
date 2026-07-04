@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { calculateScores, withEffectiveHC } from "@/lib/calculators"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
+import { recomputeElementScores } from "@/lib/recompute"
 
 // GET – kõik tulemused selle elemendi jaoks
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -93,7 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!exceptionLabel && !hasAnyValue) {
     await prisma.result.deleteMany({ where: { elementId, teamId } })
     await prisma.computedScore.deleteMany({ where: { elementId, teamId } })
-    await recomputeScores(elementId)
+    await recomputeElementScores(elementId)
     return NextResponse.json({ deleted: true, teamId })
   }
 
@@ -118,109 +118,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     include: { team: true },
   })
 
-  // Taasaruta skoorid kohe pärast sisestust
-  await recomputeScores(elementId)
+  // Taasaruta skoorid kohe pärast sisestust (jagatud loogika hulgi-ümberarvutusega)
+  await recomputeElementScores(elementId)
 
   return NextResponse.json(result)
-}
-
-// Abi: arvuta kõigi võistkondade skoorid uuesti
-async function recomputeScores(elementId: string) {
-  const element = await prisma.scoringElement.findUnique({
-    where: { id: elementId },
-    include: {
-      fields: { where: { sectionId: null } },
-      exceptions: true,
-      calcMethod: true,
-      miscEntries: true,
-      sections: {
-        include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
-        orderBy: { order: "asc" },
-      },
-      competition: {
-        select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true },
-      },
-    },
-  })
-  if (!element) return
-
-  const results = await prisma.result.findMany({
-    where: { elementId },
-    include: { team: true },
-  })
-  if (results.length === 0) return
-
-  const competitionConfig = {
-    scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
-    defaultKPMaxValue: element.competition.defaultKPMaxValue,
-    defaultPKMaxValue: element.competition.defaultPKMaxValue,
-  }
-  const isPlusMode = competitionConfig.scoringMode === "PLUS"
-
-  const miscByTeam = new Map<string, number>()
-  for (const entry of element.miscEntries) {
-    miscByTeam.set(entry.teamId, (miscByTeam.get(entry.teamId) ?? 0) + entry.points)
-  }
-
-  let scored: { teamId: string; penaltyPoints: number }[]
-
-  if (element.sections.length > 0) {
-    // Kombineeritud: iga sektsiooni skoor arvutatakse eraldi ja summeritakse
-    const exceptionResults = results.filter(r => r.exceptionLabel)
-    const normalResults = results.filter(r => !r.exceptionLabel)
-    const teamScores = new Map<string, number>()
-
-    for (const r of exceptionResults) {
-      const magnitude = Math.abs(r.exceptionPenalty ?? 0)
-      teamScores.set(r.teamId, isPlusMode ? -magnitude : magnitude)
-    }
-
-    for (const section of element.sections) {
-      if (!section.calcMethod || section.fields.length === 0) continue
-      const mockElement = {
-        id: element.id,
-        calcMethod: {
-          id: section.calcMethod.id,
-          elementId: element.id,
-          type: section.calcMethod.type,
-          params: section.calcMethod.params,
-          customFormula: section.calcMethod.customFormula,
-        },
-        fields: section.fields,
-        exceptions: [] as { label: string; penalty: number }[],
-        maxValue: section.maxValue,
-      }
-      const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), competitionConfig)
-      for (const s of sectionScored) {
-        teamScores.set(s.teamId, Math.round(((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints) * 1000) / 1000)
-      }
-    }
-
-    for (const [teamId, bonus] of miscByTeam) {
-      if (teamScores.has(teamId)) {
-        teamScores.set(teamId, Math.round(((teamScores.get(teamId) ?? 0) + bonus) * 1000) / 1000)
-      }
-    }
-
-    scored = [...teamScores.entries()].map(([teamId, penaltyPoints]) => ({ teamId, penaltyPoints }))
-  } else {
-    // Tavaline element
-    const calcScored = calculateScores(element, withEffectiveHC(results, element.order), competitionConfig)
-    scored = calcScored.map(s => ({
-      teamId: s.teamId,
-      penaltyPoints: Math.round((s.penaltyPoints + (miscByTeam.get(s.teamId) ?? 0)) * 1000) / 1000,
-    }))
-  }
-
-  if (scored.length === 0) return
-
-  await prisma.$transaction(
-    scored.map((s) =>
-      prisma.computedScore.upsert({
-        where: { elementId_teamId: { elementId, teamId: s.teamId } },
-        create: { elementId, teamId: s.teamId, penaltyPoints: s.penaltyPoints },
-        update: { penaltyPoints: s.penaltyPoints, computedAt: new Date() },
-      })
-    )
-  )
 }

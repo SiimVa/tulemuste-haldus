@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import * as XLSX from "xlsx"
+import { recomputeElementScores } from "@/lib/recompute"
 
 async function checkAccess(competitionId: string, userId: string, role: string) {
   if (role === "ADMIN") return true
@@ -330,9 +331,9 @@ export async function POST(
     }
   }
 
-  // Trigger recalculate for this element
+  // Trigger recalculate for this element (jagatud loogika)
   try {
-    await recomputeElementScores(elementId, competitionId)
+    await recomputeElementScores(elementId)
   } catch {
     // Non-fatal: import still succeeded
   }
@@ -345,114 +346,4 @@ export async function POST(
   }
 
   return NextResponse.json({ rows, missingTeams, summary: finalSummary, importErrors })
-}
-
-async function recomputeElementScores(elementId: string, competitionId: string) {
-  const { calculateScores, withEffectiveHC } = await import("@/lib/calculators")
-
-  const element = await prisma.scoringElement.findUnique({
-    where: { id: elementId },
-    include: {
-      fields: { where: { sectionId: null } },
-      exceptions: true,
-      calcMethod: true,
-      miscEntries: true,
-      sections: {
-        include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
-        orderBy: { order: "asc" },
-      },
-      competition: {
-        select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true },
-      },
-    },
-  })
-  if (!element) return
-
-  const teams = await prisma.team.findMany({ where: { competitionId } })
-  const dnfTeams = new Map(
-    teams.filter((t) => t.dnfFromElementOrder != null).map((t) => [t.id, t.dnfFromElementOrder!])
-  )
-
-  const results = await prisma.result.findMany({
-    where: { elementId },
-    include: { team: true },
-  })
-  if (results.length === 0) return
-
-  const competitionConfig = {
-    scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
-    defaultKPMaxValue: element.competition.defaultKPMaxValue,
-    defaultPKMaxValue: element.competition.defaultPKMaxValue,
-  }
-  const isPlusMode = competitionConfig.scoringMode === "PLUS"
-
-  const miscByTeam = new Map<string, number>()
-  for (const entry of element.miscEntries) {
-    miscByTeam.set(entry.teamId, (miscByTeam.get(entry.teamId) ?? 0) + entry.points)
-  }
-
-  const activeResults = results.filter((r) => {
-    const dnfOrder = dnfTeams.get(r.teamId)
-    return dnfOrder == null || element.order < dnfOrder
-  })
-
-  let scored: { teamId: string; penaltyPoints: number }[]
-
-  if (element.sections.length > 0) {
-    const exceptionResults = activeResults.filter((r) => r.exceptionLabel)
-    const normalResults = activeResults.filter((r) => !r.exceptionLabel)
-    const teamScores = new Map<string, number>()
-
-    for (const r of exceptionResults) {
-      const magnitude = Math.abs(r.exceptionPenalty ?? 0)
-      teamScores.set(r.teamId, isPlusMode ? -magnitude : magnitude)
-    }
-
-    for (const section of element.sections) {
-      if (!section.calcMethod || section.fields.length === 0) continue
-      const mockElement = {
-        id: element.id,
-        calcMethod: {
-          id: section.calcMethod.id,
-          elementId: element.id,
-          type: section.calcMethod.type,
-          params: section.calcMethod.params,
-          customFormula: section.calcMethod.customFormula,
-        },
-        fields: section.fields,
-        exceptions: [] as { label: string; penalty: number }[],
-        maxValue: section.maxValue,
-      }
-      const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), competitionConfig)
-      for (const s of sectionScored) {
-        teamScores.set(s.teamId, Math.round(((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints) * 1000) / 1000)
-      }
-    }
-
-    for (const [teamId, bonus] of miscByTeam) {
-      if (teamScores.has(teamId)) {
-        teamScores.set(teamId, Math.round(((teamScores.get(teamId) ?? 0) + bonus) * 1000) / 1000)
-      }
-    }
-
-    scored = [...teamScores.entries()].map(([teamId, penaltyPoints]) => ({ teamId, penaltyPoints }))
-  } else {
-    const calcScored = calculateScores(element, withEffectiveHC(activeResults, element.order), competitionConfig)
-    scored = calcScored.map((s) => ({
-      teamId: s.teamId,
-      penaltyPoints: Math.round((s.penaltyPoints + (miscByTeam.get(s.teamId) ?? 0)) * 1000) / 1000,
-    }))
-  }
-
-  if (scored.length === 0) return
-
-  await prisma.$transaction(
-    scored.map((s) =>
-      prisma.computedScore.upsert({
-        where: { elementId_teamId: { elementId, teamId: s.teamId } },
-        create: { elementId, teamId: s.teamId, penaltyPoints: s.penaltyPoints },
-        update: { penaltyPoints: s.penaltyPoints, computedAt: new Date() },
-      })
-    )
-  )
 }

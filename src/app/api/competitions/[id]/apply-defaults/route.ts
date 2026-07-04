@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { calculateScores, withEffectiveHC } from "@/lib/calculators"
+import { recomputeCompetitionScores } from "@/lib/recompute"
 
 async function checkAccess(competitionId: string, userId: string, role: string) {
   if (role === "ADMIN") return true
@@ -106,36 +106,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  // 4. Arvuta kõik skoorid ümber
-  const freshElements = await prisma.scoringElement.findMany({
-    where: { competitionId },
-    include: { fields: true, exceptions: true, calcMethod: true, competition: { select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true } } },
-  })
-
-  for (const element of freshElements) {
-    const results = await prisma.result.findMany({
-      where: { elementId: element.id },
-      include: { team: true },
-    })
-    if (results.length === 0) continue
-
-    const competitionConfig = {
-      scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
-      defaultKPMaxValue: element.competition.defaultKPMaxValue,
-      defaultPKMaxValue: element.competition.defaultPKMaxValue,
-    }
-
-    const scored = calculateScores(element, withEffectiveHC(results, element.order), competitionConfig)
-    await prisma.$transaction(
-      scored.map((s) =>
-        prisma.computedScore.upsert({
-          where: { elementId_teamId: { elementId: element.id, teamId: s.teamId } },
-          create: { elementId: element.id, teamId: s.teamId, penaltyPoints: s.penaltyPoints },
-          update: { penaltyPoints: s.penaltyPoints, computedAt: new Date() },
-        })
-      )
-    )
-  }
+  // 4. Arvuta kõik skoorid ümber (jagatud loogika)
+  await recomputeCompetitionScores(competitionId)
 
   return NextResponse.json({
     ok: true,
