@@ -70,6 +70,8 @@ export function ElementList({
       }),
     ])
 
+    // Järjekord mõjutab DNF/arvestusvälise loogikat → arvuta ümber
+    await fetch(`/api/competitions/${competitionId}/recalculate`, { method: "POST" }).catch(() => {})
     setSaving(false)
     router.refresh()
   }
@@ -99,6 +101,8 @@ export function ElementList({
         )
     )
 
+    // Järjekord mõjutab DNF/arvestusvälise loogikat → arvuta ümber
+    await fetch(`/api/competitions/${competitionId}/recalculate`, { method: "POST" }).catch(() => {})
     setSaving(false)
     router.refresh()
   }

@@ -251,6 +251,8 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
     })
 
     if (res.ok) {
+      // Valemi/meetodi/väljade muutmine mõjutab juba sisestatud tulemusi → arvuta ümber
+      await fetch(`/api/competitions/${competitionId}/recalculate`, { method: "POST" }).catch(() => {})
       router.push(`/dashboard/competitions/${competitionId}/elements/${elementId}`)
     } else {
       try {
