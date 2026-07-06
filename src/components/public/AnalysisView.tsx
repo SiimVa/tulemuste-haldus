@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import Link from "next/link"
 import { SimulatorPanel, type SimEl, type Standing } from "@/components/public/SimulatorPanel"
 
@@ -189,12 +189,16 @@ export default function AnalysisView({
     : null
 
   // ── KP tab data ────────────────────────────────────────────────────────
+  // Grupeeri katkestanud/arvestusvälised lõppu (nagu pingereas): 0 = arvestuses, 1 = AV, 2 = KAT
+  const kpGroup = (t: AnalysisTeam) => (t.isDnf ? 2 : t.isHorsDeCompetition ? 1 : 0)
   const kpStats = selectedElement
     ? teams.map((team) => {
         const stat = getStat(team.id, selectedElementId)
         return { team, stat }
       }).filter((x) => x.stat?.score !== null || x.stat?.exceptionLabel)
         .sort((a, b) => {
+          const ga = kpGroup(a.team), gb = kpGroup(b.team)
+          if (ga !== gb) return ga - gb
           const sa = a.stat?.score ?? null
           const sb = b.stat?.score ?? null
           if (sa === null && sb === null) return a.team.code.localeCompare(b.team.code)
@@ -604,8 +608,21 @@ export default function AnalysisView({
                           const isDnf = team.isDnf
                           const isMe = team.id === selectedTeamId
 
+                          // Sektsioonipäis, kui grupp muutub (arvestusvälised / katkestanud)
+                          const grp = kpGroup(team)
+                          const prevGrp = idx > 0 ? kpGroup(kpStats[idx - 1].team) : -1
+                          const sep = grp !== prevGrp && grp > 0 ? (
+                            <tr>
+                              <td colSpan={7 + kpFields.length} className={`px-4 py-2 text-xs font-semibold tracking-wide uppercase ${grp === 2 ? "bg-gray-100 text-gray-500" : "bg-amber-50 text-amber-700"}`}>
+                                {grp === 2 ? "Katkestanud" : "Arvestusvälised"}
+                              </td>
+                            </tr>
+                          ) : null
+
                           return (
-                            <tr key={team.id} className={`${isMe ? "bg-blue-50 outline-2 outline-blue-200 -outline-offset-2" : isDnf ? "bg-gray-50 hover:bg-gray-100" : isTop ? "bg-green-50/40 hover:bg-green-50" : isBottom ? "bg-red-50/30 hover:bg-red-50/50" : isHC ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-gray-50"}`}>
+                            <Fragment key={team.id}>
+                            {sep}
+                            <tr className={`${isMe ? "bg-blue-50 outline-2 outline-blue-200 -outline-offset-2" : isDnf ? "bg-gray-50 hover:bg-gray-100" : isTop ? "bg-green-50/40 hover:bg-green-50" : isBottom ? "bg-red-50/30 hover:bg-red-50/50" : isHC ? "bg-amber-50/40 hover:bg-amber-50" : "hover:bg-gray-50"}`}>
                               <td className="px-4 py-3 font-bold text-gray-700">
                                 {isDnf ? <span className="text-gray-400 font-medium text-xs">KAT</span> : isHC ? <span className="text-amber-600 font-medium text-xs">AV</span> : (stat?.rank ?? idx + 1)}
                               </td>
@@ -665,6 +682,7 @@ export default function AnalysisView({
                                 ) : <span className="text-gray-300 text-xs">–</span>}
                               </td>
                             </tr>
+                            </Fragment>
                           )
                         })}
                         {kpStats.length === 0 && (

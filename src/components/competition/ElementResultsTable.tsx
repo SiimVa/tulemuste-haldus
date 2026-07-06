@@ -32,7 +32,11 @@ function formatComputedValue(f: Field, value: unknown): string {
 type Exception = { id: string; label: string; penalty: number }
 type ResultRow = { id: string; teamId: string; teamName: string; teamCode: string; values: string; allValues?: Record<string, unknown>; exceptionLabel?: string | null; exceptionPenalty?: number | null; updatedAt: Date }
 type Score = { teamId: string; penaltyPoints: number }
-type Team = { id: string; name: string; code: string; isHorsDeCompetition?: boolean }
+type Team = { id: string; name: string; code: string; isHorsDeCompetition?: boolean; hcFromElementOrder?: number | null; dnfFromElementOrder?: number | null }
+
+// Arvestusväline = käsitsi VÕI teatud elemendist alates; katkestanud = DNF (nagu pingereas)
+const teamIsHC = (t: Team) => (t.isHorsDeCompetition ?? false) || t.hcFromElementOrder != null
+const teamIsDnf = (t: Team) => t.dnfFromElementOrder != null
 
 interface Props {
   element: {
@@ -153,8 +157,9 @@ export function ElementResultsTable({ element, teams }: Props) {
     })
   }
 
-  const inCompTeams = sortByScore(teams.filter(t => !t.isHorsDeCompetition))
-  const horsCompTeams = sortByScore(teams.filter(t => t.isHorsDeCompetition))
+  const dnfTeams = [...teams.filter(teamIsDnf)].sort((a, b) => naturalCompare(a.code, b.code))
+  const inCompTeams = sortByScore(teams.filter(t => !teamIsHC(t) && !teamIsDnf(t)))
+  const horsCompTeams = sortByScore(teams.filter(t => teamIsHC(t) && !teamIsDnf(t)))
   const totalCols = 2 + inputFields.length + computedFields.length + 3
 
   function renderRow(team: Team, rank: number | null) {
@@ -162,19 +167,23 @@ export function ElementResultsTable({ element, teams }: Props) {
     const score = getScore(team.id)
     const values = result ? parseValues(result.values) : {}
     const isEditing = editingTeamId === team.id
-    const isHC = team.isHorsDeCompetition ?? false
-    const stickyBg = isEditing ? "bg-blue-50" : isHC ? "bg-amber-50" : "bg-white"
+    const isDnf = teamIsDnf(team)
+    const isHC = teamIsHC(team) && !isDnf
+    const stickyBg = isEditing ? "bg-blue-50" : isDnf ? "bg-gray-100" : isHC ? "bg-amber-50" : "bg-white"
 
     return (
-      <tr key={team.id} className={`hover:bg-gray-50 ${isEditing ? "bg-blue-50" : isHC ? "bg-amber-50/40" : ""}`}>
+      <tr key={team.id} className={`hover:bg-gray-50 ${isEditing ? "bg-blue-50" : isDnf ? "bg-gray-50/60" : isHC ? "bg-amber-50/40" : ""}`}>
         <td className={`sticky left-0 z-10 ${stickyBg} w-10 px-2 py-2.5 text-gray-400 text-xs text-center`}>
-          {score !== null
+          {isDnf
+            ? <span className="text-gray-400 font-medium text-xs">KAT</span>
+            : score !== null
             ? (rank !== null ? rank : <span className="text-amber-600 font-medium text-xs">AV</span>)
             : "–"}
         </td>
         <td className={`sticky left-10 z-10 ${stickyBg} border-r px-4 py-2.5 min-w-40`}>
           <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
-          <span className={`font-medium ${isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
+          <span className={`font-medium ${isDnf ? "text-gray-500" : isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
+          {isDnf && <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">KAT</span>}
           {isHC && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">AV</span>}
         </td>
 
@@ -371,6 +380,16 @@ export function ElementResultsTable({ element, teams }: Props) {
                   </td>
                 </tr>
                 {horsCompTeams.map(team => renderRow(team, null))}
+              </>
+            )}
+            {dnfTeams.length > 0 && (
+              <>
+                <tr>
+                  <td colSpan={totalCols} className="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-500 tracking-wide uppercase">
+                    Katkestanud
+                  </td>
+                </tr>
+                {dnfTeams.map(team => renderRow(team, null))}
               </>
             )}
           </tbody>

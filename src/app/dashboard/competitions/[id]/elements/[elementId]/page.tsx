@@ -457,7 +457,7 @@ export default async function ElementPage({
             penaltyPoints: s.penaltyPoints,
           })),
         }}
-        teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, isHorsDeCompetition: t.isHorsDeCompetition }))}
+        teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, isHorsDeCompetition: t.isHorsDeCompetition, hcFromElementOrder: t.hcFromElementOrder, dnfFromElementOrder: t.dnfFromElementOrder }))}
       />}
     </div>
   )
