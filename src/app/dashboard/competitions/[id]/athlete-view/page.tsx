@@ -11,7 +11,7 @@ export default async function AthleteViewPage({ params }: { params: Promise<{ id
 
   const competition = await prisma.competition.findUnique({
     where: { id },
-    select: { id: true, name: true, athletePointsMode: true, athletePointsRanges: true, athleteShowTotal: true },
+    select: { id: true, name: true, athletePointsMode: true, athletePointsRanges: true, athleteShowTotal: true, athleteShowRank: true },
   })
   if (!competition) notFound()
 
@@ -34,6 +34,7 @@ export default async function AthleteViewPage({ params }: { params: Promise<{ id
         initialMode={(competition.athletePointsMode as AthletePointsMode) ?? "HIDDEN"}
         initialRanges={parseRanges(competition.athletePointsRanges)}
         initialShowTotal={competition.athleteShowTotal}
+        initialShowRank={competition.athleteShowRank}
         initialElements={elements.map(e => ({ id: e.id, code: e.code, name: e.name, reveal: e.revealPointsToAthletes }))}
       />
     </div>

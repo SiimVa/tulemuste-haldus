@@ -12,7 +12,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
   const accessToken = await prisma.accessToken.findUnique({
     where: { token },
     include: {
-      competition: { select: { id: true, name: true, scoringMode: true, defaultKPMaxValue: true, athletePointsMode: true, athletePointsRanges: true, athleteShowTotal: true } },
+      competition: { select: { id: true, name: true, scoringMode: true, defaultKPMaxValue: true, athletePointsMode: true, athletePointsRanges: true, athleteShowTotal: true, athleteShowRank: true } },
       team: { include: { members: true } },
     },
   })
@@ -26,6 +26,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
   const pointsMode = (accessToken.competition.athletePointsMode as AthletePointsMode) ?? "HIDDEN"
   const pointsRanges = parseRanges(accessToken.competition.athletePointsRanges)
   const showTotal = accessToken.competition.athleteShowTotal && pointsMode !== "HIDDEN"
+  const showRank = accessToken.competition.athleteShowRank && pointsMode !== "HIDDEN"
   const defaultMax = accessToken.competition.defaultKPMaxValue
   const scoringMode = accessToken.competition.scoringMode as "PENALTY" | "PLUS"
 
@@ -59,9 +60,9 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
 
   const scoreByElement = new Map(myScores.map(s => [s.elementId, s.penaltyPoints]))
 
-  // Kogusumma + koht (kui lubatud)
+  // Kogusumma + koht (kui lubatud) — kumbki eraldi lülitatav
   let totalBlock: { totalLabel: string; rank: number | null; totalTeams: number; classRank: number | null; classTotal: number } | null = null
-  if (showTotal) {
+  if (showTotal || showRank) {
     const [allScores, allPenalties, allTeams] = await Promise.all([
       prisma.computedScore.findMany({ where: { element: { competitionId } }, select: { teamId: true, penaltyPoints: true } }),
       prisma.manualPenalty.findMany({ where: { competitionId }, select: { teamId: true, points: true } }),
@@ -81,9 +82,9 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
     const myClass = team.class ?? "–"
     const classRanked = ranked.filter(r => r.class === myClass)
     const classIdx = classRanked.findIndex(r => r.id === team.id)
-    const sumMax = elements.filter(e => !e.isCancelled).reduce((s, e) => s + (e.maxValue ?? defaultMax), 0)
     totalBlock = {
-      totalLabel: formatAthletePoints(myTotal, sumMax, pointsMode, pointsRanges, scoringMode) ?? `${myTotal}p`,
+      // Kokku näidatakse alati täpse summana (ilma vahemiketa) — vahemikud kehtivad ainult üksikelementidel
+      totalLabel: formatAthletePoints(myTotal, 0, "EXACT", pointsRanges, scoringMode) ?? `${myTotal}p`,
       rank: rankIdx >= 0 ? rankIdx + 1 : null,
       totalTeams: ranked.length,
       classRank: classIdx >= 0 ? classIdx + 1 : null,
@@ -166,21 +167,29 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
           <div className="bg-blue-600 text-white rounded-xl p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-blue-100">Kokku</p>
-                <p className="text-2xl font-bold font-mono">{totalBlock.totalLabel}</p>
-              </div>
-              <div className="text-right">
-                {totalBlock.rank != null && (
-                  <p className="text-xs text-blue-100">
-                    Üldkoht <span className="text-lg font-bold text-white">{totalBlock.rank}</span><span className="text-blue-200">/{totalBlock.totalTeams}</span>
-                  </p>
-                )}
-                {totalBlock.classRank != null && totalBlock.classTotal > 1 && (
-                  <p className="text-xs text-blue-100 mt-1">
-                    Klassis <span className="font-bold text-white">{totalBlock.classRank}</span><span className="text-blue-200">/{totalBlock.classTotal}</span>
-                  </p>
+                {showTotal ? (
+                  <>
+                    <p className="text-xs text-blue-100">Kokku</p>
+                    <p className="text-2xl font-bold font-mono">{totalBlock.totalLabel}</p>
+                  </>
+                ) : (
+                  <p className="text-sm font-medium text-blue-50">Pingerea koht</p>
                 )}
               </div>
+              {showRank && (
+                <div className="text-right">
+                  {totalBlock.rank != null && (
+                    <p className="text-xs text-blue-100">
+                      Üldkoht <span className="text-lg font-bold text-white">{totalBlock.rank}</span><span className="text-blue-200">/{totalBlock.totalTeams}</span>
+                    </p>
+                  )}
+                  {totalBlock.classRank != null && totalBlock.classTotal > 1 && (
+                    <p className="text-xs text-blue-100 mt-1">
+                      Klassis <span className="font-bold text-white">{totalBlock.classRank}</span><span className="text-blue-200">/{totalBlock.classTotal}</span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

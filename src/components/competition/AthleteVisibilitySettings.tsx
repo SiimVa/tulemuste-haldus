@@ -17,18 +17,21 @@ export function AthleteVisibilitySettings({
   initialMode,
   initialRanges,
   initialShowTotal,
+  initialShowRank,
   initialElements,
 }: {
   competitionId: string
   initialMode: AthletePointsMode
   initialRanges: RangeBucket[]
   initialShowTotal: boolean
+  initialShowRank: boolean
   initialElements: ElementRow[]
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<AthletePointsMode>(initialMode)
   const [ranges, setRanges] = useState<RangeBucket[]>(initialRanges.length > 0 ? initialRanges : DEFAULT_RANGES)
   const [showTotal, setShowTotal] = useState(initialShowTotal)
+  const [showRank, setShowRank] = useState(initialShowRank)
   const [elements, setElements] = useState<ElementRow[]>(initialElements)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -45,7 +48,7 @@ export function AthleteVisibilitySettings({
   async function saveSettings() {
     setSaving(true)
     setSaved(false)
-    const ok = await patch({ mode, ranges, showTotal })
+    const ok = await patch({ mode, ranges, showTotal, showRank })
     setSaving(false)
     if (ok) {
       setSaved(true)
@@ -113,12 +116,18 @@ export function AthleteVisibilitySettings({
           </div>
         )}
 
-        {/* Kogusumma */}
+        {/* Kogusumma + koht — eraldi lülitatavad */}
         {mode !== "HIDDEN" && (
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer border-t pt-3">
-            <input type="checkbox" checked={showTotal} onChange={e => setShowTotal(e.target.checked)} className="accent-blue-600" />
-            Näita ka kogusummat ja pingerea kohta
-          </label>
+          <div className="border-t pt-3 space-y-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={showTotal} onChange={e => setShowTotal(e.target.checked)} className="accent-blue-600" />
+              Näita kogusummat <span className="text-xs text-gray-400">(täpne summa, ilma vahemiketa)</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={showRank} onChange={e => setShowRank(e.target.checked)} className="accent-blue-600" />
+              Näita pingerea kohta <span className="text-xs text-gray-400">(üld + klass)</span>
+            </label>
+          </div>
         )}
 
         <div className="flex items-center gap-3 pt-1">

@@ -27,6 +27,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (body.mode !== undefined) compData.athletePointsMode = body.mode
   if (body.ranges !== undefined) compData.athletePointsRanges = JSON.stringify(body.ranges)
   if (body.showTotal !== undefined) compData.athleteShowTotal = Boolean(body.showTotal)
+  if (body.showRank !== undefined) compData.athleteShowRank = Boolean(body.showRank)
   if (Object.keys(compData).length > 0) {
     await prisma.competition.update({ where: { id }, data: compData })
   }
@@ -51,7 +52,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const competition = await prisma.competition.findUnique({
     where: { id },
-    select: { athletePointsMode: true, athletePointsRanges: true, athleteShowTotal: true },
+    select: { athletePointsMode: true, athletePointsRanges: true, athleteShowTotal: true, athleteShowRank: true },
   })
   const elements = await prisma.scoringElement.findMany({
     where: { competitionId: id },

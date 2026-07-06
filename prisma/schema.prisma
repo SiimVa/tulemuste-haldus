@@ -93,7 +93,8 @@ model Competition {
   // Punktide nähtavus võistlejate vaates
   athletePointsMode   String  @default("HIDDEN") // "HIDDEN" | "EXACT" | "RANGE"
   athletePointsRanges String  @default("[]")     // JSON: [{maxPct:number,label:string}] (protsendipõhised vahemikud)
-  athleteShowTotal    Boolean @default(false)    // kuva ka kogusumma + koht
+  athleteShowTotal    Boolean @default(false)    // kuva kogusumma (täpne summa, ilma vahemiketa)
+  athleteShowRank     Boolean @default(false)    // kuva pingerea koht (üld + klass)
 
   elements        ScoringElement[]
   teams           Team[]
