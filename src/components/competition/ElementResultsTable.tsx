@@ -61,6 +61,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   const [exceptionLabel, setExceptionLabel] = useState<string>("")
   const [saving, setSaving] = useState(false)
   const [bulkException, setBulkException] = useState("")
+  const [bulkValues, setBulkValues] = useState<Record<string, string>>({})
   const [bulkApplying, setBulkApplying] = useState(false)
 
   const isDirectEntry = element.directPointsEntry ?? false
@@ -81,25 +82,28 @@ export function ElementResultsTable({ element, teams }: Props) {
     try { return JSON.parse(valuesJson) } catch { return {} }
   }
 
-  async function bulkApplyException() {
-    if (!bulkException) return
+  // Kas bulk-vormis on mõni väljaväärtus sisestatud (nt vaikeväärtus "0")
+  const hasBulkValues = Object.values(bulkValues).some(v => (v ?? "").trim() !== "")
+
+  // Lisab kõigile sisestamata võistkondadele korraga sama tulemuse VÕI erandi.
+  // Erand (kui valitud) võidab — väljaväärtused jäetakse siis kõrvale (nagu ühe rea vormis).
+  async function bulkApply() {
     const missing = teams.filter(t => !results.find(r => r.teamId === t.id))
     if (missing.length === 0) return
+    const useException = !!bulkException
+    if (!useException && !hasBulkValues) return
     setBulkApplying(true)
     try {
       for (const team of missing) {
-        const res = await fetch(`/api/elements/${element.id}/results`, {
+        await fetch(`/api/elements/${element.id}/results`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ teamId: team.id, values: {}, exceptionLabel: bulkException }),
+          body: JSON.stringify({
+            teamId: team.id,
+            values: useException ? {} : bulkValues,
+            exceptionLabel: useException ? bulkException : null,
+          }),
         })
-        if (res.ok) {
-          const saved = await res.json()
-          setResults(prev => {
-            const newRow: ResultRow = { ...saved, teamName: team.name, teamCode: team.code }
-            return [...prev, newRow]
-          })
-        }
       }
       window.location.reload()
     } finally {
@@ -162,6 +166,35 @@ export function ElementResultsTable({ element, teams }: Props) {
   const inCompTeams = sortByScore(teams.filter(t => !teamIsHC(t) && !teamIsDnf(t)))
   const horsCompTeams = sortByScore(teams.filter(t => teamIsHC(t) && !teamIsDnf(t)))
   const totalCols = 2 + inputFields.length + computedFields.length + 3
+
+  const missingTeams = teams.filter(t => !results.find(r => r.teamId === t.id))
+  const bulkCls = "px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-300"
+
+  // Üks bulk-vormi väljasisestus (sama loogika nagu rea muutmisel); keelatud kui erand valitud
+  function renderBulkInput(f: Field) {
+    const disabled = !!bulkException
+    if (f.type === "TIME_RANGE") {
+      return (
+        <span className="inline-flex items-center gap-1">
+          <TimeClockInput value={bulkValues[f.name + "_start"] ?? ""} disabled={disabled}
+            onChange={v => setBulkValues(p => ({ ...p, [f.name + "_start"]: v }))} className={bulkCls} />
+          <span className="text-gray-300">–</span>
+          <TimeClockInput value={bulkValues[f.name + "_end"] ?? ""} disabled={disabled}
+            onChange={v => setBulkValues(p => ({ ...p, [f.name + "_end"]: v }))} className={bulkCls} />
+        </span>
+      )
+    }
+    if (f.type === "TIME") {
+      return <TimeDurationInput value={bulkValues[f.name] ?? ""} disabled={disabled} placeholder="m:ss"
+        onChange={v => setBulkValues(p => ({ ...p, [f.name]: v }))} className={`w-24 ${bulkCls}`} />
+    }
+    return <input type={f.type === "NUMBER" ? "number" : "text"}
+      inputMode={f.type === "NUMBER" ? "decimal" : undefined}
+      onWheel={f.type === "NUMBER" ? (e) => e.currentTarget.blur() : undefined}
+      value={bulkValues[f.name] ?? ""} disabled={disabled}
+      onChange={e => setBulkValues(p => ({ ...p, [f.name]: e.target.value }))}
+      className={`w-24 ${bulkCls}`} />
+  }
 
   function renderRow(team: Team, rank: number | null) {
     const result = getResult(team.id)
@@ -344,25 +377,48 @@ export function ElementResultsTable({ element, teams }: Props) {
         <h2 className="font-semibold text-gray-900">Tulemused</h2>
         <span className="text-sm text-gray-400">{results.length} / {teams.length} sisestatud</span>
       </div>
-      {element.exceptions.length > 0 && teams.some(t => !results.find(r => r.teamId === t.id)) && (
+      {missingTeams.length > 0 && (inputFields.length > 0 || element.exceptions.length > 0) && (
         <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500 shrink-0">Lisa erand kõigile sisestamata:</span>
-          <select
-            value={bulkException}
-            onChange={e => setBulkException(e.target.value)}
-            className="px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-          >
-            <option value="">Vali erand…</option>
-            {element.exceptions.map(ex => (
-              <option key={ex.id} value={ex.label}>{ex.label} ({ex.penalty}p)</option>
-            ))}
-          </select>
+          <span className="text-xs text-gray-500 shrink-0">Lisa kõigile sisestamata ({missingTeams.length}):</span>
+
+          {/* Väljade vaikeväärtused (nt 0) — keelatud kui erand on valitud */}
+          {isDirectEntry ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="text-xs text-gray-400">Punktid</span>
+              <input type="number" step="0.5" inputMode="decimal" onWheel={e => e.currentTarget.blur()}
+                value={resultField ? (bulkValues[resultField.name] ?? "") : ""} disabled={!!bulkException}
+                onChange={e => resultField && setBulkValues(p => ({ ...p, [resultField.name]: e.target.value }))}
+                className={`w-24 ${bulkCls}`} />
+            </span>
+          ) : (
+            inputFields.map(f => (
+              <span key={f.id} className="inline-flex items-center gap-1">
+                <span className="text-xs text-gray-400">{f.label}</span>
+                {renderBulkInput(f)}
+              </span>
+            ))
+          )}
+
+          {/* Erand — kui element neid omab (võidab väljaväärtuste üle) */}
+          {element.exceptions.length > 0 && (
+            <select
+              value={bulkException}
+              onChange={e => setBulkException(e.target.value)}
+              className="px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+            >
+              <option value="">– Erand (valikuline) –</option>
+              {element.exceptions.map(ex => (
+                <option key={ex.id} value={ex.label}>{ex.label} ({ex.penalty}p)</option>
+              ))}
+            </select>
+          )}
+
           <button
-            onClick={bulkApplyException}
-            disabled={!bulkException || bulkApplying}
-            className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-40 transition-colors"
+            onClick={bulkApply}
+            disabled={bulkApplying || (!bulkException && !hasBulkValues)}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-40 transition-colors"
           >
-            {bulkApplying ? "Lisan…" : `Lisa ${teams.filter(t => !results.find(r => r.teamId === t.id)).length} võistkonnale`}
+            {bulkApplying ? "Lisan…" : `Lisa ${missingTeams.length} võistkonnale`}
           </button>
         </div>
       )}

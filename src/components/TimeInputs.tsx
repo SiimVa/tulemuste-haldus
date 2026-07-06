@@ -25,9 +25,10 @@ type DurationProps = {
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
-export function TimeDurationInput({ value, onChange, onKeyDown, placeholder, className }: DurationProps) {
+export function TimeDurationInput({ value, onChange, onKeyDown, placeholder, className, disabled }: DurationProps) {
   return (
     <input
       type="text"
@@ -37,6 +38,7 @@ export function TimeDurationInput({ value, onChange, onKeyDown, placeholder, cla
       onKeyDown={onKeyDown}
       placeholder={placeholder ?? "m:ss"}
       className={className}
+      disabled={disabled}
     />
   )
 }
@@ -59,9 +61,10 @@ type ClockProps = {
   onChange: (v: string) => void
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   className?: string
+  disabled?: boolean
 }
 
-export function TimeClockInput({ value, onChange, onKeyDown, className }: ClockProps) {
+export function TimeClockInput({ value, onChange, onKeyDown, className, disabled }: ClockProps) {
   return (
     <input
       type="time"
@@ -70,6 +73,7 @@ export function TimeClockInput({ value, onChange, onKeyDown, className }: ClockP
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       className={className}
+      disabled={disabled}
     />
   )
 }
