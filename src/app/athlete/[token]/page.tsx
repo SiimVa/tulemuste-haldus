@@ -61,7 +61,7 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
   const scoreByElement = new Map(myScores.map(s => [s.elementId, s.penaltyPoints]))
 
   // Kogusumma + koht (kui lubatud) — kumbki eraldi lülitatav
-  let totalBlock: { totalLabel: string; rank: number | null; totalTeams: number; classRank: number | null; classTotal: number } | null = null
+  let totalBlock: { totalLabel: string; rank: number | null; totalTeams: number; classRank: number | null; classTotal: number; notional: boolean; statusLabel: string | null } | null = null
   if (showTotal || showRank) {
     const [allScores, allPenalties, allTeams] = await Promise.all([
       prisma.computedScore.findMany({ where: { element: { competitionId } }, select: { teamId: true, penaltyPoints: true } }),
@@ -78,17 +78,28 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
       .map(t => ({ id: t.id, class: t.class ?? "–", total: Math.round((totalByTeam.get(t.id) ?? 0) * 1000) / 1000 }))
       .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
     const myTotal = Math.round((totalByTeam.get(team.id) ?? 0) * 1000) / 1000
-    const rankIdx = ranked.findIndex(r => r.id === team.id)
     const myClass = team.class ?? "–"
     const classRanked = ranked.filter(r => r.class === myClass)
+    const rankIdx = ranked.findIndex(r => r.id === team.id)
     const classIdx = classRanked.findIndex(r => r.id === team.id)
+
+    // Arvestusväline / katkestanud võistkond pole ametlikus pingereas — näitame
+    // mitteametlikku ("~") kohta, kuhu ta ametlike võistkondade seas paigutuks
+    const teamHC = team.isHorsDeCompetition || team.hcFromElementOrder != null
+    const teamDnf = team.dnfFromElementOrder != null
+    const isNotional = rankIdx < 0 && (teamHC || teamDnf)
+    const betterThan = (list: { total: number }[]) =>
+      list.filter(r => (scoringMode === "PLUS" ? r.total > myTotal : r.total < myTotal)).length
+
     totalBlock = {
       // Kokku näidatakse alati täpse summana (ilma vahemiketa) — vahemikud kehtivad ainult üksikelementidel
       totalLabel: formatAthletePoints(myTotal, 0, "EXACT", pointsRanges, scoringMode) ?? `${myTotal}p`,
-      rank: rankIdx >= 0 ? rankIdx + 1 : null,
-      totalTeams: ranked.length,
-      classRank: classIdx >= 0 ? classIdx + 1 : null,
-      classTotal: classRanked.length,
+      rank: rankIdx >= 0 ? rankIdx + 1 : (isNotional ? betterThan(ranked) + 1 : null),
+      totalTeams: ranked.length + (isNotional ? 1 : 0),
+      classRank: classIdx >= 0 ? classIdx + 1 : (isNotional ? betterThan(classRanked) + 1 : null),
+      classTotal: classRanked.length + (isNotional ? 1 : 0),
+      notional: isNotional,
+      statusLabel: isNotional ? (teamDnf ? "Katkestanud" : "Arvestusväline") : null,
     }
   }
 
@@ -178,15 +189,21 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
               </div>
               {showRank && (
                 <div className="text-right">
+                  {totalBlock.statusLabel && (
+                    <p className="text-xs font-medium text-blue-50 mb-0.5">{totalBlock.statusLabel}</p>
+                  )}
                   {totalBlock.rank != null && (
                     <p className="text-xs text-blue-100">
-                      Üldkoht <span className="text-lg font-bold text-white">{totalBlock.rank}</span><span className="text-blue-200">/{totalBlock.totalTeams}</span>
+                      Üldkoht <span className="text-lg font-bold text-white">{totalBlock.notional ? "~" : ""}{totalBlock.rank}</span><span className="text-blue-200">/{totalBlock.totalTeams}</span>
                     </p>
                   )}
                   {totalBlock.classRank != null && totalBlock.classTotal > 1 && (
                     <p className="text-xs text-blue-100 mt-1">
-                      Klassis <span className="font-bold text-white">{totalBlock.classRank}</span><span className="text-blue-200">/{totalBlock.classTotal}</span>
+                      Klassis <span className="font-bold text-white">{totalBlock.notional ? "~" : ""}{totalBlock.classRank}</span><span className="text-blue-200">/{totalBlock.classTotal}</span>
                     </p>
+                  )}
+                  {totalBlock.notional && (
+                    <p className="text-[10px] text-blue-200 mt-0.5">mitteametlik koht</p>
                   )}
                 </div>
               )}
