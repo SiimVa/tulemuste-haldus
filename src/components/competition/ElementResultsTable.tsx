@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { naturalCompare } from "@/lib/utils"
+import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; meta?: string | null }
 
@@ -171,6 +172,12 @@ export function ElementResultsTable({ element, teams }: Props) {
     const isHC = teamIsHC(team) && !isDnf
     const stickyBg = isEditing ? "bg-blue-50" : isDnf ? "bg-gray-100" : isHC ? "bg-amber-50" : "bg-white"
 
+    // Enter salvestab, Esc katkestab (kiire klaviatuuriga sisestus)
+    const onKey = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") { e.preventDefault(); saveResult(team.id) }
+      else if (e.key === "Escape") { e.preventDefault(); setEditingTeamId(null) }
+    }
+
     return (
       <tr key={team.id} className={`hover:bg-gray-50 ${isEditing ? "bg-blue-50" : isDnf ? "bg-gray-50/60" : isHC ? "bg-amber-50/40" : ""}`}>
         <td className={`sticky left-0 z-10 ${stickyBg} w-10 px-2 py-2.5 text-gray-400 text-xs text-center`}>
@@ -197,11 +204,15 @@ export function ElementResultsTable({ element, teams }: Props) {
                   <input
                     type="number"
                     step="0.5"
+                    inputMode="decimal"
+                    onWheel={e => e.currentTarget.blur()}
                     value={resultField ? (formValues[resultField.name] ?? "") : ""}
                     onChange={e => resultField && setFormValues({ ...formValues, [resultField.name]: e.target.value })}
+                    onKeyDown={onKey}
                     placeholder="Kokku punktid"
                     onFocus={e => e.target.select()}
                     className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    autoFocus
                   />
                 )}
               </td>
@@ -213,27 +224,35 @@ export function ElementResultsTable({ element, teams }: Props) {
                       <span className="text-gray-300 text-xs">—</span>
                     ) : f.type === "TIME_RANGE" ? (
                       <div className="space-y-1">
-                        <input
-                          type="text"
+                        <TimeClockInput
                           value={formValues[f.name + "_start"] ?? ""}
-                          onChange={e => setFormValues({ ...formValues, [f.name + "_start"]: e.target.value })}
-                          placeholder="Algus h:mm:ss"
+                          onChange={v => setFormValues({ ...formValues, [f.name + "_start"]: v })}
+                          onKeyDown={onKey}
                           className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
-                        <input
-                          type="text"
+                        <TimeClockInput
                           value={formValues[f.name + "_end"] ?? ""}
-                          onChange={e => setFormValues({ ...formValues, [f.name + "_end"]: e.target.value })}
-                          placeholder="Lõpp h:mm:ss"
+                          onChange={v => setFormValues({ ...formValues, [f.name + "_end"]: v })}
+                          onKeyDown={onKey}
                           className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
+                    ) : f.type === "TIME" ? (
+                      <TimeDurationInput
+                        value={formValues[f.name] ?? ""}
+                        onChange={v => setFormValues({ ...formValues, [f.name]: v })}
+                        onKeyDown={onKey}
+                        placeholder="m:ss"
+                        className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
                     ) : (
                       <input
                         type={f.type === "NUMBER" ? "number" : "text"}
+                        inputMode={f.type === "NUMBER" ? "decimal" : undefined}
+                        onWheel={f.type === "NUMBER" ? (e) => e.currentTarget.blur() : undefined}
                         value={formValues[f.name] ?? ""}
                         onChange={e => setFormValues({ ...formValues, [f.name]: e.target.value })}
-                        placeholder={f.type === "TIME" ? "0:00:00" : ""}
+                        onKeyDown={onKey}
                         className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     )}
@@ -248,6 +267,7 @@ export function ElementResultsTable({ element, teams }: Props) {
               <select
                 value={exceptionLabel}
                 onChange={e => setExceptionLabel(e.target.value)}
+                onKeyDown={onKey}
                 className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="">– Sooritati –</option>

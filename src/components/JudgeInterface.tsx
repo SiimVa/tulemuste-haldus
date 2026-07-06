@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { naturalCompare } from "@/lib/utils"
+import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; validation?: string | null }
 type Exception = { id: string; label: string; penalty: number }
@@ -234,11 +235,9 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                     <div className="pt-3">
                       <p className="text-xs font-semibold text-gray-600 mb-2">1. Kõigil sama stardiaeg</p>
                       <div className="flex gap-2 items-center">
-                        <input
-                          type="text"
+                        <TimeClockInput
                           value={commonStart}
-                          onChange={e => setCommonStart(e.target.value)}
-                          placeholder="h:mm:ss"
+                          onChange={setCommonStart}
                           className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button
@@ -256,11 +255,9 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
                           <label className="text-xs text-gray-500 mb-0.5 block">1. VK start</label>
-                          <input
-                            type="text"
+                          <TimeClockInput
                             value={intervalStart}
-                            onChange={e => setIntervalStart(e.target.value)}
-                            placeholder="h:mm:ss"
+                            onChange={setIntervalStart}
                             className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -268,6 +265,8 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                           <label className="text-xs text-gray-500 mb-0.5 block">Intervall (min)</label>
                           <input
                             type="number"
+                            inputMode="decimal"
+                            onWheel={e => e.currentTarget.blur()}
                             value={intervalMinutes}
                             onChange={e => setIntervalMinutes(e.target.value)}
                             min="0.5"
@@ -357,21 +356,17 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-gray-400 mb-0.5 block">Algusaeg</label>
-                          <input
-                            type="text"
+                          <TimeClockInput
                             value={formValues[field.name + "_start"] ?? ""}
-                            onChange={e => setFormValues({ ...formValues, [field.name + "_start"]: e.target.value })}
-                            placeholder="h:mm:ss"
+                            onChange={v => setFormValues({ ...formValues, [field.name + "_start"]: v })}
                             className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
                         <div>
                           <label className="text-xs text-gray-400 mb-0.5 block">Lõppaeg</label>
-                          <input
-                            type="text"
+                          <TimeClockInput
                             value={formValues[field.name + "_end"] ?? ""}
-                            onChange={e => setFormValues({ ...formValues, [field.name + "_end"]: e.target.value })}
-                            placeholder="h:mm:ss"
+                            onChange={v => setFormValues({ ...formValues, [field.name + "_end"]: v })}
                             className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -385,12 +380,20 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                         return <p className="text-xs text-blue-600">Kestvus: {h}:{String(m).padStart(2,"0")}:{String(s).padStart(2,"0")}</p>
                       })()}
                     </div>
+                  ) : field.type === "TIME" ? (
+                    <TimeDurationInput
+                      value={formValues[field.name] ?? ""}
+                      onChange={v => setFormValues({ ...formValues, [field.name]: v })}
+                      placeholder="m:ss"
+                      className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   ) : (
                     <input
                       type={field.type === "NUMBER" ? "number" : "text"}
+                      inputMode={field.type === "NUMBER" ? "decimal" : undefined}
+                      onWheel={field.type === "NUMBER" ? (e) => e.currentTarget.blur() : undefined}
                       value={formValues[field.name] ?? ""}
                       onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                      placeholder={field.type === "TIME" ? "h:mm:ss" : ""}
                       className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       step={field.type === "NUMBER" ? "any" : undefined}
                     />
