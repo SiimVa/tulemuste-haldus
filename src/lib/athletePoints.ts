@@ -24,7 +24,7 @@ export function parseRanges(json: string | null | undefined): RangeBucket[] {
   return DEFAULT_RANGES
 }
 
-// Vormindab punktid sportlasele vastavalt režiimile. Tagastab null kui peidetud.
+// Vormindab punktid võistlejale vastavalt režiimile. Tagastab null kui peidetud.
 // scoringMode arvestab, et karistussüsteemis on väiksem skoor parem.
 export function formatAthletePoints(
   score: number,

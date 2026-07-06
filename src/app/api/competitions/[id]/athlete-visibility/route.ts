@@ -11,7 +11,7 @@ async function checkAccess(competitionId: string, userId: string, role: string) 
   return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
 }
 
-// PATCH — uuenda sportlaste punktide nähtavuse seadeid (osaline)
+// PATCH — uuenda võistlejate punktide nähtavuse seadeid (osaline)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

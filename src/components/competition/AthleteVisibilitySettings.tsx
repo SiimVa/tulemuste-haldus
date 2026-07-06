@@ -7,7 +7,7 @@ import { DEFAULT_RANGES, type RangeBucket, type AthletePointsMode } from "@/lib/
 type ElementRow = { id: string; code: string; name: string; reveal: boolean }
 
 const MODES: { value: AthletePointsMode; label: string; desc: string }[] = [
-  { value: "HIDDEN", label: "Peidetud", desc: "Sportlased ei näe punkte (vaikeseade)." },
+  { value: "HIDDEN", label: "Peidetud", desc: "Võistlejad ei näe punkte (vaikeseade)." },
   { value: "EXACT", label: "Täpsed punktid", desc: "Näitab täpset punktide arvu (1:1)." },
   { value: "RANGE", label: "Vahemikega", desc: "Näitab protsendipõhist vahemikku + silti (nt \"Hea (10–20p)\")." },
 ]
@@ -70,7 +70,7 @@ export function AthleteVisibilitySettings({
     <div className="space-y-5">
       {/* Režiim */}
       <div className="bg-white border rounded-xl p-5 space-y-3">
-        <h2 className="font-semibold text-gray-900">Punktide nähtavus sportlastele</h2>
+        <h2 className="font-semibold text-gray-900">Punktide nähtavus võistlejatele</h2>
         <p className="text-xs text-gray-500">Vaikimisi on punktid peidetud. Saad need avaldada ja vajadusel uuesti peita.</p>
         <div className="space-y-2">
           {MODES.map(m => (

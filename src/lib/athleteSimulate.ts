@@ -1,4 +1,4 @@
-// Kliendiohutu simulatsiooni-loogika sportlase vaate jaoks.
+// Kliendiohutu simulatsiooni-loogika võistleja vaate jaoks.
 // EI impordi mathjs ega @prisma/client'i — väldib brauseri paketi paisumist.
 // Toetab ainult "oma-sisendi" arvutusmeetodeid (sõltuvad ainult tiimi enda sisendist).
 // Relatiivsete meetodite puhul tagastab null (= ei saa kliendipoolselt simuleerida).

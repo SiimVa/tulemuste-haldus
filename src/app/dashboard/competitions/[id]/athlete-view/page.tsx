@@ -27,7 +27,7 @@ export default async function AthleteViewPage({ params }: { params: Promise<{ id
         <Link href={`/dashboard/competitions/${id}`}>← Tagasi</Link>
       </div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">{competition.name}</h1>
-      <p className="text-gray-500 text-sm mb-6">Sportlaste vaate seaded — mida võistlejad oma token-vaates näevad</p>
+      <p className="text-gray-500 text-sm mb-6">Võistlejate vaate seaded — mida võistlejad oma token-vaates näevad</p>
 
       <AthleteVisibilitySettings
         competitionId={id}

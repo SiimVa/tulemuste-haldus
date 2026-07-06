@@ -90,7 +90,7 @@ model Competition {
   // nt [{"place":1,"points":20},{"place":2,"points":18}]
   defaultFixedRankingPoints String @default("[]")
 
-  // Punktide nähtavus sportlaste vaates
+  // Punktide nähtavus võistlejate vaates
   athletePointsMode   String  @default("HIDDEN") // "HIDDEN" | "EXACT" | "RANGE"
   athletePointsRanges String  @default("[]")     // JSON: [{maxPct:number,label:string}] (protsendipõhised vahemikud)
   athleteShowTotal    Boolean @default(false)    // kuva ka kogusumma + koht
@@ -118,7 +118,7 @@ model ScoringElement {
   createdAt         DateTime    @default(now())
   isCancelled       Boolean     @default(false)
   directPointsEntry Boolean     @default(false)
-  revealPointsToAthletes Boolean @default(false) // kas selle elemendi punktid on sportlastele nähtavad
+  revealPointsToAthletes Boolean @default(false) // kas selle elemendi punktid on võistlejatele nähtavad
 
   fields       FieldDefinition[]
   exceptions   ElementException[]
