@@ -36,6 +36,7 @@ type CompDefs = {
   defaultCalcType: string
   defaultHigherIsBetter: boolean
   defaultRankingMinPoints: number
+  defaultFixedRankingPoints: string[]
 }
 
 const FIELD_TYPES = [
@@ -206,6 +207,10 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           defaultCalcType: data.defaultCalcType ?? "RELATIVE_RANKING",
           defaultHigherIsBetter: data.defaultHigherIsBetter ?? false,
           defaultRankingMinPoints: data.defaultRankingMinPoints ?? 0,
+          defaultFixedRankingPoints: (() => {
+            try { const p = JSON.parse(data.defaultFixedRankingPoints ?? "[]"); return Array.isArray(p) ? p.map(String) : [] }
+            catch { return [] }
+          })(),
         }
         setCompDefs(defs)
         setDirectHigherIsBetter(defs.scoringMode === "PLUS")
@@ -219,6 +224,9 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         setMinPoints(defs.defaultRankingMinPoints)
         setMaxValue(td.maxValue)
         setElementConfig(td.config)
+        if (td.calcType === "FIXED_RANKING" && defs.defaultFixedRankingPoints.length > 0) {
+          setFixedPoints(defs.defaultFixedRankingPoints)
+        }
 
         const copyFromId = new URLSearchParams(window.location.search).get('copyFrom')
         if (copyFromId) {
@@ -300,6 +308,15 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
     setMinPoints(compDefs?.defaultRankingMinPoints ?? 0)
     setMaxValue(td.maxValue)
     setElementConfig(td.config)
+    maybePrefillFixed(td.calcType)
+  }
+
+  // Eeltäida fikseeritud pingerea punktid võistluse vaikeväärtusest (kui kasutaja pole veel ise sisestanud)
+  function maybePrefillFixed(newCalc: string) {
+    if (newCalc !== "FIXED_RANKING") return
+    const defaults = compDefs?.defaultFixedRankingPoints
+    if (!defaults || defaults.length === 0) return
+    setFixedPoints(prev => (prev.length === 0 ? defaults : prev))
   }
 
   function addSection() {
@@ -1002,7 +1019,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               {CALC_TYPES.filter(ct => ct.value !== "COMBINED" || canCombine).map(ct => (
                 <label key={ct.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${calcType === ct.value ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"}`}>
                   <input type="radio" name="calcType" value={ct.value}
-                    checked={calcType === ct.value} onChange={() => setCalcType(ct.value)}
+                    checked={calcType === ct.value} onChange={() => { setCalcType(ct.value); maybePrefillFixed(ct.value) }}
                     className="mt-0.5 accent-blue-600" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">{ct.label}</p>

@@ -13,6 +13,7 @@ type Form = {
   defaultCalcType: string
   defaultHigherIsBetter: boolean
   defaultRankingMinPoints: number
+  defaultFixedRankingPoints: string[]
   defaultKPMaxValue: number
   defaultNotPassed: number
   defaultPassedNotDone: number
@@ -41,6 +42,7 @@ const DEFAULTS: Form = {
   defaultCalcType: "RELATIVE_RANKING",
   defaultHigherIsBetter: false,
   defaultRankingMinPoints: 0,
+  defaultFixedRankingPoints: [],
   defaultKPMaxValue: 30, defaultNotPassed: 40, defaultPassedNotDone: 35,
   defaultPKMaxValue: 15,
   defaultVastutegevusPenaltyPerLife: 5,
@@ -89,6 +91,8 @@ export default function NewCompetitionPage() {
         defaultHilinemineIntervalMinutes: Number(form.defaultHilinemineIntervalMinutes),
         defaultHilineminePenaltyPerInterval: Number(form.defaultHilineminePenaltyPerInterval),
         defaultHilinemineMaxPenalty: Number(form.defaultHilinemineMaxPenalty),
+        defaultFixedRankingPoints: form.defaultFixedRankingPoints
+          .map(v => Number(v)).filter(n => !isNaN(n)),
       }),
     })
 
@@ -221,6 +225,59 @@ export default function NewCompetitionPage() {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">Halvim sooritanud tiim saab vähemalt selle palju punkte. Parim saab KP/PK maksimumpunkti.</p>
               </div>
+            </div>
+          )}
+          {form.defaultCalcType === "FIXED_RANKING" && (
+            <div className="space-y-3 pt-1 border-t mt-1">
+              <p className="text-xs text-gray-500">
+                Määra mitu punkti iga koht annab. Kasutatakse elementides, mis kasutavad fikseeritud pingerida arvutusviisi.
+                Elemente luues saab neid vaikeväärtusi muuta.
+              </p>
+              {form.defaultFixedRankingPoints.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">Kohad pole määratud — lisa esimene koht allpool.</p>
+              ) : (
+                <div className="space-y-2">
+                  {form.defaultFixedRankingPoints.map((pts, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-sm text-gray-500 w-20 shrink-0">{i + 1}. koht</span>
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="number" min={0} step={0.5}
+                          value={pts}
+                          onChange={e => {
+                            const updated = [...form.defaultFixedRankingPoints]
+                            updated[i] = e.target.value
+                            set("defaultFixedRankingPoints", updated)
+                          }}
+                          onFocus={e => e.target.select()}
+                          className="w-28 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-400">{form.scoringMode === "PLUS" ? "plusspunkti" : "karistuspunkti"}</span>
+                      </div>
+                      <button type="button"
+                        onClick={() => set("defaultFixedRankingPoints", form.defaultFixedRankingPoints.filter((_, idx) => idx !== i))}
+                        className="text-red-400 hover:text-red-600 text-sm px-2">
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button"
+                onClick={() => {
+                  const list = form.defaultFixedRankingPoints
+                  const last = list.length > 0 ? Number(list[list.length - 1]) : 20
+                  const next = Math.max(0, last - 2)
+                  set("defaultFixedRankingPoints", [...list, String(next)])
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                + Lisa koht
+              </button>
+              {form.defaultFixedRankingPoints.length > 0 && (
+                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                  Kohad mis pole määratud saavad 0 punkti. Viigi korral saavad mõlemad kõrgema koha punktid.
+                </p>
+              )}
             </div>
           )}
         </div>
