@@ -82,7 +82,7 @@ export function AbandonmentTable({
   initialEntries: MiscEntry[]
 }) {
   const [entries, setEntries] = useState<MiscEntry[]>(initialEntries.filter((e) => e.description !== WHOLE_TEAM))
-  const [dnf, setDnf] = useState<Record<string, boolean>>(
+  const [dnf] = useState<Record<string, boolean>>(
     Object.fromEntries(teams.map((t) => [t.id, t.dnfFromElementOrder != null]))
   )
   const [busy, setBusy] = useState<string | null>(null)

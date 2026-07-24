@@ -51,9 +51,7 @@ function computeFields(values: Record<string, string | number>, fields: SimField
         const n = typeof v === "number" ? v : parseFloat(String(v))
         if (!isNaN(n)) scope[k] = n
       }
-      // eslint-disable-next-line no-new-func
-      const fn = new Function(...Object.keys(scope), "min", "max", "floor", "round", "abs", `return (${field.formula})`)
-      const val = fn(...Object.values(scope), Math.min, Math.max, Math.floor, Math.round, Math.abs)
+      const val = evaluateFormula(field.formula!, scope)
       result[field.name] = typeof val === "number" && isFinite(val) ? val : 0
     } catch {
       result[field.name] = 0
@@ -70,9 +68,7 @@ function computeFields(values: Record<string, string | number>, fields: SimField
 
 function evalFormula(formula: string, resultVal: number): number {
   try {
-    // eslint-disable-next-line no-new-func
-    const fn = new Function("result", "min", "max", "floor", "round", "abs", `return (${formula})`)
-    const v = fn(resultVal, Math.min, Math.max, Math.floor, Math.round, Math.abs)
+    const v = evaluateFormula(formula, { result: resultVal })
     return typeof v === "number" && isFinite(v) ? v : 0
   } catch {
     return 0
@@ -125,3 +121,4 @@ export function simulateElementScore(opts: {
       return null
   }
 }
+import { evaluateFormula } from "@/lib/formula"

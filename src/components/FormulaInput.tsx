@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useEffect } from "react"
+import { evaluateFormula } from "@/lib/formula"
 
 type Field = { name: string; label: string; type: string }
 
@@ -17,11 +18,7 @@ function tryEval(formula: string, fields: Field[]): number | null {
   try {
     const scope: Record<string, number> = {}
     fields.forEach(f => { scope[f.name] = f.type === "TIME" ? 60 : 1 })
-    const argNames = Object.keys(scope)
-    const argValues = Object.values(scope)
-    // eslint-disable-next-line no-new-func
-    const fn = new Function(...argNames, "min", "max", "floor", "round", "abs", `return (${formula})`)
-    const result = fn(...argValues, Math.min, Math.max, Math.floor, Math.round, Math.abs)
+    const result = evaluateFormula(formula, scope)
     return typeof result === "number" && isFinite(result) ? Math.round(result * 100) / 100 : null
   } catch {
     return null

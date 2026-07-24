@@ -136,7 +136,6 @@ export default function AnalysisView({
   teamElementStats,
   elementStats,
   simElements,
-  defaultMax,
 }: Props) {
   const [tab, setTab] = useState<Tab>("team")
   const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? "")

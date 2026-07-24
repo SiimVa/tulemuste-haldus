@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState, useEffect, useRef } from "react"
+import { use, useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 
 type Team = {
@@ -45,15 +45,15 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   const [dqSaving, setDqSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  async function loadTeams() {
+  const loadTeams = useCallback(async () => {
     const r = await fetch(`/api/competitions/${competitionId}`)
     const d = await r.json()
     setTeams(d.teams ?? [])
     setElements((d.elements ?? []).map((el: Element) => ({ id: el.id, name: el.name, code: el.code, order: el.order })))
     setLoading(false)
-  }
+  }, [competitionId])
 
-  useEffect(() => { loadTeams() }, [competitionId])
+  useEffect(() => { void loadTeams() }, [loadTeams])
 
   async function addTeam(e: React.FormEvent) {
     e.preventDefault()

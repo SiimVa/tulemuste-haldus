@@ -3,6 +3,21 @@ import { calculateScores, withEffectiveHC } from "@/lib/calculators"
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
+async function replaceComputedScores(
+  elementId: string,
+  scores: { teamId: string; penaltyPoints: number }[]
+): Promise<void> {
+  const computedAt = new Date()
+  await prisma.$transaction(async (tx) => {
+    await tx.computedScore.deleteMany({ where: { elementId } })
+    if (scores.length > 0) {
+      await tx.computedScore.createMany({
+        data: scores.map((score) => ({ ...score, elementId, computedAt })),
+      })
+    }
+  })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ÜKS tõesuse allikas skooride arvutamiseks. Kasutavad NII tulemuse salvestamine
 // (POST /results) kui ka hulgi-ümberarvutus (/recalculate), et need ei saaks
@@ -42,15 +57,10 @@ export async function recomputeElementScores(elementId: string): Promise<number>
       where: { competitionId: element.competitionId },
       select: { id: true },
     })
-    await prisma.$transaction(
-      teams.map((t) =>
-        prisma.computedScore.upsert({
-          where: { elementId_teamId: { elementId, teamId: t.id } },
-          create: { elementId, teamId: t.id, penaltyPoints: 0 },
-          update: { penaltyPoints: 0, computedAt: new Date() },
-        })
-      )
-    )
+    await replaceComputedScores(elementId, teams.map((team) => ({
+      teamId: team.id,
+      penaltyPoints: 0,
+    })))
     return teams.length
   }
 
@@ -58,15 +68,9 @@ export async function recomputeElementScores(elementId: string): Promise<number>
   if (element.type === "OTHER" || element.type === "ABANDONMENT") {
     const byTeam = new Map<string, number>()
     for (const e of element.miscEntries) byTeam.set(e.teamId, (byTeam.get(e.teamId) ?? 0) + e.points)
-    if (byTeam.size === 0) return 0
-    await prisma.$transaction(
-      [...byTeam.entries()].map(([teamId, pts]) =>
-        prisma.computedScore.upsert({
-          where: { elementId_teamId: { elementId, teamId } },
-          create: { elementId, teamId, penaltyPoints: pts },
-          update: { penaltyPoints: pts, computedAt: new Date() },
-        })
-      )
+    await replaceComputedScores(
+      elementId,
+      [...byTeam.entries()].map(([teamId, penaltyPoints]) => ({ teamId, penaltyPoints }))
     )
     return byTeam.size
   }
@@ -87,7 +91,10 @@ export async function recomputeElementScores(elementId: string): Promise<number>
   }
 
   const results = await prisma.result.findMany({ where: { elementId }, include: { team: true } })
-  if (results.length === 0 && miscByTeam.size === 0) return 0
+  if (results.length === 0 && miscByTeam.size === 0) {
+    await replaceComputedScores(elementId, [])
+    return 0
+  }
 
   const activeResults = results.filter((r) => !isDnfHere(r.teamId))
 
@@ -148,17 +155,7 @@ export async function recomputeElementScores(elementId: string): Promise<number>
     }))
   }
 
-  if (scored.length === 0) return 0
-
-  await prisma.$transaction(
-    scored.map((s) =>
-      prisma.computedScore.upsert({
-        where: { elementId_teamId: { elementId, teamId: s.teamId } },
-        create: { elementId, teamId: s.teamId, penaltyPoints: s.penaltyPoints },
-        update: { penaltyPoints: s.penaltyPoints, computedAt: new Date() },
-      })
-    )
-  )
+  await replaceComputedScores(elementId, scored)
   return scored.length
 }
 

@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccessElement } from "@/lib/competitionAccess"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: elementId } = await params
+  if (!await canAccessElement(elementId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
   const sections = await prisma.elementSection.findMany({
     where: { elementId },
     include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
@@ -17,6 +23,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id: elementId } = await params
+  if (!await canAccessElement(elementId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
   const body = await req.json()
   const { name, maxValue, fields, calcMethod, order } = body
 

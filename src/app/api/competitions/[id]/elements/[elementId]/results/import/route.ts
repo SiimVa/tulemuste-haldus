@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import * as XLSX from "xlsx"
 import { recomputeElementScores } from "@/lib/recompute"
+import { elementBelongsToCompetition } from "@/lib/competitionAccess"
 
 async function checkAccess(competitionId: string, userId: string, role: string) {
   if (role === "ADMIN") return true
@@ -67,6 +68,9 @@ export async function POST(
 
   const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  if (!await elementBelongsToCompetition(elementId, competitionId)) {
+    return NextResponse.json({ error: "Elementi ei leitud" }, { status: 404 })
+  }
 
   const contentType = req.headers.get("content-type") ?? ""
   if (!contentType.includes("multipart/form-data")) {

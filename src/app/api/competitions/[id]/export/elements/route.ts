@@ -3,16 +3,17 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { computeFields } from "@/lib/calculators"
+import { canAccessCompetition } from "@/lib/competitionAccess"
 import * as XLSX from "xlsx"
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id: competitionId } = await params
-  const { searchParams } = new URL(req.url)
-  const format = searchParams.get("format") ?? "xlsx"
-
+  if (!await canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },
     include: {

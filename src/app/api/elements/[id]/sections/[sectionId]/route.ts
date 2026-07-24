@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccessSection } from "@/lib/competitionAccess"
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id: elementId, sectionId } = await params
+  if (!await canAccessSection(sectionId, elementId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
   const body = await req.json()
   const { name, maxValue, calcMethod, fields } = body
 
@@ -71,7 +75,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { sectionId } = await params
+  const { id: elementId, sectionId } = await params
+  if (!await canAccessSection(sectionId, elementId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
   await prisma.elementSection.delete({ where: { id: sectionId } })
   return NextResponse.json({ ok: true })
 }
