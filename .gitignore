@@ -15,3 +15,5 @@ node_modules
 .claude/
 tsconfig.tsbuildinfo
 .test-dist
+playwright-report
+test-results
