@@ -9,7 +9,12 @@ export type ValidationError = { field: string; label: string; message: string }
 
 export function parseValidation(raw?: string | null): FieldValidation {
   if (!raw) return {}
-  try { return JSON.parse(raw) } catch { return {} }
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
 }
 
 export function validateFieldValue(
@@ -28,10 +33,12 @@ export function validateFieldValue(
   if (isEmpty) return null
 
   if (fieldType === "NUMBER") {
-    const num = parseFloat(String(value))
-    if (isNaN(num)) {
+    const raw = String(value).trim()
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw)) {
       return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema arv` }
     }
+    const num = Number(raw)
+    if (!Number.isFinite(num)) return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema lõplik arv` }
     if (validation.integer && !Number.isInteger(num)) {
       return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema täisarv` }
     }
@@ -46,13 +53,18 @@ export function validateFieldValue(
   if (fieldType === "TIME") {
     const str = String(value).trim()
     if (!/^\d+:\d{1,2}(:\d{1,2})?$/.test(str)) {
-      return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema formaadis h:mm:ss` }
+      return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema formaadis m:ss või h:mm:ss` }
+    }
+    const parts = str.split(":").map(Number)
+    const minutePart = parts.length === 3 ? parts[1] : null
+    const secondPart = parts.at(-1) ?? 0
+    if ((minutePart != null && minutePart > 59) || secondPart > 59) {
+      return { field: fieldName, label: fieldLabel, message: `${fieldLabel} minutid ja sekundid peavad olema vahemikus 0–59` }
     }
     if (validation.min != null || validation.max != null) {
-      const parts = str.split(":")
       let seconds = 0
-      if (parts.length === 3) seconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2])
-      else if (parts.length === 2) seconds = parseInt(parts[0]) * 60 + parseInt(parts[1])
+      if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+      else if (parts.length === 2) seconds = parts[0] * 60 + parts[1]
       if (validation.min != null && seconds < validation.min) {
         return { field: fieldName, label: fieldLabel, message: `${fieldLabel} on liiga väike (min ${validation.min}s)` }
       }
@@ -62,5 +74,23 @@ export function validateFieldValue(
     }
   }
 
+  return null
+}
+
+export function validateClockValue(
+  value: string | number | undefined | null,
+  fieldName: string,
+  fieldLabel: string,
+  required: boolean
+): ValidationError | null {
+  const raw = value == null ? "" : String(value).trim()
+  if (!raw) {
+    return required
+      ? { field: fieldName, label: fieldLabel, message: `${fieldLabel} on kohustuslik` }
+      : null
+  }
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(raw)) {
+    return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema korrektne kellaaeg` }
+  }
   return null
 }

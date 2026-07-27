@@ -6,7 +6,6 @@ import { RecalculateButton } from "@/components/RecalculateButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { ElementList } from "@/components/competition/ElementList"
 
-const ELEMENT_TYPE_LABEL: Record<string, string> = { CHECKPOINT: "KP", PENALTY_BOX: "Postkast/Vastutegevus", MANUAL: "Käsitsi", OTHER: "Muu" }
 const STATUS_LABEL: Record<string, string> = { SETUP: "Ettevalmistus", ACTIVE: "Aktiivne", FINISHED: "Lõppenud" }
 const STATUS_COLOR: Record<string, string> = {
   SETUP: "bg-gray-100 text-gray-600",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
+import { canAccessCompetition, elementBelongsToCompetition } from "@/lib/competitionAccess"
 import * as XLSX from "xlsx"
 
 export async function GET(
@@ -12,6 +13,12 @@ export async function GET(
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id: competitionId, elementId } = await params
+  if (
+    !await canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role }) ||
+    !await elementBelongsToCompetition(elementId, competitionId)
+  ) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
 
   const element = await prisma.scoringElement.findUnique({
     where: { id: elementId },

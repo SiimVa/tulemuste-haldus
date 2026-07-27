@@ -51,22 +51,6 @@ const CALC_TYPES = [
   { value: "CUSTOM", label: "Korraldaja valem", desc: "Kirjuta ise valem (muutujad: result, n, rank)." },
 ]
 
-const DEFAULTS: CompetitionForm = {
-  name: "", date: "", endDate: "", location: "", status: "SETUP",
-  scoringMode: "PENALTY",
-  defaultCalcType: "RELATIVE_RANKING",
-  defaultHigherIsBetter: false,
-  defaultRankingMinPoints: 0,
-  defaultKPMaxValue: 30, defaultNotPassed: 40, defaultPassedNotDone: 35,
-  defaultPKMaxValue: 15,
-  defaultVastutegevusPenaltyPerLife: 5,
-  defaultVarustusPenaltyPerItem: 5,
-  defaultHilinemineMode: "ONE_TIME",
-  defaultHilinemineIntervalMinutes: 1,
-  defaultHilineminePenaltyPerInterval: 1,
-  defaultHilinemineMaxPenalty: 30,
-}
-
 export default function SettingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = use(params)
   const router = useRouter()

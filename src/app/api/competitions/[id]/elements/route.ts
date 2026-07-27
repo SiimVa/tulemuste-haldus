@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccessCompetition } from "@/lib/competitionAccess"
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId } = await params
+  if (!await canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
 
   const body = await req.json()
   const { name, code, type, order, maxValue, config, fields, exceptions, calcMethod, sections } = body

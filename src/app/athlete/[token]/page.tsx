@@ -17,7 +17,12 @@ export default async function AthletePage({ params }: { params: Promise<{ token:
     },
   })
 
-  if (!accessToken || accessToken.type !== "ATHLETE" || !accessToken.team) notFound()
+  if (
+    !accessToken ||
+    accessToken.type !== "ATHLETE" ||
+    !accessToken.team ||
+    accessToken.team.competitionId !== accessToken.competition.id
+  ) notFound()
 
   const team = accessToken.team
   const competitionId = accessToken.competition.id

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { teamBelongsToCompetition } from "@/lib/competitionAccess"
 
 async function checkAccess(competitionId: string, userId: string, role: string) {
   if (role === "ADMIN") return true
@@ -18,6 +19,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  if (!await teamBelongsToCompetition(teamId, competitionId)) {
+    return NextResponse.json({ error: "Võistkonda ei leitud" }, { status: 404 })
+  }
 
   try {
     const body = await req.json()
@@ -70,6 +74,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  if (!await teamBelongsToCompetition(teamId, competitionId)) {
+    return NextResponse.json({ error: "Võistkonda ei leitud" }, { status: 404 })
+  }
 
   await prisma.team.delete({ where: { id: teamId } })
   return NextResponse.json({ ok: true })

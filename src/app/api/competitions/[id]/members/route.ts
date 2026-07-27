@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccessCompetition } from "@/lib/competitionAccess"
 
 async function isOwnerOrAdmin(competitionId: string, userId: string, role: string) {
   if (role === "ADMIN") return true
@@ -12,6 +13,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
+  if (!await canAccessCompetition(id, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
 
   const members = await prisma.competitionMember.findMany({
     where: { competitionId: id },

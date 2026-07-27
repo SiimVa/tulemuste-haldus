@@ -19,7 +19,11 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
     },
   })
 
-  if (!accessToken || accessToken.type !== "JUDGE") notFound()
+  if (
+    !accessToken ||
+    accessToken.type !== "JUDGE" ||
+    (accessToken.element && accessToken.element.competitionId !== accessToken.competition.id)
+  ) notFound()
 
   // Leia elemendid, mida see kohtunik tohib sisestada
   let elements

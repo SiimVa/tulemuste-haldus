@@ -1,4 +1,5 @@
-import { CalcMethod, Result, FieldDefinition } from "@prisma/client"
+import { CalcMethod, FieldDefinition } from "@prisma/client"
+import { evaluateFormula } from "@/lib/formula"
 
 // Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
 export type ScoreInput = {
@@ -8,8 +9,6 @@ export type ScoreInput = {
   exceptionPenalty: number | null
   team: { id: string; isHorsDeCompetition?: boolean }
 }
-import { evaluate } from "mathjs"
-
 type CalcType = "RELATIVE_RANKING" | "ABSOLUTE_TIME" | "ABSOLUTE_POINTS" | "CUSTOM" | "ABSOLUTE_PENALTY" | "FIXED_RANKING" | "VALUE_BASED" | "PERFORMANCE_BASED" | "DIRECT_ENTRY"
 export type ScoringMode = "PENALTY" | "PLUS"
 
@@ -113,11 +112,7 @@ export function computeFields(
         const n = typeof v === "number" ? v : parseFloat(String(v))
         if (!isNaN(n)) scope[k] = n
       }
-      const argNames = Object.keys(scope)
-      const argValues = Object.values(scope)
-      // eslint-disable-next-line no-new-func
-      const fn = new Function(...argNames, "min", "max", "floor", "round", "abs", `return (${field.formula!})`)
-      const val = fn(...argValues, Math.min, Math.max, Math.floor, Math.round, Math.abs)
+      const val = evaluateFormula(field.formula!, scope)
       result[field.name] = typeof val === "number" && isFinite(val) ? val : 0
     } catch {
       result[field.name] = 0
@@ -206,7 +201,7 @@ export function calculateScores(
       applyAbsolutePoints(normal, maxValue, scoringMode)
       break
     case "CUSTOM":
-      applyCustom(normal, calcMethod.customFormula || "0", fields)
+      applyCustom(normal, calcMethod.customFormula || "0")
       break
     case "ABSOLUTE_PENALTY":
       applyAbsolutePenalty(normal, calcMethod.customFormula || "result", scoringMode)
@@ -376,7 +371,7 @@ function applyAbsolutePenalty(
   for (const entry of entries) {
     try {
       const scope = { result: Number(entry.rawValue ?? 0) }
-      const penalty = Number(evaluate(formula, scope))
+      const penalty = evaluateFormula(formula, scope)
       entry.penaltyPoints = scoringMode === "PLUS" ? -Math.abs(penalty) : Math.abs(penalty)
     } catch {
       entry.penaltyPoints = Number(entry.rawValue ?? 0)
@@ -578,17 +573,16 @@ function applyPerformanceBased(
 // ─── Korraldaja valem ─────────────────────────────────────────────────────────
 function applyCustom(
   entries: ScoredEntry[],
-  formula: string,
-  _fields: FieldDefinition[]
+  formula: string
 ) {
   for (const entry of entries) {
     try {
-      const scope: FieldValues = {
+      const scope: Record<string, number> = {
         result: entry.rawValue ?? 0,
         n: entries.length,
         rank: entries.indexOf(entry) + 1,
       }
-      entry.penaltyPoints = evaluate(formula, scope) as number
+      entry.penaltyPoints = evaluateFormula(formula, scope)
     } catch {
       entry.penaltyPoints = 0
     }
