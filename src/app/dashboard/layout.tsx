@@ -6,6 +6,12 @@ import { SignOutButton } from "@/components/SignOutButton"
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  const roleLabel =
+    session.user.role === "ADMIN"
+      ? "Admin"
+      : session.user.role === "ORGANIZER"
+        ? "Korraldaja"
+        : "Kasutaja"
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -23,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Link href="/dashboard/profile" className="text-sm text-gray-500 hover:text-blue-600">
               {session.user.name}{" "}
               <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
-                {session.user.role === "ADMIN" ? "Admin" : "Korraldaja"}
+                {roleLabel}
               </span>
             </Link>
             <SignOutButton />

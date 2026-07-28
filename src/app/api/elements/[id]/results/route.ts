@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { parseValidation, validateClockValue, validateFieldValue } from "@/lib/fieldValidation"
 import { recomputeElementScores } from "@/lib/recompute"
 import {
-  canAccessCompetition,
-  canAccessElement,
+  canEnterCompetitionResults,
+  canEnterElementResults,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
 
@@ -14,7 +14,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
-  if (!await canAccessElement(id, { id: session.user.id, role: session.user.role })) {
+  if (!await canEnterElementResults(id, { id: session.user.id, role: session.user.role })) {
     return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   }
 
@@ -42,7 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let enteredByTokenId: string | null = null
 
   if (session?.user?.id) {
-    if (!await canAccessCompetition(targetElement.competitionId, { id: session.user.id, role: session.user.role })) {
+    if (!await canEnterCompetitionResults(targetElement.competitionId, { id: session.user.id, role: session.user.role })) {
       return NextResponse.json({ error: "Keelatud" }, { status: 403 })
     }
     enteredByUserId = session.user.id

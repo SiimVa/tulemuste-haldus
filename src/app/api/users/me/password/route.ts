@@ -9,8 +9,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { currentPassword, newPassword } = await req.json()
-  if (!currentPassword || !newPassword) {
-    return NextResponse.json({ error: "Kõik väljad on kohustuslikud" }, { status: 400 })
+  if (!newPassword) {
+    return NextResponse.json({ error: "Uus parool on kohustuslik" }, { status: 400 })
   }
   if (newPassword.length < 6) {
     return NextResponse.json({ error: "Uus parool peab olema vähemalt 6 tähemärki" }, { status: 400 })
@@ -19,8 +19,13 @@ export async function POST(req: Request) {
   const user = await prisma.user.findUnique({ where: { id: session.user.id } })
   if (!user) return NextResponse.json({ error: "Kasutajat ei leitud" }, { status: 404 })
 
-  const valid = await bcrypt.compare(currentPassword, user.passwordHash)
-  if (!valid) return NextResponse.json({ error: "Praegune parool on vale" }, { status: 400 })
+  if (user.passwordHash) {
+    if (!currentPassword) {
+      return NextResponse.json({ error: "Praegune parool on kohustuslik" }, { status: 400 })
+    }
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash)
+    if (!valid) return NextResponse.json({ error: "Praegune parool on vale" }, { status: 400 })
+  }
 
   const passwordHash = await bcrypt.hash(newPassword, 12)
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } })

@@ -1,19 +1,26 @@
 "use client"
 
-import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { useEffect, useState } from "react"
+import { getProviders, signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState<"credentials" | "google" | null>(null)
+  const [googleEnabled, setGoogleEnabled] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    getProviders()
+      .then((providers) => setGoogleEnabled(Boolean(providers?.google)))
+      .catch(() => setGoogleEnabled(false))
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
+    setLoading("credentials")
     setError("")
 
     const res = await signIn("credentials", {
@@ -24,10 +31,16 @@ export default function LoginPage() {
 
     if (res?.error) {
       setError("Vale e-post või parool")
-      setLoading(false)
+      setLoading(null)
     } else {
       router.push("/dashboard")
     }
+  }
+
+  async function handleGoogleSignIn() {
+    setError("")
+    setLoading("google")
+    await signIn("google", { redirectTo: "/dashboard" })
   }
 
   return (
@@ -65,12 +78,30 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading !== null}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {loading ? "Sisenemine..." : "Logi sisse"}
+            {loading === "credentials" ? "Sisenemine..." : "Logi sisse"}
           </button>
         </form>
+
+        {googleEnabled && (
+          <>
+            <div className="flex items-center gap-3 my-5">
+              <div className="h-px bg-gray-200 flex-1" />
+              <span className="text-xs text-gray-400">või</span>
+              <div className="h-px bg-gray-200 flex-1" />
+            </div>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading !== null}
+              className="w-full border border-gray-300 bg-white text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              {loading === "google" ? "Suunan Google’isse..." : "Jätka Google’iga"}
+            </button>
+          </>
+        )}
 
         <div className="mt-6 pt-4 border-t text-center">
           <p className="text-sm text-gray-500">

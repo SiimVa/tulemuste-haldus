@@ -12,6 +12,12 @@ const otherOrganizer = {
   password: "teine-turvaline-123",
 }
 
+const representative = {
+  email: "esindaja.e2e@example.com",
+  name: "E2E Esindaja",
+  password: "esindaja-turvaline-123",
+}
+
 const setupSecret = "e2e-setup-secret-used-only-by-playwright-tests"
 
 async function login(page: Page, email: string, password: string) {
@@ -25,6 +31,7 @@ async function login(page: Page, email: string, password: string) {
 test.describe.serial("võistluse põhivoog", () => {
   let competitionId = ""
   let teamId = ""
+  let secondTeamId = ""
   let elementId = ""
   let judgeToken = ""
   let athleteToken = ""
@@ -139,6 +146,15 @@ test.describe.serial("võistluse põhivoog", () => {
       data: otherOrganizer,
     })
     expect(userResponse.status(), await userResponse.text()).toBe(200)
+
+    const representativeResponse = await page.request.post("/api/users", {
+      data: representative,
+    })
+    expect(
+      representativeResponse.status(),
+      await representativeResponse.text()
+    ).toBe(200)
+
   })
 
   test("kohtunik sisestab tulemuse ja pingerida arvutatakse", async ({ page }) => {
@@ -171,6 +187,68 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(page.getByText("Kontrollpunkt 1", { exact: true })).toBeVisible()
     await expect(page.getByText("1:23", { exact: true })).toBeVisible()
     await expect(page.getByText("83p", { exact: true }).first()).toBeVisible()
+  })
+
+  test("esindaja näeb ainult talle määratud võistkondi", async ({ browser }) => {
+    const adminContext = await browser.newContext()
+    const adminPage = await adminContext.newPage()
+    await login(adminPage, admin.email, admin.password)
+
+    const secondTeamResponse = await adminPage.request.post(
+      `/api/competitions/${competitionId}/teams`,
+      {
+        data: {
+          name: "Teine testvõistkond",
+          code: "VK 2",
+          class: "P",
+          members: [],
+        },
+      }
+    )
+    expect(secondTeamResponse.status(), await secondTeamResponse.text()).toBe(200)
+    secondTeamId = (await secondTeamResponse.json()).id
+    expect(secondTeamId).not.toBe("")
+
+    const assignmentResponse = await adminPage.request.post(
+      `/api/competitions/${competitionId}/representatives`,
+      {
+        data: {
+          email: representative.email,
+          teamIds: [teamId, secondTeamId],
+        },
+      }
+    )
+    expect(assignmentResponse.status(), await assignmentResponse.text()).toBe(200)
+    expect(await assignmentResponse.json()).toHaveLength(2)
+    await adminContext.close()
+
+    const context = await browser.newContext()
+    const page = await context.newPage()
+
+    await login(page, representative.email, representative.password)
+
+    const assignmentsResponse = await page.request.get(
+      "/api/representative/teams"
+    )
+    expect(
+      assignmentsResponse.status(),
+      await assignmentsResponse.text()
+    ).toBe(200)
+
+    const assignments = await assignmentsResponse.json()
+    expect(assignments).toHaveLength(2)
+    expect(
+      assignments.map(
+        (assignment: { team: { id: string } }) => assignment.team.id
+      )
+    ).toEqual(expect.arrayContaining([teamId, secondTeamId]))
+
+    const managementResponse = await page.request.get(
+      `/api/competitions/${competitionId}`
+    )
+    expect(managementResponse.status()).toBe(403)
+
+    await context.close()
   })
 
   test("teine korraldaja ei pääse võistluse andmetele ligi", async ({ browser }) => {

@@ -7,20 +7,71 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Kasutajad (Admin + Korraldajad) ───────────────────────────────────────
-// role: "ADMIN" | "ORGANIZER"
+enum CompetitionRole {
+  OWNER
+  ORGANIZER
+  JUDGE
+  COMPETITOR
+  REPRESENTATIVE
+  VIEWER
+}
+
+// ─── Kasutajad ──────────────────────────────────────────────────────────────
+// Süsteemiülene role: "ADMIN" | "USER" (legacy kasutajatel võib olla "ORGANIZER")
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  role         String   @default("ORGANIZER")
-  createdAt    DateTime @default(now())
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  passwordHash  String?
+  role          String    @default("USER")
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
 
   competitions   Competition[]
   memberOf       CompetitionMember[]
   enteredResults Result[]
+  accounts       Account[]
+  sessions       Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 // ─── Juurdepääsu tokenid (Kohtunikud + Võistlejad) ─────────────────────────
@@ -199,8 +250,10 @@ model Team {
   manualPenalties ManualPenalty[]
   scores          ComputedScore[]
   miscEntries     MiscEntry[]
+  representative  TeamRepresentative?
 
   @@unique([competitionId, code])
+  @@unique([id, competitionId])
 }
 
 // role: "COMPETITOR" | "SUPPORT"
@@ -305,12 +358,40 @@ model SectionCalcMethod {
 // ─── Kaas-korraldajad ─────────────────────────────────────────────────────────
 
 model CompetitionMember {
-  id            String      @id @default(cuid())
-  competitionId String
-  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  addedAt       DateTime    @default(now())
+  id               String                  @id @default(cuid())
+  competitionId    String
+  competition      Competition             @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt          DateTime                @default(now())
+  roles            CompetitionMemberRole[]
+  representedTeams TeamRepresentative[]
 
   @@unique([competitionId, userId])
+  @@unique([id, competitionId])
+}
+
+model CompetitionMemberRole {
+  memberId String
+  member   CompetitionMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role     CompetitionRole
+  addedAt  DateTime          @default(now())
+
+  @@id([memberId, role])
+  @@index([role])
+}
+
+// Ühel võistkonnal on kuni üks esindaja; üks esindaja võib hallata mitut võistkonda.
+// Komposiitvõtmed tagavad, et võistkond ja esindaja kuuluvad samale võistlusele.
+model TeamRepresentative {
+  id            String            @id @default(cuid())
+  competitionId String
+  teamId        String            @unique
+  team          Team              @relation(fields: [teamId, competitionId], references: [id, competitionId], onDelete: Cascade)
+  memberId      String
+  member        CompetitionMember @relation(fields: [memberId, competitionId], references: [id, competitionId], onDelete: Cascade)
+  addedAt       DateTime          @default(now())
+
+  @@unique([teamId, competitionId])
+  @@index([memberId])
 }

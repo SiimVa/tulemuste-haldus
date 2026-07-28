@@ -7,7 +7,7 @@ haldamiseks. Rakendus kasutab PostgreSQL-i.
 
 Eeldused:
 
-- Node.js 20 või uuem
+- Node.js 20 või 22 (projekti `.node-version` kasutab Node.js 20)
 - Docker Desktop
 
 ```bash
@@ -50,3 +50,6 @@ Rakenduse `DATABASE_URL` peab viitama Railway PostgreSQL-i privaatsele
 
 Olemasoleva Railway SQLite-andmebaasi ühekordne üleviimine on kirjeldatud
 failis [docs/postgresql-cutover.md](docs/postgresql-cutover.md).
+
+Kasutajakontode, Google’i sisselogimise ja võistluspõhiste rollide kirjeldus on
+failis [docs/accounts-and-roles.md](docs/accounts-and-roles.md).

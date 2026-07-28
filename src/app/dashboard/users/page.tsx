@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation"
 
 type User = { id: string; email: string; name: string; role: string; createdAt: string }
 
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: "Admin",
+  ORGANIZER: "Korraldaja",
+  USER: "Kasutaja",
+}
+
 export default function UsersPage() {
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
@@ -76,7 +82,7 @@ export default function UsersPage() {
 
       {/* Uue korraldaja vorm */}
       <form onSubmit={createUser} className="bg-white border rounded-xl p-5 mb-6 space-y-4">
-        <h3 className="font-semibold text-gray-900">Lisa korraldaja</h3>
+        <h3 className="font-semibold text-gray-900">Lisa kasutaja</h3>
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Nimi *</label>
@@ -100,7 +106,7 @@ export default function UsersPage() {
         {error && <p className="text-red-600 text-sm">{error}</p>}
         <button type="submit" disabled={saving}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-          {saving ? "Loon..." : "Lisa korraldaja"}
+          {saving ? "Loon..." : "Lisa kasutaja"}
         </button>
       </form>
 
@@ -111,7 +117,7 @@ export default function UsersPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.role === "ADMIN" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"}`}>
-                  {u.role === "ADMIN" ? "Admin" : "Korraldaja"}
+                  {ROLE_LABEL[u.role] ?? u.role}
                 </span>
                 <span className="font-medium text-gray-900 text-sm">{u.name}</span>
               </div>
