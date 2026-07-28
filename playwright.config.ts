@@ -1,9 +1,13 @@
 import { defineConfig, devices } from "@playwright/test"
 
 const baseURL = "http://127.0.0.1:3100"
+const e2eDatabaseURL =
+  process.env.E2E_DATABASE_URL ??
+  "postgresql://postgres:postgres@127.0.0.1:5432/tulemuste_haldus?schema=e2e"
 const e2eEnvironment = {
   ...process.env,
-  DATABASE_URL: "file:./e2e.db",
+  DATABASE_URL: e2eDatabaseURL,
+  ALLOW_E2E_DATABASE_RESET: "1",
   AUTH_SECRET: "e2e-auth-secret-used-only-by-playwright-tests",
   SETUP_SECRET: "e2e-setup-secret-used-only-by-playwright-tests",
   AUTH_URL: baseURL,

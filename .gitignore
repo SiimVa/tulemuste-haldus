@@ -3,13 +3,14 @@ node_modules
 .env
 .env.local
 
-# SQLite database files
+# SQLite database files (legacy migration source and local exports)
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
 
 /generated/prisma
+/generated/sqlite-client
 .next
 .DS_Store
 .claude/
