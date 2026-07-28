@@ -17,8 +17,23 @@ jobs:
     name: Test and build
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: tulemuste_haldus
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tulemuste_haldus"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      DATABASE_URL: file:./ci.db
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/tulemuste_haldus?schema=e2e
+      E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/tulemuste_haldus?schema=e2e
       AUTH_SECRET: ci-auth-secret-used-only-during-github-actions
       SETUP_SECRET: ci-setup-secret-used-only-during-github-actions
 
