@@ -2,22 +2,17 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
-
-async function checkAccess(competitionId: string, userId: string, role: string) {
-  if (role === "ADMIN") return true
-  const comp = await prisma.competition.findUnique({
-    where: { id: competitionId },
-    include: { members: { where: { userId }, select: { id: true } } },
-  })
-  return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
-}
+import { canAccessCompetition } from "@/lib/competitionAccess"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
 
-  const ok = await checkAccess(id, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(id, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
 
   const competition = await prisma.competition.findUnique({
@@ -53,7 +48,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const body = await req.json()
-    const ok = await checkAccess(id, session.user.id, session.user.role ?? "")
+    const ok = await canAccessCompetition(id, {
+      id: session.user.id,
+      role: session.user.role,
+    })
     if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
 
     const updated = await prisma.competition.update({

@@ -13,6 +13,7 @@
   "include": [
     "src/lib/formula.ts",
     "src/lib/fieldValidation.ts",
+    "src/lib/permissions.ts",
     "tests/**/*.test.ts"
   ]
 }

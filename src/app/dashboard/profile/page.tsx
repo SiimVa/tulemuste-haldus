@@ -54,11 +54,11 @@ export default function ProfilePage() {
         <h3 className="font-semibold text-gray-900">Muuda parooli</h3>
 
         <div>
-          <label className="text-xs text-gray-500 mb-1 block">Praegune parool *</label>
-          <input type="password" required value={currentPassword}
+          <label className="text-xs text-gray-500 mb-1 block">Praegune parool</label>
+          <input type="password" value={currentPassword}
             onChange={e => setCurrentPassword(e.target.value)}
             autoComplete="current-password"
-            placeholder="••••••••"
+            placeholder="Google’i kontol jäta tühjaks"
             className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>

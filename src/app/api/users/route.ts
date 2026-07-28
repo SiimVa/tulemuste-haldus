@@ -20,13 +20,20 @@ export async function POST(req: Request) {
 
   const { email, name, password } = await req.json()
   if (!email || !name || !password) return NextResponse.json({ error: "Kõik väljad on kohustuslikud" }, { status: 400 })
+  const normalizedEmail = String(email).trim().toLowerCase()
+  const normalizedName = String(name).trim()
 
-  const existing = await prisma.user.findUnique({ where: { email } })
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
   if (existing) return NextResponse.json({ error: "E-post on juba kasutusel" }, { status: 400 })
 
   const passwordHash = await bcrypt.hash(password, 12)
   const user = await prisma.user.create({
-    data: { email, name, passwordHash, role: "ORGANIZER" },
+    data: {
+      email: normalizedEmail,
+      name: normalizedName,
+      passwordHash,
+      role: "USER",
+    },
     select: { id: true, email: true, name: true, role: true, createdAt: true },
   })
   return NextResponse.json(user)

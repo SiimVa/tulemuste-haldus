@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const where =
-    session.user.role === "ADMIN"
-      ? {}
-      : { OR: [{ organizerId: session.user.id }, { members: { some: { userId: session.user.id } } }] }
+  const where = managedCompetitionsWhere({
+    id: session.user.id,
+    role: session.user.role,
+  })
 
   const competitions = await prisma.competition.findMany({
     where,
@@ -38,6 +39,12 @@ export async function POST(req: Request) {
       endDate: endDate ? new Date(endDate) : null,
       location,
       organizerId: session.user.id,
+      members: {
+        create: {
+          userId: session.user.id,
+          roles: { create: { role: "OWNER" } },
+        },
+      },
       scoringMode: defaults.scoringMode ?? "PENALTY",
       defaultKPMaxValue: defaults.defaultKPMaxValue ?? 30,
       defaultPKMaxValue: defaults.defaultPKMaxValue ?? 15,

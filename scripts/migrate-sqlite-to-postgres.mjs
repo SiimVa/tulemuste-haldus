@@ -124,6 +124,51 @@ try {
 
         console.log(`  ${table}: ${expected}`)
       }
+
+      // PR #3 rollimudel loodi pärast algset SQLite → PostgreSQL lõiget.
+      // Taastamisel luuakse omaniku liikmelisus ja senised kaas-korraldajad
+      // saavad tagasi oma korraldaja õiguse.
+      const competitions = await transaction.competition.findMany({
+        select: { id: true, organizerId: true, createdAt: true },
+      })
+
+      for (const competition of competitions) {
+        await transaction.competitionMember.upsert({
+          where: {
+            competitionId_userId: {
+              competitionId: competition.id,
+              userId: competition.organizerId,
+            },
+          },
+          create: {
+            competitionId: competition.id,
+            userId: competition.organizerId,
+            addedAt: competition.createdAt,
+          },
+          update: {},
+        })
+      }
+
+      const memberships = await transaction.competitionMember.findMany({
+        select: {
+          id: true,
+          addedAt: true,
+          userId: true,
+          competition: { select: { organizerId: true } },
+        },
+      })
+
+      await transaction.competitionMemberRole.createMany({
+        data: memberships.map((membership) => ({
+          memberId: membership.id,
+          role:
+            membership.userId === membership.competition.organizerId
+              ? "OWNER"
+              : "ORGANIZER",
+          addedAt: membership.addedAt,
+        })),
+        skipDuplicates: true,
+      })
     },
     {
       maxWait: 30_000,

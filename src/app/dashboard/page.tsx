@@ -1,15 +1,16 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import Link from "next/link"
 
 export default async function DashboardPage() {
   const session = await auth()
   if (!session?.user?.id) return null
 
-  const where =
-    session.user.role === "ADMIN"
-      ? {}
-      : { OR: [{ organizerId: session.user.id }, { members: { some: { userId: session.user.id } } }] }
+  const where = managedCompetitionsWhere({
+    id: session.user.id,
+    role: session.user.role,
+  })
 
   const competitions = await prisma.competition.findMany({
     where,

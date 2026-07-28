@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 type Member = { id: string; userId: string; addedAt: string; user: { id: string; name: string; email: string } }
+type TeamOption = { id: string; code: string; name: string }
+type RepresentativeAssignment = {
+  id: string
+  team: TeamOption
+  member: { user: { id: string; name: string; email: string } }
+}
 
 type CompetitionForm = {
   name: string
@@ -63,6 +69,12 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [memberEmail, setMemberEmail] = useState("")
   const [memberError, setMemberError] = useState("")
   const [addingMember, setAddingMember] = useState(false)
+  const [teams, setTeams] = useState<TeamOption[]>([])
+  const [representatives, setRepresentatives] = useState<RepresentativeAssignment[]>([])
+  const [representativeEmail, setRepresentativeEmail] = useState("")
+  const [representativeTeamIds, setRepresentativeTeamIds] = useState<string[]>([])
+  const [representativeError, setRepresentativeError] = useState("")
+  const [assigningRepresentative, setAssigningRepresentative] = useState(false)
   const [applying, setApplying] = useState(false)
   const [applyResult, setApplyResult] = useState<{ maxValues: number; exceptions: number; calcMethods: number } | null>(null)
   const [applyError, setApplyError] = useState("")
@@ -72,12 +84,17 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       .then(r => r.ok ? r.json() : [])
       .then(setMembers)
       .catch(() => {})
+    fetch(`/api/competitions/${competitionId}/representatives`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setRepresentatives)
+      .catch(() => {})
   }, [competitionId])
 
   useEffect(() => {
     fetch(`/api/competitions/${competitionId}`)
       .then(r => r.json())
       .then(data => {
+        setTeams(data.teams ?? [])
         setForm({
           name: data.name ?? "",
           date: data.date ? data.date.slice(0, 10) : "",
@@ -177,6 +194,64 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       body: JSON.stringify({ userId }),
     })
     setMembers(prev => prev.filter(m => m.userId !== userId))
+  }
+
+  function toggleRepresentativeTeam(teamId: string) {
+    setRepresentativeTeamIds((selected) =>
+      selected.includes(teamId)
+        ? selected.filter((id) => id !== teamId)
+        : [...selected, teamId]
+    )
+  }
+
+  async function assignRepresentative(e: React.FormEvent) {
+    e.preventDefault()
+    setAssigningRepresentative(true)
+    setRepresentativeError("")
+
+    const res = await fetch(
+      `/api/competitions/${competitionId}/representatives`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: representativeEmail,
+          teamIds: representativeTeamIds,
+        }),
+      }
+    )
+    const data = await res.json().catch(() => ({}))
+
+    if (res.ok) {
+      const assigned = data as RepresentativeAssignment[]
+      const assignedTeamIds = new Set(assigned.map((item) => item.team.id))
+      setRepresentatives((current) => [
+        ...current.filter((item) => !assignedTeamIds.has(item.team.id)),
+        ...assigned,
+      ].sort((a, b) => a.team.code.localeCompare(b.team.code, "et", { numeric: true })))
+      setRepresentativeEmail("")
+      setRepresentativeTeamIds([])
+    } else {
+      setRepresentativeError(data.error ?? "Esindaja määramine ebaõnnestus")
+    }
+
+    setAssigningRepresentative(false)
+  }
+
+  async function removeRepresentative(teamId: string) {
+    const res = await fetch(
+      `/api/competitions/${competitionId}/representatives`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId }),
+      }
+    )
+    if (res.ok) {
+      setRepresentatives((current) =>
+        current.filter((item) => item.team.id !== teamId)
+      )
+    }
   }
 
   async function applyDefaults() {
@@ -590,6 +665,95 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           </button>
         </form>
         {memberError && <p className="text-sm text-red-600">{memberError}</p>}
+      </div>
+
+      {/* Võistkondade esindajad */}
+      <div className="mt-6 bg-white border rounded-xl p-5 space-y-4">
+        <div>
+          <h2 className="font-semibold text-gray-900">Võistkondade esindajad</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Esindaja saab olla samal võistlusel mitme võistkonna esindaja.
+            Uus määramine asendab valitud võistkonna senise esindaja.
+          </p>
+        </div>
+
+        {representatives.length > 0 && (
+          <div className="divide-y border rounded-lg">
+            {representatives.map((assignment) => (
+              <div key={assignment.id} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {assignment.team.code} · {assignment.team.name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {assignment.member.user.name} · {assignment.member.user.email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeRepresentative(assignment.team.id)}
+                  className="text-xs text-red-400 hover:text-red-600 px-2 py-1"
+                >
+                  Eemalda
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={assignRepresentative} className="space-y-3">
+          <input
+            type="email"
+            required
+            value={representativeEmail}
+            onChange={(e) => setRepresentativeEmail(e.target.value)}
+            placeholder="esindaja@email.ee"
+            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <div className="border rounded-lg max-h-48 overflow-y-auto divide-y">
+            {teams.map((team) => {
+              const current = representatives.find(
+                (assignment) => assignment.team.id === team.id
+              )
+              return (
+                <label
+                  key={team.id}
+                  className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={representativeTeamIds.includes(team.id)}
+                    onChange={() => toggleRepresentativeTeam(team.id)}
+                    className="rounded border-gray-300"
+                  />
+                  <span className="font-medium text-gray-700">
+                    {team.code} · {team.name}
+                  </span>
+                  {current && (
+                    <span className="ml-auto text-xs text-gray-400">
+                      Praegu: {current.member.user.name}
+                    </span>
+                  )}
+                </label>
+              )
+            })}
+          </div>
+
+          <button
+            type="submit"
+            disabled={
+              assigningRepresentative ||
+              representativeTeamIds.length === 0
+            }
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {assigningRepresentative ? "Määran..." : "Määra esindaja"}
+          </button>
+          {representativeError && (
+            <p className="text-sm text-red-600">{representativeError}</p>
+          )}
+        </form>
       </div>
 
       {/* Ohtlik tsoon */}
