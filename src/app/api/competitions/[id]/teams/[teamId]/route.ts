@@ -1,23 +1,20 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { teamBelongsToCompetition } from "@/lib/competitionAccess"
-
-async function checkAccess(competitionId: string, userId: string, role: string) {
-  if (role === "ADMIN") return true
-  const comp = await prisma.competition.findUnique({
-    where: { id: competitionId },
-    include: { members: { where: { userId }, select: { id: true } } },
-  })
-  return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
-}
+import {
+  canAccessCompetition,
+  teamBelongsToCompetition,
+} from "@/lib/competitionAccess"
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; teamId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId, teamId } = await params
 
-  const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(competitionId, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   if (!await teamBelongsToCompetition(teamId, competitionId)) {
     return NextResponse.json({ error: "Võistkonda ei leitud" }, { status: 404 })
@@ -72,7 +69,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId, teamId } = await params
 
-  const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(competitionId, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   if (!await teamBelongsToCompetition(teamId, competitionId)) {
     return NextResponse.json({ error: "Võistkonda ei leitud" }, { status: 404 })

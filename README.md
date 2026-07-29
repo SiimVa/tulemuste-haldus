@@ -53,3 +53,6 @@ failis [docs/postgresql-cutover.md](docs/postgresql-cutover.md).
 
 Kasutajakontode, Google’i sisselogimise ja võistluspõhiste rollide kirjeldus on
 failis [docs/accounts-and-roles.md](docs/accounts-and-roles.md).
+
+Esindaja registreerimise ja mandaadi töövoog on kirjeldatud failis
+[docs/registration-and-mandate.md](docs/registration-and-mandate.md).

@@ -19,6 +19,19 @@ export async function GET() {
           code: true,
           name: true,
           class: true,
+          registrationStatus: true,
+          registrationSubmittedAt: true,
+          registrationReviewedAt: true,
+          registrationReviewNote: true,
+          mandateStatus: true,
+          mandateSubmittedAt: true,
+          mandateReviewedAt: true,
+          mandateReviewNote: true,
+          workflowUpdatedAt: true,
+          members: {
+            select: { id: true, name: true, role: true },
+            orderBy: { name: "asc" },
+          },
           competition: {
             select: {
               id: true,
