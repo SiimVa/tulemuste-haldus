@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  canCreateCompetition,
   canEnterCompetitionResults,
   canManageCompetition,
   canManageCompetitionMembers,
@@ -30,6 +31,13 @@ test("admin ja omanik saavad võistlust ning liikmeid hallata", () => {
     assert.equal(canManageCompetition(subject), true)
     assert.equal(canManageCompetitionMembers(subject), true)
   }
+})
+
+test("ainult süsteemiadministraator saab uue võistluse luua", () => {
+  assert.equal(canCreateCompetition("ADMIN"), true)
+  assert.equal(canCreateCompetition("USER"), false)
+  assert.equal(canCreateCompetition("ORGANIZER"), false)
+  assert.equal(canCreateCompetition(undefined), false)
 })
 
 test("korraldaja haldab võistlust, kuid ei jaga omaniku õigusi", () => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
+import { canCreateCompetition } from "@/lib/permissions"
 
 export async function GET() {
   const session = await auth()
@@ -26,6 +27,12 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!canCreateCompetition(session.user.role)) {
+    return NextResponse.json(
+      { error: "Sul puudub võistluse loomise õigus" },
+      { status: 403 }
+    )
+  }
 
   const body = await req.json()
   const { name, date, endDate, location, ...defaults } = body

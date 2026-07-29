@@ -23,6 +23,10 @@ function hasRole(
   return access.roles.some((role) => roles.includes(role))
 }
 
+export function canCreateCompetition(systemRole?: string | null) {
+  return systemRole === "ADMIN"
+}
+
 export function canViewCompetition(access: CompetitionAccessContext) {
   return (
     access.systemRole === "ADMIN" ||

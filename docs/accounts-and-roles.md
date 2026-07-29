@@ -6,6 +6,11 @@ Süsteemiülene `User.role` on mõeldud ainult rakenduse administraatori
 eristamiseks. Võistluse õigused tulevad `CompetitionMember` liikmelisusest ja
 selle `CompetitionMemberRole` kirjetest.
 
+Uue võistluse saab luua ainult süsteemiadministraator. Tavakasutaja võib saada
+olemasoleval võistlusel korraldaja, kohtuniku, võistleja, esindaja või vaatleja
+rolli, kuid ükski neist rollidest ei anna automaatselt uue võistluse loomise
+õigust.
+
 Toetatud võistluse rollid:
 
 - `OWNER` – võistluse omanik, saab hallata ka liikmeid;

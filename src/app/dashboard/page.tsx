@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
+import { canCreateCompetition } from "@/lib/permissions"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -27,24 +28,31 @@ export default async function DashboardPage() {
     ACTIVE: "bg-green-100 text-green-700",
     FINISHED: "bg-blue-100 text-blue-700",
   }
+  const mayCreateCompetition = canCreateCompetition(session.user.role)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Võistlused</h1>
-        <Link
-          href="/dashboard/competitions/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Uus võistlus
-        </Link>
+        {mayCreateCompetition && (
+          <Link
+            href="/dashboard/competitions/new"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            + Uus võistlus
+          </Link>
+        )}
       </div>
 
       {competitions.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">🏁</p>
           <p className="font-medium">Ühtegi võistlust veel pole</p>
-          <p className="text-sm mt-1">Loo oma esimene võistlus nupuga üleval</p>
+          <p className="text-sm mt-1">
+            {mayCreateCompetition
+              ? "Loo oma esimene võistlus nupuga üleval"
+              : "Sulle pole veel ühtegi võistlust määratud"}
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
