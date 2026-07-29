@@ -189,7 +189,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(page.getByText("83p", { exact: true }).first()).toBeVisible()
   })
 
-  test("esindaja näeb ainult talle määratud võistkondi", async ({ browser }) => {
+  test("esindaja täidab registreerimise ja mandaadi", async ({ browser }) => {
     const adminContext = await browser.newContext()
     const adminPage = await adminContext.newPage()
     await login(adminPage, admin.email, admin.password)
@@ -220,12 +220,17 @@ test.describe.serial("võistluse põhivoog", () => {
     )
     expect(assignmentResponse.status(), await assignmentResponse.text()).toBe(200)
     expect(await assignmentResponse.json()).toHaveLength(2)
-    await adminContext.close()
 
     const context = await browser.newContext()
     const page = await context.newPage()
 
     await login(page, representative.email, representative.password)
+    await expect(
+      page.getByRole("heading", { name: "Minu esindatavad võistkonnad" })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("heading", { name: /VK 1 · Testvõistkond/ })
+    ).toBeVisible()
 
     const assignmentsResponse = await page.request.get(
       "/api/representative/teams"
@@ -243,12 +248,74 @@ test.describe.serial("võistluse põhivoog", () => {
       )
     ).toEqual(expect.arrayContaining([teamId, secondTeamId]))
 
+    await page
+      .getByRole("heading", { name: /VK 1 · Testvõistkond/ })
+      .click()
+    await page.waitForURL(`/dashboard/representative/teams/${teamId}`)
+    await page.getByLabel("Klass").fill("Põhiklass")
+    await page.getByRole("button", { name: "Esita registreerimine" }).click()
+    await expect(
+      page.getByText("Registreerimine esitatud korraldajale")
+    ).toBeVisible()
+
+    await adminPage.goto(
+      `/dashboard/competitions/${competitionId}/registrations`
+    )
+    await expect(
+      adminPage.getByRole("heading", {
+        name: "Registreerimine ja mandaat",
+      })
+    ).toBeVisible()
+    await adminPage.getByRole("button", { name: "Kinnita" }).click()
+    await expect(
+      adminPage.getByText("Kinnitatud", { exact: true }).first()
+    ).toBeVisible()
+
+    await page.reload()
+    await page.getByRole("button", { name: "+ Lisa liige" }).click()
+    await page.getByRole("button", { name: "+ Lisa liige" }).click()
+    const memberInputs = page.getByPlaceholder("Ees- ja perekonnanimi")
+    await memberInputs.nth(0).fill("Mari Mets")
+    await memberInputs.nth(1).fill("Jüri Järv")
+    await page.locator("select").nth(1).selectOption("SUPPORT")
+    await page.getByRole("button", { name: "Esita mandaat" }).click()
+    await expect(
+      page.getByText("Mandaat esitatud korraldajale")
+    ).toBeVisible()
+
+    await adminPage.reload()
+    await adminPage.getByRole("button", { name: "Kinnita" }).click()
+    await expect(
+      adminPage.getByText("Kinnitatud", { exact: true }).nth(1)
+    ).toBeVisible()
+
+    const workflowResponse = await page.request.get(
+      `/api/representative/teams/${teamId}`
+    )
+    expect(workflowResponse.status(), await workflowResponse.text()).toBe(200)
+    const workflow = await workflowResponse.json()
+    expect(workflow.registrationStatus).toBe("APPROVED")
+    expect(workflow.mandateStatus).toBe("APPROVED")
+    expect(workflow.members).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Mari Mets", role: "COMPETITOR" }),
+        expect.objectContaining({ name: "Jüri Järv", role: "SUPPORT" }),
+      ])
+    )
+
     const managementResponse = await page.request.get(
       `/api/competitions/${competitionId}`
     )
     expect(managementResponse.status()).toBe(403)
 
+    const broadTeamUpdate = await page.request.patch(
+      `/api/competitions/${competitionId}/teams/${teamId}`,
+      { data: { name: "Lubamatu muudatus" } }
+    )
+    expect(broadTeamUpdate.status()).toBe(403)
+
     await context.close()
+    await adminContext.close()
   })
 
   test("teine korraldaja ei pääse võistluse andmetele ligi", async ({ browser }) => {

@@ -238,6 +238,20 @@ model Team {
   class               String?
   isHorsDeCompetition Boolean     @default(false)
   createdAt           DateTime    @default(now())
+  workflowUpdatedAt   DateTime    @default(now()) @updatedAt
+
+  // Registreerimine: "DRAFT" | "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED"
+  registrationStatus      String    @default("DRAFT")
+  registrationSubmittedAt DateTime?
+  registrationReviewedAt  DateTime?
+  registrationReviewNote  String?
+
+  // Mandaat: "DRAFT" | "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED"
+  mandateStatus      String    @default("DRAFT")
+  mandateSubmittedAt DateTime?
+  mandateReviewedAt  DateTime?
+  mandateReviewNote  String?
+
   dnfFromElementOrder Int?
   dnfReason           String?
   hcFromElementOrder  Int?        // Arvestusväline alates selle järjekorraga elemendist (null = pole)
@@ -254,6 +268,8 @@ model Team {
 
   @@unique([competitionId, code])
   @@unique([id, competitionId])
+  @@index([competitionId, registrationStatus])
+  @@index([competitionId, mandateStatus])
 }
 
 // role: "COMPETITOR" | "SUPPORT"
