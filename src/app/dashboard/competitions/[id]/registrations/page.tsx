@@ -30,6 +30,7 @@ type RegistrationApplication = {
   id: string
   teamName: string
   status: string
+  allocationReason: string | null
   submittedAt: string | null
   class: { id: string; name: string } | null
   submittedBy: { id: string; name: string; email: string }
@@ -305,6 +306,11 @@ export default function RegistrationsPage({
                   {application.submittedBy.name} ·{" "}
                   {application.submittedBy.email}
                 </p>
+                {application.allocationReason && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    {application.allocationReason}
+                  </p>
+                )}
                 {application.details.length > 0 && (
                   <dl className="grid sm:grid-cols-2 gap-x-5 gap-y-2 mt-4">
                     {application.details.map((detail) => (
@@ -321,6 +327,7 @@ export default function RegistrationsPage({
                 )}
               </div>
               {application.status === "WAITLISTED" &&
+                overview?.registrationStatus !== "OPEN" &&
                 !overview?.registrationFinalizedAt && (
                   <div className="flex gap-2">
                     <button

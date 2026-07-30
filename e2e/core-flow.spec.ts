@@ -420,12 +420,35 @@ test.describe.serial("võistluse põhivoog", () => {
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "OPEN",
-          registrationCapacity: 1,
+          registrationCapacity: 2,
+          registrationClassBalanceMode: "OFF",
           mandateOpensAt: null,
           mandateClosesAt: null,
           mandateOverride: "AUTO",
           classes: [],
           formFields,
+          allocationRules: [
+            {
+              label: "Iga maakonna üks kiireim",
+              type: "GROUP_GUARANTEE",
+              source: "FORM_FIELD",
+              fieldId: null,
+              fieldKey: "county",
+              values: [],
+              quota: 1,
+              order: 0,
+            },
+            {
+              label: "Noorteorganisatsioonide võistkonnad",
+              type: "PRIORITY",
+              source: "FORM_FIELD",
+              fieldId: null,
+              fieldKey: "team_type",
+              values: ["Noored Kotkad", "Kodutütred"],
+              quota: null,
+              order: 1,
+            },
+          ],
         },
       }
     )
@@ -440,6 +463,14 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBeVisible()
     await expect(
       adminPage.locator('input[value="Maakond"]')
+    ).toBeVisible()
+    await expect(
+      adminPage.getByRole("heading", {
+        name: "Kohtade automaatne jaotamine",
+      })
+    ).toBeVisible()
+    await expect(
+      adminPage.locator('input[value="Iga maakonna üks kiireim"]')
     ).toBeVisible()
 
     const representativeContext = await browser.newContext()
@@ -457,21 +488,37 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(page.getByText("Registreeritud", { exact: true })).toBeVisible()
 
     await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 2")
-    await page.getByLabel("Maakond").selectOption("Raplamaa")
+    await page.getByLabel("Maakond").selectOption("Harjumaa")
     await page.getByLabel("Võistkonna liik").selectOption("Noored Kotkad")
-    await page.getByLabel("Rühma nimi").fill("Rapla rühm")
+    await page.getByLabel("Rühma nimi").fill("Harju teine rühm")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
-    await expect(page.getByText("Võistkond lisati ootenimekirja.")).toBeVisible()
-    await expect(page.getByText("Ootenimekirjas", { exact: true })).toBeVisible()
+    await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
+
+    await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 3")
+    await page.getByLabel("Maakond").selectOption("Raplamaa")
+    await page.getByLabel("Võistkonna liik").selectOption("Kodutütred")
+    await page.getByRole("button", { name: "Registreeri võistkond" }).click()
+    await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
+    const secondApplication = page
+      .getByText("Avalik testvõistkond 2", { exact: true })
+      .locator("..")
+      .locator("..")
+    await expect(
+      secondApplication.getByText("Ootenimekirjas", { exact: true })
+    ).toBeVisible()
+    await expect(
+      page.getByText("Garanteeritud koht: Iga maakonna üks kiireim")
+    ).toHaveCount(2)
 
     page.once("dialog", (dialog) => dialog.accept())
     await page
-      .getByText("Registreeritud", { exact: true })
+      .getByText("Avalik testvõistkond 1", { exact: true })
+      .locator("..")
       .locator("..")
       .getByRole("button", { name: "Loobu" })
       .click()
     await expect(
-      page.getByText("Registreeritud", { exact: true })
+      secondApplication.getByText("Registreeritud", { exact: true })
     ).toBeVisible()
 
     const closedResponse = await adminPage.request.patch(
@@ -482,12 +529,15 @@ test.describe.serial("võistluse põhivoog", () => {
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "CLOSED",
-          registrationCapacity: 1,
+          registrationCapacity: 2,
+          registrationClassBalanceMode:
+            settings.registrationClassBalanceMode,
           mandateOpensAt: null,
           mandateClosesAt: null,
           mandateOverride: "AUTO",
           classes: settings.registrationClasses,
           formFields: settings.registrationFormFields,
+          allocationRules: settings.registrationAllocationRules,
         },
       }
     )
@@ -497,7 +547,7 @@ test.describe.serial("võistluse põhivoog", () => {
       `/api/competitions/${competitionId}/registration-applications/finalize`
     )
     expect(finalizeResponse.status(), await finalizeResponse.text()).toBe(200)
-    expect((await finalizeResponse.json()).createdTeams).toBe(1)
+    expect((await finalizeResponse.json()).createdTeams).toBe(2)
 
     const mandateSettingsResponse = await adminPage.request.patch(
       `/api/competitions/${competitionId}/registration-settings`,
@@ -507,12 +557,15 @@ test.describe.serial("võistluse põhivoog", () => {
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "CLOSED",
-          registrationCapacity: 1,
+          registrationCapacity: 2,
+          registrationClassBalanceMode:
+            settings.registrationClassBalanceMode,
           mandateOpensAt: null,
           mandateClosesAt: null,
           mandateOverride: "OPEN",
           classes: settings.registrationClasses,
           formFields: settings.registrationFormFields,
+          allocationRules: settings.registrationAllocationRules,
         },
       }
     )
@@ -527,8 +580,9 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(assignmentsResponse.status()).toBe(200)
     const assignments = await assignmentsResponse.json()
     const assignment = assignments.find(
-      (item: { team: { competition: { id: string } } }) =>
-        item.team.competition.id === competitionId
+      (item: { team: { name: string; competition: { id: string } } }) =>
+        item.team.competition.id === competitionId &&
+        item.team.name === "Avalik testvõistkond 3"
     )
     expect(assignment).toBeTruthy()
 

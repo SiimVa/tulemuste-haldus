@@ -152,25 +152,27 @@ model Competition {
   athleteShowRank     Boolean @default(false) // kuva pingerea koht (üld + klass)
 
   // Registreerimise ja mandaadi avatus. override: "AUTO" | "OPEN" | "CLOSED"
-  registrationOpensAt     DateTime?
-  registrationClosesAt    DateTime?
-  registrationOverride    String    @default("AUTO")
-  registrationFinalizedAt DateTime?
-  registrationCapacity    Int?
-  mandateOpensAt          DateTime?
-  mandateClosesAt         DateTime?
-  mandateOverride         String    @default("AUTO")
-  mandateFinalizedAt      DateTime?
+  registrationOpensAt          DateTime?
+  registrationClosesAt         DateTime?
+  registrationOverride         String    @default("AUTO")
+  registrationFinalizedAt      DateTime?
+  registrationCapacity         Int?
+  registrationClassBalanceMode String    @default("OFF")
+  mandateOpensAt               DateTime?
+  mandateClosesAt              DateTime?
+  mandateOverride              String    @default("AUTO")
+  mandateFinalizedAt           DateTime?
 
-  elements                 ScoringElement[]
-  teams                    Team[]
-  accessTokens             AccessToken[]
-  manualPenalties          ManualPenalty[]
-  members                  CompetitionMember[]
-  registrationClasses      CompetitionClass[]
-  registrationApplications RegistrationApplication[]
-  registrationFormFields   CompetitionFormField[]
-  phaseEvents              CompetitionPhaseEvent[]
+  elements                    ScoringElement[]
+  teams                       Team[]
+  accessTokens                AccessToken[]
+  manualPenalties             ManualPenalty[]
+  members                     CompetitionMember[]
+  registrationClasses         CompetitionClass[]
+  registrationApplications    RegistrationApplication[]
+  registrationFormFields      CompetitionFormField[]
+  registrationAllocationRules RegistrationAllocationRule[]
+  phaseEvents                 CompetitionPhaseEvent[]
 }
 
 // Korraldaja määratud klassid. Null klassi tähendab klassideta võistlust,
@@ -194,22 +196,23 @@ model CompetitionClass {
 // Registreerimisavaldus on Team-ist eraldi. Team luuakse alles osalejate
 // nimekirja kinnitamisel.
 model RegistrationApplication {
-  id            String            @id @default(cuid())
-  competitionId String
-  competition   Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  submittedById String
-  submittedBy   User              @relation(fields: [submittedById], references: [id], onDelete: Restrict)
-  teamName      String
-  classId       String?
-  class         CompetitionClass? @relation(fields: [classId], references: [id], onDelete: Restrict)
-  status        String            @default("DRAFT")
-  submittedAt   DateTime?
-  decidedAt     DateTime?
-  withdrawnAt   DateTime?
-  teamId        String?           @unique
-  team          Team?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id               String            @id @default(cuid())
+  competitionId    String
+  competition      Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  submittedById    String
+  submittedBy      User              @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  teamName         String
+  classId          String?
+  class            CompetitionClass? @relation(fields: [classId], references: [id], onDelete: Restrict)
+  status           String            @default("DRAFT")
+  allocationReason String?
+  submittedAt      DateTime?
+  decidedAt        DateTime?
+  withdrawnAt      DateTime?
+  teamId           String?           @unique
+  team             Team?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   events      RegistrationApplicationEvent[]
   fieldValues RegistrationApplicationFieldValue[]
@@ -247,10 +250,33 @@ model CompetitionFormField {
 
   registrationValues RegistrationApplicationFieldValue[]
   teamValues         TeamFormFieldValue[]
+  allocationRules    RegistrationAllocationRule[]
 
   @@unique([competitionId, key])
   @@unique([competitionId, semanticKey])
   @@index([competitionId, isActive, order])
+}
+
+// Kohtade jaotamise reeglid. source on "CLASS" või "FORM_FIELD";
+// type on "GROUP_GUARANTEE" või "PRIORITY". values on JSON massiiv.
+model RegistrationAllocationRule {
+  id            String                @id @default(cuid())
+  competitionId String
+  competition   Competition           @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  fieldId       String?
+  field         CompetitionFormField? @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  label         String
+  type          String
+  source        String
+  values        String                @default("[]")
+  quota         Int?
+  order         Int                   @default(0)
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([competitionId, isActive, order])
+  @@index([fieldId])
 }
 
 model RegistrationApplicationFieldValue {

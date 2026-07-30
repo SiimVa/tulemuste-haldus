@@ -2,7 +2,12 @@
 
 import Link from "next/link"
 import { use, useEffect, useState } from "react"
+import { AllocationRuleBuilder } from "@/components/registration/AllocationRuleBuilder"
 import { FormBuilder } from "@/components/registration/FormBuilder"
+import type {
+  AllocationRuleDefinition,
+  ClassBalanceMode,
+} from "@/lib/registrationAllocation"
 import type { FormFieldDefinition } from "@/lib/registrationForm"
 
 type PhaseOverride = "AUTO" | "OPEN" | "CLOSED"
@@ -17,6 +22,7 @@ type Settings = {
   registrationOverride: PhaseOverride
   registrationFinalizedAt: string | null
   registrationCapacity: number | ""
+  registrationClassBalanceMode: ClassBalanceMode
   registrationStatus: PhaseStatus
   mandateOpensAt: string
   mandateClosesAt: string
@@ -25,6 +31,7 @@ type Settings = {
   mandateStatus: PhaseStatus
   registrationClasses: CompetitionClass[]
   registrationFormFields: FormFieldDefinition[]
+  registrationAllocationRules: AllocationRuleDefinition[]
 }
 
 const STATUS_LABEL: Record<PhaseStatus, string> = {
@@ -162,6 +169,10 @@ export default function RegistrationSettingsPage({
           mandateOpensAt: toLocalInput(data.mandateOpensAt),
           mandateClosesAt: toLocalInput(data.mandateClosesAt),
           registrationCapacity: data.registrationCapacity ?? "",
+          registrationClassBalanceMode:
+            data.registrationClassBalanceMode ?? "OFF",
+          registrationAllocationRules:
+            data.registrationAllocationRules ?? [],
         })
       })
       .catch((reason) =>
@@ -229,11 +240,13 @@ export default function RegistrationSettingsPage({
             form.registrationCapacity === ""
               ? null
               : Number(form.registrationCapacity),
+          registrationClassBalanceMode: form.registrationClassBalanceMode,
           mandateOpensAt: toIso(form.mandateOpensAt),
           mandateClosesAt: toIso(form.mandateClosesAt),
           mandateOverride: form.mandateOverride,
           classes: form.registrationClasses,
           formFields: form.registrationFormFields,
+          allocationRules: form.registrationAllocationRules,
         }),
       }
     )
@@ -248,6 +261,10 @@ export default function RegistrationSettingsPage({
         mandateOpensAt: toLocalInput(data.mandateOpensAt),
         mandateClosesAt: toLocalInput(data.mandateClosesAt),
         registrationCapacity: data.registrationCapacity ?? "",
+        registrationClassBalanceMode:
+          data.registrationClassBalanceMode ?? "OFF",
+        registrationAllocationRules:
+          data.registrationAllocationRules ?? [],
       })
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2500)
@@ -375,6 +392,20 @@ export default function RegistrationSettingsPage({
             fields={form.registrationFormFields}
             onChange={(registrationFormFields) =>
               setForm({ ...form, registrationFormFields })
+            }
+          />
+
+          <AllocationRuleBuilder
+            capacity={form.registrationCapacity}
+            classes={form.registrationClasses}
+            fields={form.registrationFormFields}
+            rules={form.registrationAllocationRules}
+            classBalanceMode={form.registrationClassBalanceMode}
+            onRulesChange={(registrationAllocationRules) =>
+              setForm({ ...form, registrationAllocationRules })
+            }
+            onClassBalanceModeChange={(registrationClassBalanceMode) =>
+              setForm({ ...form, registrationClassBalanceMode })
             }
           />
 

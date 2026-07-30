@@ -74,6 +74,7 @@ export default async function PublicCompetitionPage({
           id: true,
           teamName: true,
           status: true,
+          allocationReason: true,
           submittedAt: true,
           class: { select: { name: true } },
         },
