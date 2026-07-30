@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
+import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 
 const ACTION_STATUS = {
@@ -53,12 +54,26 @@ export async function PATCH(
         const application = await tx.registrationApplication.findFirst({
           where: { id: applicationId, competitionId },
           include: {
-            competition: { select: { registrationFinalizedAt: true } },
+            competition: {
+              select: {
+                registrationOverride: true,
+                registrationOpensAt: true,
+                registrationClosesAt: true,
+                registrationFinalizedAt: true,
+              },
+            },
           },
         })
         if (!application) throw new Error("Registreerimisavaldust ei leitud")
         if (application.competition.registrationFinalizedAt) {
           throw new Error("Kinnitatud osalejate nimekirja ei saa muuta")
+        }
+        if (
+          getCompetitionRegistrationStatus(application.competition) === "OPEN"
+        ) {
+          throw new Error(
+            "Avatud registreerimise ajal määrab kohad automaatne jaotus"
+          )
         }
         if (["WITHDRAWN", "REJECTED"].includes(application.status)) {
           throw new Error("Seda registreerimisavaldust ei saa enam muuta")
@@ -72,6 +87,12 @@ export async function PATCH(
           where: { id: application.id },
           data: {
             status: nextStatus,
+            allocationReason:
+              nextStatus === "CONFIRMED"
+                ? note || "Korraldaja kinnitatud pärast registreerimise lõppu"
+                : nextStatus === "WAITLISTED"
+                  ? note || "Korraldaja jäetud ootenimekirja"
+                  : null,
             decidedAt:
               nextStatus === "CONFIRMED" || nextStatus === "REJECTED"
                 ? now
@@ -91,37 +112,6 @@ export async function PATCH(
             team: { select: { id: true, code: true } },
           },
         })
-
-        if (
-          application.status === "CONFIRMED" &&
-          nextStatus !== "CONFIRMED"
-        ) {
-          const next = await tx.registrationApplication.findFirst({
-            where: {
-              competitionId,
-              status: "WAITLISTED",
-              id: { not: application.id },
-            },
-            orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
-          })
-          if (next) {
-            await tx.registrationApplication.update({
-              where: { id: next.id },
-              data: {
-                status: "CONFIRMED",
-                decidedAt: now,
-                events: {
-                  create: {
-                    fromStatus: "WAITLISTED",
-                    toStatus: "CONFIRMED",
-                    actorId: actor.id,
-                    note: "Edutatud pärast koha vabanemist",
-                  },
-                },
-              },
-            })
-          }
-        }
 
         return result
       },

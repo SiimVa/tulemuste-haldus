@@ -16,6 +16,7 @@ type Application = {
   id: string
   teamName: string
   status: string
+  allocationReason: string | null
   submittedAt: string | Date | null
   class: { name: string } | null
 }
@@ -182,6 +183,11 @@ export function RegistrationPanel({
                       </button>
                     )}
                 </div>
+                {application.allocationReason && (
+                  <p className="w-full text-xs text-gray-500">
+                    {application.allocationReason}
+                  </p>
+                )}
               </div>
             ))}
           </div>

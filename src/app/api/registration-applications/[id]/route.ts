@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
 import { canWithdrawRegistration } from "@/lib/registrationApplications"
 
 async function withdrawApplication(applicationId: string, userId: string) {
@@ -36,6 +37,7 @@ async function withdrawApplication(applicationId: string, userId: string) {
         where: { id: application.id },
         data: {
           status: "WITHDRAWN",
+          allocationReason: null,
           withdrawnAt: now,
           events: {
             create: {
@@ -47,33 +49,18 @@ async function withdrawApplication(applicationId: string, userId: string) {
         },
       })
 
-      let promotedId: string | null = null
-      if (application.status === "CONFIRMED") {
-        const next = await tx.registrationApplication.findFirst({
-          where: {
-            competitionId: application.competitionId,
-            status: "WAITLISTED",
-          },
-          orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
-        })
-        if (next) {
-          promotedId = next.id
-          await tx.registrationApplication.update({
-            where: { id: next.id },
-            data: {
-              status: "CONFIRMED",
-              decidedAt: now,
-              events: {
-                create: {
-                  fromStatus: "WAITLISTED",
-                  toStatus: "CONFIRMED",
-                  note: "Edutatud pärast kinnitatud võistkonna loobumist",
-                },
-              },
-            },
-          })
+      const allocation = await recalculateRegistrationAllocation(
+        tx,
+        application.competitionId,
+        {
+          actorId: userId,
+          eventNote: "Loobumise järel arvutatud koht",
         }
-      }
+      )
+      const promotedId =
+        allocation.transitions.find(
+          ({ toStatus }) => toStatus === "CONFIRMED"
+        )?.id ?? null
 
       return { application: updated, promotedId }
     },

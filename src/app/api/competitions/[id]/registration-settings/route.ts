@@ -9,6 +9,13 @@ import {
 } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import {
+  type AllocationRuleDefinition,
+  isAllocationRuleSource,
+  isAllocationRuleType,
+  isClassBalanceMode,
+} from "@/lib/registrationAllocation"
+import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
+import {
   type FormFieldDefinition,
   FORM_FIELD_TYPES,
   FORM_SEMANTIC_KEYS,
@@ -37,6 +44,118 @@ const formFieldSelect = {
   conditionOperator: true,
   conditionValue: true,
   order: true,
+}
+
+const allocationRuleSelect = {
+  id: true,
+  label: true,
+  type: true,
+  source: true,
+  fieldId: true,
+  values: true,
+  quota: true,
+  order: true,
+}
+
+function parseStoredValues(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : []
+  } catch {
+    return []
+  }
+}
+
+function toAllocationRuleDefinition(rule: {
+  id: string
+  label: string
+  type: string
+  source: string
+  fieldId: string | null
+  values: string
+  quota: number | null
+  order: number
+}): AllocationRuleDefinition | null {
+  if (!isAllocationRuleType(rule.type) || !isAllocationRuleSource(rule.source)) {
+    return null
+  }
+  return {
+    ...rule,
+    type: rule.type,
+    source: rule.source,
+    values: parseStoredValues(rule.values),
+  }
+}
+
+function parseAllocationRules(value: unknown): AllocationRuleDefinition[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Kohtade jaotamise reeglite nimekiri puudub")
+  }
+  if (value.length > 50) {
+    throw new Error("Ühel võistlusel saab olla kuni 50 jaotusreeglit")
+  }
+  return value.map((item: unknown, order): AllocationRuleDefinition => {
+    if (!item || typeof item !== "object") {
+      throw new Error("Vigane kohtade jaotamise reegel")
+    }
+    const raw = item as Record<string, unknown>
+    const label = typeof raw.label === "string" ? raw.label.trim() : ""
+    if (!label || label.length > 200) {
+      throw new Error("Jaotusreegli nimetus on kohustuslik")
+    }
+    if (!isAllocationRuleType(raw.type)) {
+      throw new Error(`Reegli „${label}” tüüp on vigane`)
+    }
+    if (!isAllocationRuleSource(raw.source)) {
+      throw new Error(`Reegli „${label}” alus on vigane`)
+    }
+    const fieldId =
+      raw.source === "FORM_FIELD" && typeof raw.fieldId === "string"
+        ? raw.fieldId
+        : null
+    const fieldKey =
+      raw.source === "FORM_FIELD" && typeof raw.fieldKey === "string"
+        ? raw.fieldKey
+        : null
+    if (raw.source === "FORM_FIELD" && !fieldId && !fieldKey) {
+      throw new Error(`Reeglile „${label}” tuleb valida vormiväli`)
+    }
+    const values = Array.isArray(raw.values)
+      ? raw.values.map((entry) =>
+          typeof entry === "string" ? entry.trim() : ""
+        )
+      : []
+    if (
+      values.some((entry) => !entry || entry.length > 200) ||
+      new Set(values).size !== values.length
+    ) {
+      throw new Error(`Kontrolli reegli „${label}” väärtusi`)
+    }
+    if (raw.type === "PRIORITY" && values.length === 0) {
+      throw new Error(`Prioriteedireeglile „${label}” tuleb valida väärtus`)
+    }
+    const quota =
+      raw.type === "GROUP_GUARANTEE" ? Number(raw.quota) : null
+    if (
+      raw.type === "GROUP_GUARANTEE" &&
+      (!Number.isInteger(quota) || quota === null || quota < 1 || quota > 10000)
+    ) {
+      throw new Error(`Reegli „${label}” kohtade arv peab olema täisarv`)
+    }
+    return {
+      id: typeof raw.id === "string" ? raw.id : undefined,
+      label,
+      type: raw.type,
+      source: raw.source,
+      fieldId,
+      fieldKey,
+      values,
+      quota,
+      order,
+    }
+  })
 }
 
 function optionalDate(value: unknown): Date | null {
@@ -258,6 +377,7 @@ export async function GET(
       registrationOverride: true,
       registrationFinalizedAt: true,
       registrationCapacity: true,
+      registrationClassBalanceMode: true,
       mandateOpensAt: true,
       mandateClosesAt: true,
       mandateOverride: true,
@@ -271,6 +391,11 @@ export async function GET(
         where: { isActive: true },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
         select: formFieldSelect,
+      },
+      registrationAllocationRules: {
+        where: { isActive: true },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: allocationRuleSelect,
       },
       _count: {
         select: { registrationApplications: true },
@@ -286,6 +411,11 @@ export async function GET(
     registrationFormFields: competition.registrationFormFields.map(
       toFormFieldDefinition
     ),
+    registrationAllocationRules:
+      competition.registrationAllocationRules.flatMap((rule) => {
+        const definition = toAllocationRuleDefinition(rule)
+        return definition ? [definition] : []
+      }),
   })
 }
 
@@ -355,6 +485,12 @@ export async function PATCH(
         )
       }
     }
+    if (!isClassBalanceMode(body.registrationClassBalanceMode)) {
+      return NextResponse.json(
+        { error: "Vigane klasside tasakaalustamise valik" },
+        { status: 400 }
+      )
+    }
 
     if (!Array.isArray(body.classes)) {
       return NextResponse.json(
@@ -391,6 +527,7 @@ export async function PATCH(
       )
     }
     const formFields = parseFormFields(body.formFields)
+    const allocationRules = parseAllocationRules(body.allocationRules)
 
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.competition.findUnique({
@@ -500,6 +637,83 @@ export async function PATCH(
         data: { isActive: false, semanticKey: null },
       })
 
+      const [activeClasses, activeFields] = await Promise.all([
+        tx.competitionClass.findMany({
+          where: { competitionId: id, isActive: true },
+          select: { id: true },
+        }),
+        tx.competitionFormField.findMany({
+          where: { competitionId: id, isActive: true },
+          select: {
+            id: true,
+            key: true,
+            type: true,
+            options: true,
+            showInRegistration: true,
+          },
+        }),
+      ])
+      const classValues = new Set(activeClasses.map(({ id }) => id))
+      const fieldsById = new Map(activeFields.map((field) => [field.id, field]))
+      const fieldsByKey = new Map(
+        activeFields.map((field) => [field.key, field])
+      )
+      const resolvedRuleFieldIds = new Map<number, string | null>()
+
+      for (const [ruleIndex, rule] of allocationRules.entries()) {
+        let availableValues: Set<string>
+        if (rule.source === "CLASS") {
+          if (activeClasses.length === 0) {
+            throw new Error(
+              `Reeglit „${rule.label}” ei saa kasutada klassideta võistlusel`
+            )
+          }
+          availableValues = classValues
+          resolvedRuleFieldIds.set(ruleIndex, null)
+        } else {
+          const field =
+            (rule.fieldId ? fieldsById.get(rule.fieldId) : null) ??
+            (rule.fieldKey ? fieldsByKey.get(rule.fieldKey) : null)
+          if (
+            !field ||
+            field.type !== "SELECT" ||
+            !field.showInRegistration
+          ) {
+            throw new Error(
+              `Reegli „${rule.label}” väli peab olema registreerimisel kuvatav rippmenüü`
+            )
+          }
+          availableValues = new Set(parseStoredValues(field.options))
+          resolvedRuleFieldIds.set(ruleIndex, field.id)
+        }
+        if (rule.values.some((value) => !availableValues.has(value))) {
+          throw new Error(
+            `Reegel „${rule.label}” sisaldab valikut, mida vormis enam ei ole`
+          )
+        }
+      }
+
+      await tx.registrationAllocationRule.deleteMany({
+        where: { competitionId: id },
+      })
+      for (const [ruleIndex, rule] of allocationRules.entries()) {
+        await tx.registrationAllocationRule.create({
+          data: {
+            competitionId: id,
+            label: rule.label,
+            type: rule.type,
+            source: rule.source,
+            fieldId:
+              rule.source === "FORM_FIELD"
+                ? resolvedRuleFieldIds.get(ruleIndex)
+                : null,
+            values: JSON.stringify(rule.values),
+            quota: rule.quota,
+            order: rule.order,
+          },
+        })
+      }
+
       const competition = await tx.competition.update({
         where: { id },
         data: {
@@ -508,6 +722,7 @@ export async function PATCH(
           registrationClosesAt,
           registrationOverride: body.registrationOverride,
           registrationCapacity,
+          registrationClassBalanceMode: body.registrationClassBalanceMode,
           mandateOpensAt,
           mandateClosesAt,
           mandateOverride: body.mandateOverride,
@@ -522,6 +737,11 @@ export async function PATCH(
             where: { isActive: true },
             orderBy: [{ order: "asc" }, { createdAt: "asc" }],
             select: formFieldSelect,
+          },
+          registrationAllocationRules: {
+            where: { isActive: true },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            select: allocationRuleSelect,
           },
           _count: { select: { registrationApplications: true } },
         },
@@ -550,6 +770,13 @@ export async function PATCH(
         })
       }
 
+      if (getCompetitionRegistrationStatus(competition) === "OPEN") {
+        await recalculateRegistrationAllocation(tx, id, {
+          actorId: actor.id,
+          eventNote: "Jaotusreeglite muutmise järel arvutatud koht",
+        })
+      }
+
       return competition
     })
 
@@ -558,6 +785,11 @@ export async function PATCH(
       registrationFormFields: updated.registrationFormFields.map(
         toFormFieldDefinition
       ),
+      registrationAllocationRules:
+        updated.registrationAllocationRules.flatMap((rule) => {
+          const definition = toAllocationRuleDefinition(rule)
+          return definition ? [definition] : []
+        }),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Salvestamine ebaõnnestus"

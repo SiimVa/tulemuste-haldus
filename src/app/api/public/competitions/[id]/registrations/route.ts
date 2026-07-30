@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
-import { initialRegistrationStatus } from "@/lib/registrationApplications"
+import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
 import {
   RegistrationClassError,
   resolveRegistrationClass,
@@ -97,23 +97,16 @@ async function createApplication(
         )
       }
 
-      const confirmedCount = await tx.registrationApplication.count({
-        where: { competitionId, status: "CONFIRMED" },
-      })
-      const status = initialRegistrationStatus(
-        confirmedCount,
-        competition.registrationCapacity
-      )
       const now = new Date()
-      return tx.registrationApplication.create({
+      const created = await tx.registrationApplication.create({
         data: {
           competitionId,
           submittedById,
           teamName,
           classId,
-          status,
+          status: "WAITLISTED",
           submittedAt: now,
-          decidedAt: status === "CONFIRMED" ? now : null,
+          decidedAt: null,
           fieldValues: {
             create: Object.entries(validated.answers).map(([key, value]) => {
               const field = competition.registrationFormFields.find(
@@ -132,18 +125,21 @@ async function createApplication(
           },
           events: {
             create: {
-              toStatus: status,
+              toStatus: "WAITLISTED",
               actorId: submittedById,
-              note:
-                status === "WAITLISTED"
-                  ? "Kohtade üldarv on täitunud"
-                  : "Automaatselt kinnitatud",
+              note: "Saadetud automaatsesse kohtade jaotusse",
             },
           },
         },
-        include: {
-          class: { select: { id: true, name: true } },
-        },
+        select: { id: true },
+      })
+      await recalculateRegistrationAllocation(tx, competitionId, {
+        actorId: submittedById,
+        eventNote: "Registreerimise järel arvutatud koht",
+      })
+      return tx.registrationApplication.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { class: { select: { id: true, name: true } } },
       })
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }

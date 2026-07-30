@@ -196,6 +196,11 @@ export default async function DashboardPage() {
                     Klass: {application.class.name}
                   </p>
                 )}
+                {application.allocationReason && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {application.allocationReason}
+                  </p>
+                )}
                 <span className="inline-flex mt-3 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
                   {applicationStatusLabel[application.status] ??
                     application.status}
