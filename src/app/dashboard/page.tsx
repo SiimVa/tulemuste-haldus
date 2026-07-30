@@ -191,9 +191,11 @@ export default async function DashboardPage() {
                 <h3 className="font-semibold text-gray-900 mt-1">
                   {application.teamName}
                 </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Klass: {application.class.name}
-                </p>
+                {application.class && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Klass: {application.class.name}
+                  </p>
+                )}
                 <span className="inline-flex mt-3 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
                   {applicationStatusLabel[application.status] ??
                     application.status}

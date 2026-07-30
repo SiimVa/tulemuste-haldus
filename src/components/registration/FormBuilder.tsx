@@ -103,9 +103,10 @@ export function FormBuilder({
           </p>
         </div>
         <div className="border rounded-lg p-3 bg-gray-50">
-          <p className="text-sm font-medium text-gray-800">Klass *</p>
+          <p className="text-sm font-medium text-gray-800">Klass</p>
           <p className="text-xs text-gray-500 mt-1">
-            Süsteemne rippmenüü klasside nimekirjast
+            Valikuline süsteemiväli: puudub, määratakse automaatselt või
+            valitakse klasside arvu järgi
           </p>
         </div>
       </div>

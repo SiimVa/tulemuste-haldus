@@ -111,7 +111,7 @@ export async function POST(
           data: {
             competitionId,
             name: application.teamName,
-            class: application.class.name,
+            class: application.class?.name ?? null,
             code: nextTeamCode(codes, createdTeams + 1),
             registrationStatus: "APPROVED",
             formValues: {

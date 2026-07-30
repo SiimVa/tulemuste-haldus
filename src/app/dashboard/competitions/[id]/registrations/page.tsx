@@ -31,7 +31,7 @@ type RegistrationApplication = {
   teamName: string
   status: string
   submittedAt: string | null
-  class: { id: string; name: string }
+  class: { id: string; name: string } | null
   submittedBy: { id: string; name: string; email: string }
   team: { id: string; code: string } | null
   details: { fieldId: string; label: string; value: string }[]
@@ -301,7 +301,8 @@ export default function RegistrationsPage({
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
-                  {application.class.name} · {application.submittedBy.name} ·{" "}
+                  {application.class ? `${application.class.name} · ` : ""}
+                  {application.submittedBy.name} ·{" "}
                   {application.submittedBy.email}
                 </p>
                 {application.details.length > 0 && (

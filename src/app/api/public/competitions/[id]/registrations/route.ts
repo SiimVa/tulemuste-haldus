@@ -5,6 +5,10 @@ import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import { initialRegistrationStatus } from "@/lib/registrationApplications"
 import {
+  RegistrationClassError,
+  resolveRegistrationClass,
+} from "@/lib/registrationClasses"
+import {
   serializeFormAnswer,
   toFormFieldDefinition,
   validateFormAnswers,
@@ -16,7 +20,7 @@ async function createApplication(
   competitionId: string,
   submittedById: string,
   teamName: string,
-  classId: string,
+  requestedClassId: string | null,
   rawAnswers: unknown
 ) {
   return prisma.$transaction(
@@ -33,7 +37,8 @@ async function createApplication(
           registrationFinalizedAt: true,
           registrationCapacity: true,
           registrationClasses: {
-            where: { id: classId, isActive: true },
+            where: { isActive: true },
+            orderBy: [{ order: "asc" }, { name: "asc" }],
             select: { id: true },
           },
           registrationFormFields: {
@@ -71,9 +76,10 @@ async function createApplication(
       if (getCompetitionRegistrationStatus(competition) !== "OPEN") {
         throw new Error("Registreerimine ei ole avatud")
       }
-      if (competition.registrationClasses.length !== 1) {
-        throw new Error("Valitud klass ei kuulu sellele võistlusele")
-      }
+      const classId = resolveRegistrationClass(
+        competition.registrationClasses.map(({ id }) => id),
+        requestedClassId
+      )
 
       const formFields = competition.registrationFormFields.map(
         toFormFieldDefinition
@@ -156,17 +162,14 @@ export async function POST(
   const { id } = await params
   const body = await req.json()
   const teamName = typeof body.teamName === "string" ? body.teamName.trim() : ""
-  const classId = typeof body.classId === "string" ? body.classId : ""
+  const classId =
+    typeof body.classId === "string" && body.classId ? body.classId : null
   if (!teamName || teamName.length > 200) {
     return NextResponse.json(
       { error: "Võistkonna nimi on kohustuslik ja võib olla kuni 200 tähemärki" },
       { status: 400 }
     )
   }
-  if (!classId) {
-    return NextResponse.json({ error: "Vali klass" }, { status: 400 })
-  }
-
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const application = await createApplication(
@@ -189,7 +192,13 @@ export async function POST(
         error instanceof Error ? error.message : "Registreerimine ebaõnnestus"
       return NextResponse.json(
         { error: message },
-        { status: error instanceof RegistrationValidationError ? 400 : 409 }
+        {
+          status:
+            error instanceof RegistrationValidationError ||
+            error instanceof RegistrationClassError
+              ? 400
+              : 409,
+        }
       )
     }
   }
