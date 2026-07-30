@@ -318,6 +318,87 @@ test.describe.serial("võistluse põhivoog", () => {
     await adminContext.close()
   })
 
+  test("avalik registreerimine kinnitab koha või lisab ootenimekirja", async ({
+    browser,
+  }) => {
+    const adminContext = await browser.newContext()
+    const adminPage = await adminContext.newPage()
+    await login(adminPage, admin.email, admin.password)
+
+    const settingsResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/registration-settings`,
+      {
+        data: {
+          isPublic: true,
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "OPEN",
+          registrationCapacity: 1,
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "AUTO",
+          classes: [{ name: "Põhiklass" }],
+        },
+      }
+    )
+    expect(settingsResponse.status(), await settingsResponse.text()).toBe(200)
+    const settings = await settingsResponse.json()
+    expect(settings.registrationStatus).toBe("OPEN")
+
+    const representativeContext = await browser.newContext()
+    const page = await representativeContext.newPage()
+    await login(page, representative.email, representative.password)
+    await page.goto(`/competitions/${competitionId}`)
+
+    await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 1")
+    await page.getByLabel("Klass").selectOption({ label: "Põhiklass" })
+    await page.getByRole("button", { name: "Registreeri võistkond" }).click()
+    await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
+    await expect(page.getByText("Registreeritud", { exact: true })).toBeVisible()
+
+    await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 2")
+    await page.getByRole("button", { name: "Registreeri võistkond" }).click()
+    await expect(page.getByText("Võistkond lisati ootenimekirja.")).toBeVisible()
+    await expect(page.getByText("Ootenimekirjas", { exact: true })).toBeVisible()
+
+    page.once("dialog", (dialog) => dialog.accept())
+    await page
+      .getByText("Registreeritud", { exact: true })
+      .locator("..")
+      .getByRole("button", { name: "Loobu" })
+      .click()
+    await expect(
+      page.getByText("Registreeritud", { exact: true })
+    ).toBeVisible()
+
+    const closedResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/registration-settings`,
+      {
+        data: {
+          isPublic: true,
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "CLOSED",
+          registrationCapacity: 1,
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "AUTO",
+          classes: settings.registrationClasses,
+        },
+      }
+    )
+    expect(closedResponse.status(), await closedResponse.text()).toBe(200)
+
+    const finalizeResponse = await adminPage.request.post(
+      `/api/competitions/${competitionId}/registration-applications/finalize`
+    )
+    expect(finalizeResponse.status(), await finalizeResponse.text()).toBe(200)
+    expect((await finalizeResponse.json()).createdTeams).toBe(1)
+
+    await representativeContext.close()
+    await adminContext.close()
+  })
+
   test("teine korraldaja ei pääse võistluse andmetele ligi", async ({ browser }) => {
     const context = await browser.newContext()
     const page = await context.newPage()

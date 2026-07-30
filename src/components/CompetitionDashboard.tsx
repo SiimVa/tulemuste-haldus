@@ -23,7 +23,16 @@ const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 
 export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
   const { competition, teamCount, inCompCount, classCount, elementCount, elements, totalEntered, totalSlots, progressPct } = data
-  const statusLabel = competition.status === "ACTIVE" ? "Aktiivne" : competition.status === "FINISHED" ? "Lõppenud" : "Ettevalmistus"
+  const statusLabel =
+    competition.status === "ACTIVE"
+      ? "Toimub"
+      : competition.status === "FINISHED"
+        ? "Lõppenud"
+        : competition.status === "CANCELLED"
+          ? "Tühistatud"
+          : competition.status === "ARCHIVED"
+            ? "Arhiveeritud"
+            : "Ettevalmistus"
 
   return (
     <div className="space-y-6">

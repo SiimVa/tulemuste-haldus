@@ -24,6 +24,23 @@ type RegistrationTeam = {
   } | null
 }
 
+type PhaseStatus = "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
+type RegistrationApplication = {
+  id: string
+  teamName: string
+  status: string
+  submittedAt: string | null
+  class: { id: string; name: string }
+  submittedBy: { id: string; name: string; email: string }
+  team: { id: string; code: string } | null
+}
+type RegistrationOverview = {
+  registrationStatus: PhaseStatus
+  mandateStatus: PhaseStatus
+  registrationFinalizedAt: string | null
+  registrationCapacity: number | null
+}
+
 const STATUS_LABEL: Record<WorkflowStatus, string> = {
   DRAFT: "Mustand",
   SUBMITTED: "Esitatud",
@@ -38,6 +55,31 @@ const STATUS_COLOR: Record<WorkflowStatus, string> = {
   CHANGES_REQUESTED: "bg-amber-100 text-amber-800",
 }
 
+const PHASE_LABEL: Record<PhaseStatus, string> = {
+  NOT_OPEN: "Pole veel avatud",
+  OPEN: "Avatud",
+  CLOSED: "Suletud",
+  FINALIZED: "Kinnitatud",
+}
+
+const APPLICATION_LABEL: Record<string, string> = {
+  DRAFT: "Mustand",
+  PENDING_REVIEW: "Ootab ülevaatamist",
+  CONFIRMED: "Registreeritud",
+  WAITLISTED: "Ootenimekirjas",
+  REJECTED: "Tagasi lükatud",
+  WITHDRAWN: "Loobunud",
+}
+
+const APPLICATION_COLOR: Record<string, string> = {
+  CONFIRMED: "bg-green-100 text-green-700",
+  WAITLISTED: "bg-amber-100 text-amber-800",
+  PENDING_REVIEW: "bg-blue-100 text-blue-700",
+  REJECTED: "bg-red-100 text-red-700",
+  WITHDRAWN: "bg-gray-100 text-gray-600",
+  DRAFT: "bg-gray-100 text-gray-700",
+}
+
 export default function RegistrationsPage({
   params,
 }: {
@@ -45,9 +87,12 @@ export default function RegistrationsPage({
 }) {
   const { id: competitionId } = use(params)
   const [teams, setTeams] = useState<RegistrationTeam[]>([])
+  const [applications, setApplications] = useState<RegistrationApplication[]>([])
+  const [overview, setOverview] = useState<RegistrationOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [reviewing, setReviewing] = useState<string | null>(null)
+  const [finalizing, setFinalizing] = useState(false)
 
   const loadTeams = useCallback(async () => {
     const response = await fetch(
@@ -59,7 +104,9 @@ export default function RegistrationsPage({
       setLoading(false)
       return
     }
-    setTeams(data)
+    setTeams(data.legacyTeams ?? [])
+    setApplications(data.applications ?? [])
+    setOverview(data.competition ?? null)
     setLoading(false)
   }, [competitionId])
 
@@ -97,6 +144,56 @@ export default function RegistrationsPage({
     setReviewing(null)
   }
 
+  async function decideApplication(
+    applicationId: string,
+    action: "CONFIRM" | "REJECT"
+  ) {
+    const note =
+      action === "REJECT"
+        ? window.prompt("Soovi korral lisa tagasilükkamise põhjus:") ?? ""
+        : ""
+    setReviewing(`application-${applicationId}`)
+    setError("")
+    const response = await fetch(
+      `/api/competitions/${competitionId}/registration-applications/${applicationId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, note }),
+      }
+    )
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(data.error ?? "Otsuse salvestamine ebaõnnestus")
+    } else {
+      await loadTeams()
+    }
+    setReviewing(null)
+  }
+
+  async function finalizeRegistrations() {
+    if (
+      !window.confirm(
+        "Kinnitan osalejate nimekirja. Kinnitatud avaldustest luuakse võistkonnad ja registreerimine lukustatakse."
+      )
+    ) {
+      return
+    }
+    setFinalizing(true)
+    setError("")
+    const response = await fetch(
+      `/api/competitions/${competitionId}/registration-applications/finalize`,
+      { method: "POST" }
+    )
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(data.error ?? "Nimekirja kinnitamine ebaõnnestus")
+    } else {
+      await loadTeams()
+    }
+    setFinalizing(false)
+  }
+
   if (loading) return <p className="text-gray-400 py-10">Laadin...</p>
 
   return (
@@ -112,7 +209,7 @@ export default function RegistrationsPage({
           Registreerimine ja mandaat
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Vaata esindajate esitatud andmed üle ja kinnita või saada parandamisele.
+          Halda avaldusi, ootenimekirja ja mandaadi töövoogu.
         </p>
       </div>
 
@@ -122,6 +219,133 @@ export default function RegistrationsPage({
         </p>
       )}
 
+      {overview && (
+        <div className="grid sm:grid-cols-2 gap-4 mb-6">
+          <section className="bg-white border rounded-xl p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-gray-500">Registreerimine</p>
+                <p className="font-semibold text-gray-900 mt-1">
+                  {PHASE_LABEL[overview.registrationStatus]}
+                </p>
+              </div>
+              <Link
+                href={`/dashboard/competitions/${competitionId}/registration-settings`}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Muuda avatust
+              </Link>
+            </div>
+            {overview.registrationStatus === "CLOSED" &&
+              !overview.registrationFinalizedAt && (
+                <button
+                  type="button"
+                  onClick={finalizeRegistrations}
+                  disabled={finalizing}
+                  className="mt-4 px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+                >
+                  {finalizing
+                    ? "Kinnitan..."
+                    : "Kinnita osalejate nimekiri"}
+                </button>
+              )}
+          </section>
+          <section className="bg-white border rounded-xl p-4">
+            <p className="text-xs text-gray-500">Mandaat</p>
+            <p className="font-semibold text-gray-900 mt-1">
+              {PHASE_LABEL[overview.mandateStatus]}
+            </p>
+          </section>
+        </div>
+      )}
+
+      <section className="mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">
+              Registreerimisavaldused
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              {applications.filter((item) => item.status === "CONFIRMED").length}
+              {overview?.registrationCapacity
+                ? `/${overview.registrationCapacity}`
+                : ""}{" "}
+              kinnitatud ·{" "}
+              {applications.filter((item) => item.status === "WAITLISTED").length}{" "}
+              ootenimekirjas
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {applications.map((application, index) => (
+            <article
+              key={application.id}
+              className="bg-white border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-400">#{index + 1}</span>
+                  <h3 className="font-semibold text-gray-900">
+                    {application.teamName}
+                  </h3>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      APPLICATION_COLOR[application.status] ??
+                      "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {APPLICATION_LABEL[application.status] ?? application.status}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">
+                  {application.class.name} · {application.submittedBy.name} ·{" "}
+                  {application.submittedBy.email}
+                </p>
+              </div>
+              {application.status === "WAITLISTED" &&
+                !overview?.registrationFinalizedAt && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        decideApplication(application.id, "CONFIRM")
+                      }
+                      disabled={Boolean(reviewing)}
+                      className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
+                    >
+                      Võta vastu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        decideApplication(application.id, "REJECT")
+                      }
+                      disabled={Boolean(reviewing)}
+                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-xs disabled:opacity-50"
+                    >
+                      Lükka tagasi
+                    </button>
+                  </div>
+                )}
+            </article>
+          ))}
+
+          {applications.length === 0 && (
+            <div className="bg-white border rounded-xl py-10 text-center text-sm text-gray-400">
+              Uue töövoo registreerimisavaldusi veel pole.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {teams.length > 0 && (
+        <div className="mb-4">
+          <h2 className="font-semibold text-gray-900">
+            Võistkondade mandaat ja varasemad registreerimised
+          </h2>
+        </div>
+      )}
       <div className="space-y-4">
         {teams.map((team) => (
           <article key={team.id} className="bg-white border rounded-xl p-5">
@@ -239,11 +463,6 @@ export default function RegistrationsPage({
           </article>
         ))}
 
-        {teams.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
-            Võistkondi pole veel lisatud.
-          </div>
-        )}
       </div>
     </div>
   )

@@ -6,11 +6,19 @@ import { RecalculateButton } from "@/components/RecalculateButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { ElementList } from "@/components/competition/ElementList"
 
-const STATUS_LABEL: Record<string, string> = { SETUP: "Ettevalmistus", ACTIVE: "Aktiivne", FINISHED: "Lõppenud" }
+const STATUS_LABEL: Record<string, string> = {
+  SETUP: "Ettevalmistus",
+  ACTIVE: "Toimub",
+  FINISHED: "Lõppenud",
+  CANCELLED: "Tühistatud",
+  ARCHIVED: "Arhiveeritud",
+}
 const STATUS_COLOR: Record<string, string> = {
   SETUP: "bg-gray-100 text-gray-600",
   ACTIVE: "bg-green-100 text-green-700",
   FINISHED: "bg-blue-100 text-blue-700",
+  CANCELLED: "bg-red-100 text-red-700",
+  ARCHIVED: "bg-slate-100 text-slate-600",
 }
 
 export default async function CompetitionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +43,7 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
     { href: `/dashboard/competitions/${id}/elements/new`, label: "+ Element" },
     { href: `/dashboard/competitions/${id}/teams`, label: "Võistkonnad" },
     { href: `/dashboard/competitions/${id}/registrations`, label: "Registreerimine" },
+    { href: `/dashboard/competitions/${id}/registration-settings`, label: "Registreerimise seaded" },
     { href: `/dashboard/competitions/${id}/access`, label: "Juurdepääs" },
     { href: `/dashboard/competitions/${id}/athlete-view`, label: "Võistlejate vaade" },
     { href: `/dashboard/competitions/${id}/leaderboard`, label: "Pingerida" },
@@ -81,8 +90,8 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
             },
           ]} />
           <RecalculateButton competitionId={id} />
-          <span className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COLOR[competition.status]}`}>
-            {STATUS_LABEL[competition.status]}
+          <span className={`text-sm px-3 py-1 rounded-full font-medium ${STATUS_COLOR[competition.status] ?? STATUS_COLOR.SETUP}`}>
+            {STATUS_LABEL[competition.status] ?? competition.status}
           </span>
         </div>
       </div>
