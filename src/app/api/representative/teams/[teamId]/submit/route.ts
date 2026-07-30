@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canManageTeamRegistration } from "@/lib/competitionAccess"
+import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  type FormAnswers,
+  parseFormAnswer,
+  toFormFieldDefinition,
+  validateFormAnswers,
+} from "@/lib/registrationForm"
 import {
   canSubmitMandate,
   canSubmitRegistration,
@@ -23,7 +30,41 @@ export async function POST(
     where: { id: teamId },
     include: {
       members: { select: { role: true } },
-      competition: { select: { status: true } },
+      formValues: { select: { fieldId: true, value: true } },
+      registrationApplication: { select: { id: true } },
+      competition: {
+        select: {
+          status: true,
+          registrationFinalizedAt: true,
+          mandateOverride: true,
+          mandateOpensAt: true,
+          mandateClosesAt: true,
+          mandateFinalizedAt: true,
+          registrationFormFields: {
+            where: { isActive: true },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              key: true,
+              label: true,
+              helpText: true,
+              type: true,
+              semanticKey: true,
+              options: true,
+              memberFields: true,
+              showInRegistration: true,
+              requiredInRegistration: true,
+              showInMandate: true,
+              requiredInMandate: true,
+              editableInMandate: true,
+              conditionFieldKey: true,
+              conditionOperator: true,
+              conditionValue: true,
+              order: true,
+            },
+          },
+        },
+      },
     },
   })
   if (!team) {
@@ -76,6 +117,37 @@ export async function POST(
       include: { members: true, competition: true },
     })
     return NextResponse.json(updated)
+  }
+
+  if (
+    team.registrationApplication &&
+    getCompetitionMandateStatus(team.competition) !== "OPEN"
+  ) {
+    return NextResponse.json(
+      { error: "Mandaat ei ole praegu avatud" },
+      { status: 409 }
+    )
+  }
+  const formFields = team.competition.registrationFormFields.map(
+    toFormFieldDefinition
+  )
+  const fieldById = new Map(
+    team.competition.registrationFormFields.map((field) => [field.id, field])
+  )
+  const formValues: FormAnswers = {}
+  for (const storedValue of team.formValues) {
+    const field = fieldById.get(storedValue.fieldId)
+    const value = parseFormAnswer(storedValue.value)
+    if (field && value !== undefined) formValues[field.key] = value
+  }
+  const validated = validateFormAnswers(formFields, formValues, "MANDATE")
+  const firstError = Object.entries(validated.errors)[0]
+  if (firstError) {
+    const field = formFields.find(({ key }) => key === firstError[0])
+    return NextResponse.json(
+      { error: `${field?.label ?? "Vormiväli"}: ${firstError[1]}` },
+      { status: 400 }
+    )
   }
 
   const competitorCount = team.members.filter(

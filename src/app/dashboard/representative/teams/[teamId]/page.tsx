@@ -2,6 +2,14 @@
 
 import Link from "next/link"
 import { use, useCallback, useEffect, useState } from "react"
+import { DynamicFormFields } from "@/components/registration/DynamicFormFields"
+import {
+  type FormAnswer,
+  type FormAnswers,
+  type FormFieldDefinition,
+  type MemberAnswer,
+  validateFormAnswers,
+} from "@/lib/registrationForm"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -29,6 +37,10 @@ type Team = {
   mandateReviewedAt: string | null
   mandateReviewNote: string | null
   members: TeamMember[]
+  formFields: FormFieldDefinition[]
+  formValues: FormAnswers
+  mandatePhaseStatus: "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
+  registrationApplication: { id: string } | null
   competition: {
     id: string
     name: string
@@ -71,6 +83,8 @@ export default function RepresentativeTeamPage({
   const [name, setName] = useState("")
   const [teamClass, setTeamClass] = useState("")
   const [members, setMembers] = useState<TeamMember[]>([])
+  const [formValues, setFormValues] = useState<FormAnswers>({})
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState("")
@@ -89,6 +103,7 @@ export default function RepresentativeTeamPage({
     setName(data.name)
     setTeamClass(data.class ?? "")
     setMembers(data.members ?? [])
+    setFormValues(data.formValues ?? {})
     setLoading(false)
   }, [teamId])
 
@@ -173,18 +188,44 @@ export default function RepresentativeTeamPage({
   }
 
   async function saveMandate() {
+    if (!team) return
+    const validated = validateFormAnswers(
+      team.formFields,
+      formValues,
+      "MANDATE"
+    )
+    setFormErrors(validated.errors)
+    if (Object.keys(validated.errors).length > 0) {
+      setError("Kontrolli mandaadi kohustuslikke ja vigaseid välju")
+      return
+    }
     await update(
       `/api/representative/teams/${teamId}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phase: "MANDATE", members }),
+        body: JSON.stringify({
+          phase: "MANDATE",
+          members,
+          formValues: validated.answers,
+        }),
       },
       "Mandaadi mustand salvestatud"
     )
   }
 
   async function submitMandate() {
+    if (!team) return
+    const validated = validateFormAnswers(
+      team.formFields,
+      formValues,
+      "MANDATE"
+    )
+    setFormErrors(validated.errors)
+    if (Object.keys(validated.errors).length > 0) {
+      setError("Kontrolli mandaadi kohustuslikke ja vigaseid välju")
+      return
+    }
     setSaving("mandate-submit")
     setError("")
     setMessage("")
@@ -192,7 +233,11 @@ export default function RepresentativeTeamPage({
     const saveResponse = await fetch(`/api/representative/teams/${teamId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phase: "MANDATE", members }),
+      body: JSON.stringify({
+        phase: "MANDATE",
+        members,
+        formValues: validated.answers,
+      }),
     })
     const saveData = await saveResponse.json()
     if (!saveResponse.ok) {
@@ -227,6 +272,16 @@ export default function RepresentativeTeamPage({
     )
   }
 
+  function updateFormValue(key: string, value: FormAnswer) {
+    setFormValues((current) => ({ ...current, [key]: value }))
+    setFormErrors((current) => {
+      if (!current[key]) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
   if (loading) return <p className="text-gray-400 py-10">Laadin...</p>
   if (!team) return <p className="text-red-600 py-10">{error}</p>
 
@@ -236,10 +291,31 @@ export default function RepresentativeTeamPage({
   const mandateEditable =
     team.registrationStatus === "APPROVED" &&
     (team.mandateStatus === "DRAFT" ||
-      team.mandateStatus === "CHANGES_REQUESTED")
-  const competitorCount = members.filter(
-    (member) => member.role === "COMPETITOR" && member.name.trim()
-  ).length
+      team.mandateStatus === "CHANGES_REQUESTED") &&
+    (!team.registrationApplication || team.mandatePhaseStatus === "OPEN")
+  const memberFormFields = team.formFields.filter(
+    (field) => field.type === "MEMBER_LIST" && field.showInMandate
+  )
+  const competitorCount =
+    memberFormFields.length > 0
+      ? memberFormFields.reduce((count, field) => {
+          const value = formValues[field.key]
+          return (
+            count +
+            (Array.isArray(value)
+              ? value.filter(
+                  (member): member is MemberAnswer =>
+                    typeof member === "object" &&
+                    member !== null &&
+                    typeof member.name === "string" &&
+                    Boolean(member.name.trim())
+                ).length
+              : 0)
+          )
+        }, 0)
+      : members.filter(
+          (member) => member.role === "COMPETITOR" && member.name.trim()
+        ).length
 
   return (
     <div className="max-w-3xl">
@@ -350,6 +426,14 @@ export default function RepresentativeTeamPage({
             Mandaat avaneb pärast registreerimise kinnitamist.
           </p>
         )}
+        {team.registrationApplication &&
+          team.registrationStatus === "APPROVED" &&
+          team.mandatePhaseStatus !== "OPEN" && (
+            <p className="bg-gray-50 text-gray-600 rounded-lg px-4 py-3 text-sm">
+              Mandaat ei ole praegu avatud. Korraldaja saab selle avada
+              registreerimise seadete lehel.
+            </p>
+          )}
         {team.mandateReviewNote && (
           <div className="bg-amber-50 text-amber-800 rounded-lg px-4 py-3 text-sm">
             Korraldaja märkus: {team.mandateReviewNote}
@@ -358,7 +442,19 @@ export default function RepresentativeTeamPage({
 
         {team.registrationStatus === "APPROVED" && (
           <>
-            <div className="space-y-2">
+            {team.formFields.some((field) => field.showInMandate) && (
+              <DynamicFormFields
+                fields={team.formFields}
+                phase="MANDATE"
+                values={formValues}
+                onChange={updateFormValue}
+                errors={formErrors}
+                disabled={!mandateEditable}
+              />
+            )}
+
+            {memberFormFields.length === 0 && (
+              <div className="space-y-2">
               {members.length === 0 && (
                 <p className="text-sm text-gray-400">Liikmeid pole veel lisatud.</p>
               )}
@@ -402,22 +498,25 @@ export default function RepresentativeTeamPage({
                   )}
                 </div>
               ))}
-            </div>
+              </div>
+            )}
 
             {mandateEditable && (
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMembers((current) => [
-                      ...current,
-                      { name: "", role: "COMPETITOR" },
-                    ])
-                  }
-                  className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
-                >
-                  + Lisa liige
-                </button>
+                {memberFormFields.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMembers((current) => [
+                        ...current,
+                        { name: "", role: "COMPETITOR" },
+                      ])
+                    }
+                    className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    + Lisa liige
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={saveMandate}

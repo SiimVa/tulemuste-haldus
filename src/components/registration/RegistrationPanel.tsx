@@ -3,6 +3,13 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { DynamicFormFields } from "@/components/registration/DynamicFormFields"
+import {
+  type FormAnswer,
+  type FormAnswers,
+  type FormFieldDefinition,
+  validateFormAnswers,
+} from "@/lib/registrationForm"
 
 type CompetitionClass = { id: string; name: string }
 type Application = {
@@ -36,17 +43,21 @@ export function RegistrationPanel({
   registrationOpen,
   loggedIn,
   classes,
+  formFields,
   applications,
 }: {
   competitionId: string
   registrationOpen: boolean
   loggedIn: boolean
   classes: CompetitionClass[]
+  formFields: FormFieldDefinition[]
   applications: Application[]
 }) {
   const router = useRouter()
   const [teamName, setTeamName] = useState("")
   const [classId, setClassId] = useState(classes[0]?.id ?? "")
+  const [answers, setAnswers] = useState<FormAnswers>({})
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [withdrawing, setWithdrawing] = useState<string | null>(null)
   const [error, setError] = useState("")
@@ -57,12 +68,27 @@ export function RegistrationPanel({
     setSaving(true)
     setError("")
     setMessage("")
+    const validated = validateFormAnswers(
+      formFields,
+      answers,
+      "REGISTRATION"
+    )
+    setFormErrors(validated.errors)
+    if (Object.keys(validated.errors).length > 0) {
+      setSaving(false)
+      setError("Kontrolli kohustuslikke ja vigaseid vormivälju")
+      return
+    }
     const response = await fetch(
       `/api/public/competitions/${competitionId}/registrations`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamName, classId }),
+        body: JSON.stringify({
+          teamName,
+          classId,
+          answers: validated.answers,
+        }),
       }
     )
     const data = await response.json().catch(() => ({}))
@@ -70,6 +96,8 @@ export function RegistrationPanel({
       setError(data.error ?? "Registreerimine ebaõnnestus")
     } else {
       setTeamName("")
+      setAnswers({})
+      setFormErrors({})
       setMessage(
         data.status === "WAITLISTED"
           ? "Võistkond lisati ootenimekirja."
@@ -78,6 +106,16 @@ export function RegistrationPanel({
       router.refresh()
     }
     setSaving(false)
+  }
+
+  function updateAnswer(key: string, value: FormAnswer) {
+    setAnswers((current) => ({ ...current, [key]: value }))
+    setFormErrors((current) => {
+      if (!current[key]) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
   }
 
   async function withdraw(applicationId: string) {
@@ -210,6 +248,15 @@ export function RegistrationPanel({
                 ))}
               </select>
             </div>
+            {formFields.some((field) => field.showInRegistration) && (
+              <DynamicFormFields
+                fields={formFields}
+                phase="REGISTRATION"
+                values={answers}
+                onChange={updateAnswer}
+                errors={formErrors}
+              />
+            )}
             <button
               type="submit"
               disabled={saving}

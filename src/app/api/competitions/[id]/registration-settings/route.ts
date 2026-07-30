@@ -8,6 +8,36 @@ import {
   validatePhaseWindow,
 } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  type FormFieldDefinition,
+  FORM_FIELD_TYPES,
+  FORM_SEMANTIC_KEYS,
+  isFormConditionOperator,
+  isFormFieldType,
+  isFormSemanticKey,
+  MEMBER_FIELD_TYPES,
+  toFormFieldDefinition,
+} from "@/lib/registrationForm"
+
+const formFieldSelect = {
+  id: true,
+  key: true,
+  label: true,
+  helpText: true,
+  type: true,
+  semanticKey: true,
+  options: true,
+  memberFields: true,
+  showInRegistration: true,
+  requiredInRegistration: true,
+  showInMandate: true,
+  requiredInMandate: true,
+  editableInMandate: true,
+  conditionFieldKey: true,
+  conditionOperator: true,
+  conditionValue: true,
+  order: true,
+}
 
 function optionalDate(value: unknown): Date | null {
   if (value === null || value === undefined || value === "") return null
@@ -34,6 +64,168 @@ function responseData<
     registrationStatus: getCompetitionRegistrationStatus(competition),
     mandateStatus: getCompetitionMandateStatus(competition),
   }
+}
+
+function parseFormFields(value: unknown): FormFieldDefinition[] {
+  if (!Array.isArray(value)) throw new Error("Vormiväljade nimekiri puudub")
+  if (value.length > 100) {
+    throw new Error("Ühel võistlusel saab olla kuni 100 vormivälja")
+  }
+
+  const fields = value.map((item: unknown, order): FormFieldDefinition => {
+    if (!item || typeof item !== "object") throw new Error("Vigane vormiväli")
+    const raw = item as Record<string, unknown>
+    const id = typeof raw.id === "string" ? raw.id : undefined
+    const key = typeof raw.key === "string" ? raw.key.trim() : ""
+    const label = typeof raw.label === "string" ? raw.label.trim() : ""
+    const helpText =
+      typeof raw.helpText === "string" && raw.helpText.trim()
+        ? raw.helpText.trim()
+        : null
+    if (!/^[a-z][a-z0-9_-]{2,79}$/.test(key)) {
+      throw new Error("Vormivälja tehniline võti on vigane")
+    }
+    if (!label || label.length > 200 || (helpText?.length ?? 0) > 1000) {
+      throw new Error("Kontrolli vormivälja nimetust ja abiteksti")
+    }
+    if (!isFormFieldType(raw.type)) {
+      throw new Error(
+        `Välja „${label}” tüüp peab olema üks järgmistest: ${FORM_FIELD_TYPES.join(", ")}`
+      )
+    }
+
+    const semanticKey =
+      raw.semanticKey === null || raw.semanticKey === ""
+        ? null
+        : isFormSemanticKey(raw.semanticKey)
+          ? raw.semanticKey
+          : undefined
+    if (semanticKey === undefined) {
+      throw new Error(
+        `Välja „${label}” tähendus peab olema üks järgmistest: ${FORM_SEMANTIC_KEYS.join(", ")}`
+      )
+    }
+
+    const options = Array.isArray(raw.options)
+      ? raw.options.map((option) =>
+          typeof option === "string" ? option.trim() : ""
+        )
+      : []
+    if (
+      options.some((option) => !option || option.length > 200) ||
+      new Set(options.map((option) => option.toLocaleLowerCase("et"))).size !==
+        options.length ||
+      options.length > 200
+    ) {
+      throw new Error(`Kontrolli välja „${label}” valikuid`)
+    }
+    if (
+      ["SELECT", "MULTISELECT"].includes(raw.type) &&
+      options.length === 0
+    ) {
+      throw new Error(`Väljale „${label}” tuleb lisada vähemalt üks valik`)
+    }
+    if (semanticKey && raw.type !== "SELECT") {
+      throw new Error(
+        `Kohtade jaotamise väli „${label}” peab olema rippmenüü`
+      )
+    }
+
+    const memberFields = Array.isArray(raw.memberFields)
+      ? raw.memberFields.filter(
+          (memberField): memberField is (typeof MEMBER_FIELD_TYPES)[number] =>
+            typeof memberField === "string" &&
+            MEMBER_FIELD_TYPES.includes(
+              memberField as (typeof MEMBER_FIELD_TYPES)[number]
+            )
+        )
+      : []
+    const normalizedMemberFields =
+      raw.type === "MEMBER_LIST"
+        ? Array.from(new Set(["name" as const, ...memberFields]))
+        : ["name" as const]
+
+    const showInRegistration = Boolean(raw.showInRegistration)
+    const showInMandate = Boolean(raw.showInMandate)
+    if (!showInRegistration && !showInMandate) {
+      throw new Error(
+        `Väli „${label}” peab olema nähtav registreerimisel või mandaadis`
+      )
+    }
+    if (
+      showInMandate &&
+      !showInRegistration &&
+      !Boolean(raw.editableInMandate)
+    ) {
+      throw new Error(
+        `Ainult mandaadis kuvatav väli „${label}” peab olema muudetav`
+      )
+    }
+
+    const conditionFieldKey =
+      typeof raw.conditionFieldKey === "string" && raw.conditionFieldKey
+        ? raw.conditionFieldKey
+        : null
+    const conditionOperator = conditionFieldKey
+      ? isFormConditionOperator(raw.conditionOperator)
+        ? raw.conditionOperator
+        : undefined
+      : null
+    if (conditionOperator === undefined) {
+      throw new Error(`Välja „${label}” kuvamistingimus on vigane`)
+    }
+
+    return {
+      id,
+      key,
+      label,
+      helpText,
+      type: raw.type,
+      semanticKey,
+      options,
+      memberFields: normalizedMemberFields,
+      showInRegistration,
+      requiredInRegistration:
+        showInRegistration && Boolean(raw.requiredInRegistration),
+      showInMandate,
+      requiredInMandate: showInMandate && Boolean(raw.requiredInMandate),
+      editableInMandate:
+        showInMandate && Boolean(raw.editableInMandate),
+      conditionFieldKey,
+      conditionOperator,
+      conditionValue:
+        conditionFieldKey && typeof raw.conditionValue === "string"
+          ? raw.conditionValue
+          : null,
+      order,
+    }
+  })
+
+  const keys = fields.map(({ key }) => key)
+  if (new Set(keys).size !== keys.length) {
+    throw new Error("Vormiväljade tehnilised võtmed peavad olema erinevad")
+  }
+  const semanticKeys = fields
+    .map(({ semanticKey }) => semanticKey)
+    .filter((key): key is NonNullable<typeof key> => Boolean(key))
+  if (new Set(semanticKeys).size !== semanticKeys.length) {
+    throw new Error(
+      "Maakonna ja võistkonna liigi tähendusega välja saab lisada ühe korra"
+    )
+  }
+  for (const [index, field] of fields.entries()) {
+    if (
+      field.conditionFieldKey &&
+      !fields
+        .slice(0, index)
+        .some(({ key }) => key === field.conditionFieldKey)
+    ) {
+      throw new Error(
+        `Välja „${field.label}” tingimus peab viitama varasemale väljale`
+      )
+    }
+  }
+  return fields
 }
 
 export async function GET(
@@ -75,6 +267,11 @@ export async function GET(
         orderBy: [{ order: "asc" }, { name: "asc" }],
         select: { id: true, name: true, order: true },
       },
+      registrationFormFields: {
+        where: { isActive: true },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: formFieldSelect,
+      },
       _count: {
         select: { registrationApplications: true },
       },
@@ -84,7 +281,12 @@ export async function GET(
     return NextResponse.json({ error: "Võistlust ei leitud" }, { status: 404 })
   }
 
-  return NextResponse.json(responseData(competition))
+  return NextResponse.json({
+    ...responseData(competition),
+    registrationFormFields: competition.registrationFormFields.map(
+      toFormFieldDefinition
+    ),
+  })
 }
 
 export async function PATCH(
@@ -188,11 +390,15 @@ export async function PATCH(
         { status: 400 }
       )
     }
+    const formFields = parseFormFields(body.formFields)
 
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.competition.findUnique({
         where: { id },
-        include: { registrationClasses: true },
+        include: {
+          registrationClasses: true,
+          registrationFormFields: true,
+        },
       })
       if (!current) throw new Error("Võistlust ei leitud")
 
@@ -237,6 +443,63 @@ export async function PATCH(
         data: { isActive: false },
       })
 
+      // Vabasta semantilised unikaalsed võtmed enne väljade ümberjärjestamist.
+      await tx.competitionFormField.updateMany({
+        where: { competitionId: id },
+        data: { semanticKey: null },
+      })
+      const currentFieldsById = new Map(
+        current.registrationFormFields.map((field) => [field.id, field])
+      )
+      const currentFieldsByKey = new Map(
+        current.registrationFormFields.map((field) => [field.key, field])
+      )
+      const retainedFieldIds: string[] = []
+
+      for (const field of formFields) {
+        const existing =
+          (field.id ? currentFieldsById.get(field.id) : undefined) ??
+          currentFieldsByKey.get(field.key)
+        const data = {
+          key: existing?.key ?? field.key,
+          label: field.label,
+          helpText: field.helpText,
+          type: field.type,
+          semanticKey: field.semanticKey,
+          options: JSON.stringify(field.options),
+          memberFields: JSON.stringify(field.memberFields),
+          showInRegistration: field.showInRegistration,
+          requiredInRegistration: field.requiredInRegistration,
+          showInMandate: field.showInMandate,
+          requiredInMandate: field.requiredInMandate,
+          editableInMandate: field.editableInMandate,
+          conditionFieldKey: field.conditionFieldKey,
+          conditionOperator: field.conditionOperator,
+          conditionValue: field.conditionValue,
+          order: field.order,
+          isActive: true,
+        }
+        const saved = existing
+          ? await tx.competitionFormField.update({
+              where: { id: existing.id },
+              data,
+            })
+          : await tx.competitionFormField.create({
+              data: { competitionId: id, ...data },
+            })
+        retainedFieldIds.push(saved.id)
+      }
+
+      await tx.competitionFormField.updateMany({
+        where: {
+          competitionId: id,
+          ...(retainedFieldIds.length > 0
+            ? { id: { notIn: retainedFieldIds } }
+            : {}),
+        },
+        data: { isActive: false, semanticKey: null },
+      })
+
       const competition = await tx.competition.update({
         where: { id },
         data: {
@@ -254,6 +517,11 @@ export async function PATCH(
             where: { isActive: true },
             orderBy: [{ order: "asc" }, { name: "asc" }],
             select: { id: true, name: true, order: true },
+          },
+          registrationFormFields: {
+            where: { isActive: true },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            select: formFieldSelect,
           },
           _count: { select: { registrationApplications: true } },
         },
@@ -285,7 +553,12 @@ export async function PATCH(
       return competition
     })
 
-    return NextResponse.json(responseData(updated))
+    return NextResponse.json({
+      ...responseData(updated),
+      registrationFormFields: updated.registrationFormFields.map(
+        toFormFieldDefinition
+      ),
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Salvestamine ebaõnnestus"
     return NextResponse.json({ error: message }, { status: 400 })

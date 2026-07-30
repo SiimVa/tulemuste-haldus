@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  type MemberAnswer,
+  parseFormAnswer,
+} from "@/lib/registrationForm"
 
 function nextTeamCode(existing: Set<string>, sequence: number): string {
   let number = sequence
@@ -67,7 +71,14 @@ export async function POST(
 
       const applications = await tx.registrationApplication.findMany({
         where: { competitionId, status: "CONFIRMED" },
-        include: { class: { select: { name: true } } },
+        include: {
+          class: { select: { name: true } },
+          fieldValues: {
+            include: {
+              field: { select: { id: true, type: true, isActive: true } },
+            },
+          },
+        },
         orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
       })
       const existingTeams = await tx.team.findMany({
@@ -79,6 +90,23 @@ export async function POST(
 
       for (const application of applications) {
         if (application.teamId) continue
+        const members = application.fieldValues.flatMap((fieldValue) => {
+          if (
+            !fieldValue.field.isActive ||
+            fieldValue.field.type !== "MEMBER_LIST"
+          ) {
+            return []
+          }
+          const value = parseFormAnswer(fieldValue.value)
+          if (!Array.isArray(value)) return []
+          return value.filter(
+            (member): member is MemberAnswer =>
+              typeof member === "object" &&
+              member !== null &&
+              typeof member.name === "string" &&
+              Boolean(member.name.trim())
+          )
+        })
         const team = await tx.team.create({
           data: {
             competitionId,
@@ -86,6 +114,51 @@ export async function POST(
             class: application.class.name,
             code: nextTeamCode(codes, createdTeams + 1),
             registrationStatus: "APPROVED",
+            formValues: {
+              create: application.fieldValues.map((fieldValue) => ({
+                fieldId: fieldValue.fieldId,
+                value: fieldValue.value,
+              })),
+            },
+            members: {
+              create: members.map((member) => ({
+                name: member.name.trim(),
+                role: "COMPETITOR",
+              })),
+            },
+          },
+        })
+        const representativeMembership = await tx.competitionMember.upsert({
+          where: {
+            competitionId_userId: {
+              competitionId,
+              userId: application.submittedById,
+            },
+          },
+          create: {
+            competitionId,
+            userId: application.submittedById,
+          },
+          update: {},
+        })
+        await tx.competitionMemberRole.upsert({
+          where: {
+            memberId_role: {
+              memberId: representativeMembership.id,
+              role: "REPRESENTATIVE",
+            },
+          },
+          create: {
+            memberId: representativeMembership.id,
+            role: "REPRESENTATIVE",
+          },
+          update: {},
+        })
+        await tx.teamRepresentative.create({
+          data: {
+            competitionId,
+            teamId: team.id,
+            memberId: representativeMembership.id,
           },
         })
         await tx.registrationApplication.update({

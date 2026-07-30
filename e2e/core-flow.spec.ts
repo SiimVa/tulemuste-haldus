@@ -325,6 +325,93 @@ test.describe.serial("võistluse põhivoog", () => {
     const adminPage = await adminContext.newPage()
     await login(adminPage, admin.email, admin.password)
 
+    const formFields = [
+      {
+        key: "county",
+        label: "Maakond",
+        helpText: "Vali võistkonna maakond",
+        type: "SELECT",
+        semanticKey: "COUNTY",
+        options: ["Harjumaa", "Raplamaa"],
+        memberFields: ["name"],
+        showInRegistration: true,
+        requiredInRegistration: true,
+        showInMandate: true,
+        requiredInMandate: true,
+        editableInMandate: false,
+        conditionFieldKey: null,
+        conditionOperator: null,
+        conditionValue: null,
+      },
+      {
+        key: "team_type",
+        label: "Võistkonna liik",
+        helpText: null,
+        type: "SELECT",
+        semanticKey: "TEAM_TYPE",
+        options: ["Noored Kotkad", "Kodutütred", "Lapsevanemad"],
+        memberFields: ["name"],
+        showInRegistration: true,
+        requiredInRegistration: true,
+        showInMandate: true,
+        requiredInMandate: true,
+        editableInMandate: false,
+        conditionFieldKey: null,
+        conditionOperator: null,
+        conditionValue: null,
+      },
+      {
+        key: "unit_name",
+        label: "Rühma nimi",
+        helpText: "Noorteorganisatsiooni rühm",
+        type: "TEXT",
+        semanticKey: null,
+        options: [],
+        memberFields: ["name"],
+        showInRegistration: true,
+        requiredInRegistration: true,
+        showInMandate: true,
+        requiredInMandate: true,
+        editableInMandate: true,
+        conditionFieldKey: "team_type",
+        conditionOperator: "EQUALS",
+        conditionValue: "Noored Kotkad",
+      },
+      {
+        key: "contact_email",
+        label: "Kontaktisiku e-post",
+        helpText: null,
+        type: "EMAIL",
+        semanticKey: null,
+        options: [],
+        memberFields: ["name"],
+        showInRegistration: true,
+        requiredInRegistration: false,
+        showInMandate: true,
+        requiredInMandate: true,
+        editableInMandate: true,
+        conditionFieldKey: null,
+        conditionOperator: null,
+        conditionValue: null,
+      },
+      {
+        key: "members",
+        label: "Võistkonna liikmed",
+        helpText: null,
+        type: "MEMBER_LIST",
+        semanticKey: null,
+        options: [],
+        memberFields: ["name", "email", "phone", "birthDate"],
+        showInRegistration: true,
+        requiredInRegistration: false,
+        showInMandate: true,
+        requiredInMandate: true,
+        editableInMandate: true,
+        conditionFieldKey: null,
+        conditionOperator: null,
+        conditionValue: null,
+      },
+    ]
     const settingsResponse = await adminPage.request.patch(
       `/api/competitions/${competitionId}/registration-settings`,
       {
@@ -338,12 +425,22 @@ test.describe.serial("võistluse põhivoog", () => {
           mandateClosesAt: null,
           mandateOverride: "AUTO",
           classes: [{ name: "Põhiklass" }],
+          formFields,
         },
       }
     )
     expect(settingsResponse.status(), await settingsResponse.text()).toBe(200)
     const settings = await settingsResponse.json()
     expect(settings.registrationStatus).toBe("OPEN")
+    await adminPage.goto(
+      `/dashboard/competitions/${competitionId}/registration-settings`
+    )
+    await expect(
+      adminPage.getByRole("heading", { name: "Registreerimisvorm" })
+    ).toBeVisible()
+    await expect(
+      adminPage.locator('input[value="Maakond"]')
+    ).toBeVisible()
 
     const representativeContext = await browser.newContext()
     const page = await representativeContext.newPage()
@@ -352,11 +449,17 @@ test.describe.serial("võistluse põhivoog", () => {
 
     await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 1")
     await page.getByLabel("Klass").selectOption({ label: "Põhiklass" })
+    await page.getByLabel("Maakond").selectOption("Harjumaa")
+    await page.getByLabel("Võistkonna liik").selectOption("Noored Kotkad")
+    await page.getByLabel("Rühma nimi").fill("Harju rühm")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
     await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
     await expect(page.getByText("Registreeritud", { exact: true })).toBeVisible()
 
     await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 2")
+    await page.getByLabel("Maakond").selectOption("Raplamaa")
+    await page.getByLabel("Võistkonna liik").selectOption("Noored Kotkad")
+    await page.getByLabel("Rühma nimi").fill("Rapla rühm")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
     await expect(page.getByText("Võistkond lisati ootenimekirja.")).toBeVisible()
     await expect(page.getByText("Ootenimekirjas", { exact: true })).toBeVisible()
@@ -384,6 +487,7 @@ test.describe.serial("võistluse põhivoog", () => {
           mandateClosesAt: null,
           mandateOverride: "AUTO",
           classes: settings.registrationClasses,
+          formFields: settings.registrationFormFields,
         },
       }
     )
@@ -394,6 +498,54 @@ test.describe.serial("võistluse põhivoog", () => {
     )
     expect(finalizeResponse.status(), await finalizeResponse.text()).toBe(200)
     expect((await finalizeResponse.json()).createdTeams).toBe(1)
+
+    const mandateSettingsResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/registration-settings`,
+      {
+        data: {
+          isPublic: true,
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "CLOSED",
+          registrationCapacity: 1,
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "OPEN",
+          classes: settings.registrationClasses,
+          formFields: settings.registrationFormFields,
+        },
+      }
+    )
+    expect(
+      mandateSettingsResponse.status(),
+      await mandateSettingsResponse.text()
+    ).toBe(200)
+
+    const assignmentsResponse = await page.request.get(
+      "/api/representative/teams"
+    )
+    expect(assignmentsResponse.status()).toBe(200)
+    const assignments = await assignmentsResponse.json()
+    const assignment = assignments.find(
+      (item: { team: { competition: { id: string } } }) =>
+        item.team.competition.id === competitionId
+    )
+    expect(assignment).toBeTruthy()
+
+    await page.goto(`/dashboard/representative/teams/${assignment.team.id}`)
+    await expect(page.getByLabel("Maakond")).toHaveValue("Raplamaa")
+    await expect(page.getByLabel("Maakond")).toBeDisabled()
+    await page
+      .getByLabel("Kontaktisiku e-post")
+      .fill("rapla@example.com")
+    await page.getByRole("button", { name: "+ Lisa liige" }).click()
+    await page.getByLabel("Liige 1 nimi").fill("Mari Mets")
+    await page.getByLabel("Liige 1 e-post").fill("mari@example.com")
+    await page.getByLabel("Liige 1 sünniaeg").fill("2010-05-02")
+    await page.getByRole("button", { name: "Esita mandaat" }).click()
+    await expect(
+      page.getByText("Mandaat esitatud korraldajale")
+    ).toBeVisible()
 
     await representativeContext.close()
     await adminContext.close()

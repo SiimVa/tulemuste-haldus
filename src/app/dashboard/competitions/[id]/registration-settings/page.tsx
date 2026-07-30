@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 import { use, useEffect, useState } from "react"
+import { FormBuilder } from "@/components/registration/FormBuilder"
+import type { FormFieldDefinition } from "@/lib/registrationForm"
 
 type PhaseOverride = "AUTO" | "OPEN" | "CLOSED"
 type PhaseStatus = "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
@@ -22,6 +24,7 @@ type Settings = {
   mandateFinalizedAt: string | null
   mandateStatus: PhaseStatus
   registrationClasses: CompetitionClass[]
+  registrationFormFields: FormFieldDefinition[]
 }
 
 const STATUS_LABEL: Record<PhaseStatus, string> = {
@@ -230,6 +233,7 @@ export default function RegistrationSettingsPage({
           mandateClosesAt: toIso(form.mandateClosesAt),
           mandateOverride: form.mandateOverride,
           classes: form.registrationClasses,
+          formFields: form.registrationFormFields,
         }),
       }
     )
@@ -365,6 +369,13 @@ export default function RegistrationSettingsPage({
               </p>
             </div>
           </section>
+
+          <FormBuilder
+            fields={form.registrationFormFields}
+            onChange={(registrationFormFields) =>
+              setForm({ ...form, registrationFormFields })
+            }
+          />
 
           {phaseCard("Registreerimine", "registration", form, setForm)}
           {phaseCard("Mandaat", "mandate", form, setForm)}
