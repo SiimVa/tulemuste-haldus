@@ -21,6 +21,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             🏆 Võistlused
           </Link>
           <div className="flex items-center gap-4">
+            <Link href="/competitions" className="text-sm text-gray-500 hover:text-blue-600">
+              Avalikud võistlused
+            </Link>
             {session.user.role === "ADMIN" && (
               <Link href="/dashboard/users" className="text-sm text-gray-500 hover:text-blue-600">
                 Kasutajad

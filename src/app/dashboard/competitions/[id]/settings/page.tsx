@@ -347,8 +347,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             <select value={form.status} onChange={e => set("status", e.target.value)}
               className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="SETUP">Ettevalmistus</option>
-              <option value="ACTIVE">Aktiivne</option>
+              <option value="ACTIVE">Toimub</option>
               <option value="FINISHED">Lõppenud</option>
+              <option value="CANCELLED">Tühistatud</option>
+              <option value="ARCHIVED">Arhiveeritud</option>
             </select>
           </div>
         </div>

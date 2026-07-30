@@ -29,11 +29,14 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
 
-  competitions   Competition[]
-  memberOf       CompetitionMember[]
-  enteredResults Result[]
-  accounts       Account[]
-  sessions       Session[]
+  competitions             Competition[]
+  memberOf                 CompetitionMember[]
+  enteredResults           Result[]
+  accounts                 Account[]
+  sessions                 Session[]
+  registrationApplications RegistrationApplication[]
+  registrationEvents       RegistrationApplicationEvent[] @relation("RegistrationEventActor")
+  competitionPhaseEvents   CompetitionPhaseEvent[]
 }
 
 model Account {
@@ -78,8 +81,8 @@ model VerificationToken {
 // type: "JUDGE" | "ATHLETE"
 
 model AccessToken {
-  id            String    @id @default(cuid())
-  token         String    @unique @default(cuid())
+  id            String          @id @default(cuid())
+  token         String          @unique @default(cuid())
   type          String
   name          String
   competitionId String
@@ -88,7 +91,7 @@ model AccessToken {
   element       ScoringElement? @relation(fields: [elementId], references: [id])
   teamId        String?
   team          Team?           @relation(fields: [teamId], references: [id])
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime        @default(now())
   lastUsedAt    DateTime?
 
   enteredResults Result[]
@@ -104,21 +107,22 @@ model Competition {
   endDate     DateTime?
   location    String?
   status      String    @default("SETUP")
+  isPublic    Boolean   @default(false)
   organizerId String
   organizer   User      @relation(fields: [organizerId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   // Hindamissüsteem
-  scoringMode          String @default("PENALTY") // "PENALTY" | "PLUS"
+  scoringMode String @default("PENALTY") // "PENALTY" | "PLUS"
 
   // KP vaikeväärtused
-  defaultKPMaxValue    Float  @default(30)
-  defaultNotPassed     Float  @default(40)
-  defaultPassedNotDone Float  @default(35)
+  defaultKPMaxValue    Float @default(30)
+  defaultNotPassed     Float @default(40)
+  defaultPassedNotDone Float @default(35)
 
   // PK (Postkast) vaikeväärtused
-  defaultPKMaxValue    Float  @default(15)
+  defaultPKMaxValue Float @default(15)
 
   // Vastutegevus vaikeväärtused
   defaultVastutegevusPenaltyPerLife Float @default(5)
@@ -133,9 +137,9 @@ model Competition {
   defaultHilinemineMaxPenalty         Float  @default(30)
 
   // Arvutusmeetodi vaikeväärtus KP/PK elementidele
-  defaultCalcType           String  @default("RELATIVE_RANKING")
-  defaultHigherIsBetter     Boolean @default(false)
-  defaultRankingMinPoints   Float   @default(0)  // halvima soorituse punktid relatiivses rankingus
+  defaultCalcType         String  @default("RELATIVE_RANKING")
+  defaultHigherIsBetter   Boolean @default(false)
+  defaultRankingMinPoints Float   @default(0) // halvima soorituse punktid relatiivses rankingus
 
   // Fikseeritud pingerida vaikeväärtused — JSON massiiv kohtade kaupa
   // nt [{"place":1,"points":20},{"place":2,"points":18}]
@@ -143,34 +147,119 @@ model Competition {
 
   // Punktide nähtavus võistlejate vaates
   athletePointsMode   String  @default("HIDDEN") // "HIDDEN" | "EXACT" | "RANGE"
-  athletePointsRanges String  @default("[]")     // JSON: [{maxPct:number,label:string}] (protsendipõhised vahemikud)
-  athleteShowTotal    Boolean @default(false)    // kuva kogusumma (täpne summa, ilma vahemiketa)
-  athleteShowRank     Boolean @default(false)    // kuva pingerea koht (üld + klass)
+  athletePointsRanges String  @default("[]") // JSON: [{maxPct:number,label:string}] (protsendipõhised vahemikud)
+  athleteShowTotal    Boolean @default(false) // kuva kogusumma (täpne summa, ilma vahemiketa)
+  athleteShowRank     Boolean @default(false) // kuva pingerea koht (üld + klass)
 
-  elements        ScoringElement[]
-  teams           Team[]
-  accessTokens    AccessToken[]
-  manualPenalties ManualPenalty[]
-  members         CompetitionMember[]
+  // Registreerimise ja mandaadi avatus. override: "AUTO" | "OPEN" | "CLOSED"
+  registrationOpensAt     DateTime?
+  registrationClosesAt    DateTime?
+  registrationOverride    String    @default("AUTO")
+  registrationFinalizedAt DateTime?
+  registrationCapacity    Int?
+  mandateOpensAt          DateTime?
+  mandateClosesAt         DateTime?
+  mandateOverride         String    @default("AUTO")
+  mandateFinalizedAt      DateTime?
+
+  elements                 ScoringElement[]
+  teams                    Team[]
+  accessTokens             AccessToken[]
+  manualPenalties          ManualPenalty[]
+  members                  CompetitionMember[]
+  registrationClasses      CompetitionClass[]
+  registrationApplications RegistrationApplication[]
+  phaseEvents              CompetitionPhaseEvent[]
+}
+
+// Korraldaja määratud klassid. Registreerimisel valitakse klass alati sellest
+// nimekirjast, et vabatekstina suvalisi klasse ei tekiks.
+model CompetitionClass {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String
+  order         Int         @default(0)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  applications RegistrationApplication[]
+
+  @@unique([competitionId, name])
+  @@index([competitionId, isActive, order])
+}
+
+// Registreerimisavaldus on Team-ist eraldi. Team luuakse alles osalejate
+// nimekirja kinnitamisel.
+model RegistrationApplication {
+  id            String           @id @default(cuid())
+  competitionId String
+  competition   Competition      @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  submittedById String
+  submittedBy   User             @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  teamName      String
+  classId       String
+  class         CompetitionClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  status        String           @default("DRAFT")
+  submittedAt   DateTime?
+  decidedAt     DateTime?
+  withdrawnAt   DateTime?
+  teamId        String?          @unique
+  team          Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  events RegistrationApplicationEvent[]
+
+  @@index([competitionId, status, submittedAt])
+  @@index([submittedById, createdAt])
+}
+
+model RegistrationApplicationEvent {
+  id            String                  @id @default(cuid())
+  applicationId String
+  application   RegistrationApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    String?
+  toStatus      String
+  actorId       String?
+  actor         User?                   @relation("RegistrationEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  note          String?
+  createdAt     DateTime                @default(now())
+
+  @@index([applicationId, createdAt])
+}
+
+model CompetitionPhaseEvent {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  phase         String
+  action        String
+  actorId       String
+  actor         User        @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt     DateTime    @default(now())
+
+  @@index([competitionId, phase, createdAt])
 }
 
 // ─── Hindamiselement (KP, Postkast, Vastutegevus, Muu jne) ────────────────────
 // type: "CHECKPOINT" | "PENALTY_BOX" | "MANUAL" | "OTHER"
 
 model ScoringElement {
-  id                String      @id @default(cuid())
-  competitionId     String
-  competition       Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  name              String
-  code              String
-  type              String      @default("CHECKPOINT")
-  order             Int         @default(0)
-  maxValue          Float?
-  config            String      @default("{}")
-  createdAt         DateTime    @default(now())
-  isCancelled       Boolean     @default(false)
-  directPointsEntry Boolean     @default(false)
-  revealPointsToAthletes Boolean @default(false) // kas selle elemendi punktid on võistlejatele nähtavad
+  id                     String      @id @default(cuid())
+  competitionId          String
+  competition            Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name                   String
+  code                   String
+  type                   String      @default("CHECKPOINT")
+  order                  Int         @default(0)
+  maxValue               Float?
+  config                 String      @default("{}")
+  createdAt              DateTime    @default(now())
+  isCancelled            Boolean     @default(false)
+  directPointsEntry      Boolean     @default(false)
+  revealPointsToAthletes Boolean     @default(false) // kas selle elemendi punktid on võistlejatele nähtavad
 
   fields       FieldDefinition[]
   exceptions   ElementException[]
@@ -188,16 +277,16 @@ model ScoringElement {
 // type: "TIME" | "NUMBER" | "TEXT" | "COMPUTED"
 
 model FieldDefinition {
-  id            String          @id @default(cuid())
-  elementId     String
-  element       ScoringElement  @relation(fields: [elementId], references: [id], onDelete: Cascade)
-  sectionId     String?
-  section       ElementSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  name          String
-  label         String
-  type          String
-  order           Int            @default(0)
-  isResultField   Boolean        @default(false)
+  id              String          @id @default(cuid())
+  elementId       String
+  element         ScoringElement  @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  sectionId       String?
+  section         ElementSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  name            String
+  label           String
+  type            String
+  order           Int             @default(0)
+  isResultField   Boolean         @default(false)
   rankingPriority Int?
   formula         String?
   meta            String?
@@ -254,17 +343,18 @@ model Team {
 
   dnfFromElementOrder Int?
   dnfReason           String?
-  hcFromElementOrder  Int?        // Arvestusväline alates selle järjekorraga elemendist (null = pole)
-  dqFromElementOrder  Int?        // Diskvalifitseeritud alates elemendist (ainult märge pingereas)
-  dnsFlag             Boolean     @default(false) // Ei startinud (ainult märge pingereas)
+  hcFromElementOrder  Int? // Arvestusväline alates selle järjekorraga elemendist (null = pole)
+  dqFromElementOrder  Int? // Diskvalifitseeritud alates elemendist (ainult märge pingereas)
+  dnsFlag             Boolean @default(false) // Ei startinud (ainult märge pingereas)
 
-  members         TeamMember[]
-  results         Result[]
-  accessTokens    AccessToken[]
-  manualPenalties ManualPenalty[]
-  scores          ComputedScore[]
-  miscEntries     MiscEntry[]
-  representative  TeamRepresentative?
+  members                 TeamMember[]
+  results                 Result[]
+  accessTokens            AccessToken[]
+  manualPenalties         ManualPenalty[]
+  scores                  ComputedScore[]
+  miscEntries             MiscEntry[]
+  representative          TeamRepresentative?
+  registrationApplication RegistrationApplication?
 
   @@unique([competitionId, code])
   @@unique([id, competitionId])
@@ -335,17 +425,17 @@ model ManualPenalty {
 // ─── Muu elemendi kanded ─────────────────────────────────────────────────────
 
 model MiscEntry {
-  id          String         @id @default(cuid())
-  elementId   String
-  element     ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
-  teamId      String
-  team        Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  points      Float
-  description String
-  reason           String?  // Katkestanud liikme põhjus (valikuline)
-  abandonElementId String?  // Millisel KP-l/elemendil liige katkestas (valikuline)
-  abandonTime      String?  // Katkestamise kellaaeg (valikuline)
-  createdAt   DateTime       @default(now())
+  id               String         @id @default(cuid())
+  elementId        String
+  element          ScoringElement @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  teamId           String
+  team             Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  points           Float
+  description      String
+  reason           String? // Katkestanud liikme põhjus (valikuline)
+  abandonElementId String? // Millisel KP-l/elemendil liige katkestas (valikuline)
+  abandonTime      String? // Katkestamise kellaaeg (valikuline)
+  createdAt        DateTime       @default(now())
 }
 
 // ─── Kombineeritud hindamise sektsioonid ──────────────────────────────────────
@@ -358,7 +448,7 @@ model ElementSection {
   order     Int            @default(0)
   maxValue  Float?
 
-  fields    FieldDefinition[]
+  fields     FieldDefinition[]
   calcMethod SectionCalcMethod?
 }
 

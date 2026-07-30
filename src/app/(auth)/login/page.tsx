@@ -1,16 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { getProviders, signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState<"credentials" | "google" | null>(null)
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const requestedCallback = searchParams.get("callbackUrl")
+  const callbackUrl =
+    requestedCallback?.startsWith("/") && !requestedCallback.startsWith("//")
+      ? requestedCallback
+      : "/dashboard"
 
   useEffect(() => {
     getProviders()
@@ -33,14 +39,14 @@ export default function LoginPage() {
       setError("Vale e-post või parool")
       setLoading(null)
     } else {
-      router.push("/dashboard")
+      router.push(callbackUrl)
     }
   }
 
   async function handleGoogleSignIn() {
     setError("")
     setLoading("google")
-    await signIn("google", { redirectTo: "/dashboard" })
+    await signIn("google", { redirectTo: callbackUrl })
   }
 
   return (
@@ -111,5 +117,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">
+          Laadin...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }

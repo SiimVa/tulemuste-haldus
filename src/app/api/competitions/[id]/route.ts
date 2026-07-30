@@ -53,6 +53,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       role: session.user.role,
     })
     if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+    if (
+      body.status !== undefined &&
+      !["SETUP", "ACTIVE", "FINISHED", "CANCELLED", "ARCHIVED"].includes(
+        body.status
+      )
+    ) {
+      return NextResponse.json({ error: "Vigane võistluse staatus" }, { status: 400 })
+    }
 
     const updated = await prisma.competition.update({
       where: { id },

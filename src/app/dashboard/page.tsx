@@ -2,18 +2,25 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import { canCreateCompetition } from "@/lib/permissions"
+import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import Link from "next/link"
 
 export default async function DashboardPage() {
   const session = await auth()
   if (!session?.user?.id) return null
+  const currentUser = session.user
 
   const where = managedCompetitionsWhere({
-    id: session.user.id,
-    role: session.user.role,
+    id: currentUser.id,
+    role: currentUser.role,
   })
 
-  const [competitions, representativeAssignments] = await Promise.all([
+  const [
+    competitions,
+    representativeAssignments,
+    publicCompetitionCandidates,
+    registrationApplications,
+  ] = await Promise.all([
     prisma.competition.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -23,7 +30,7 @@ export default async function DashboardPage() {
       },
     }),
     prisma.teamRepresentative.findMany({
-      where: { member: { userId: session.user.id } },
+      where: { member: { userId: currentUser.id } },
       include: {
         team: {
           include: {
@@ -44,13 +51,50 @@ export default async function DashboardPage() {
         { team: { code: "asc" } },
       ],
     }),
+    prisma.competition.findMany({
+      where: {
+        isPublic: true,
+        status: { notIn: ["CANCELLED", "ARCHIVED", "FINISHED"] },
+      },
+      select: {
+        id: true,
+        name: true,
+        date: true,
+        location: true,
+        registrationOverride: true,
+        registrationOpensAt: true,
+        registrationClosesAt: true,
+        registrationFinalizedAt: true,
+      },
+      orderBy: [{ date: "asc" }, { createdAt: "desc" }],
+    }),
+    prisma.registrationApplication.findMany({
+      where: { submittedById: currentUser.id },
+      include: {
+        competition: { select: { id: true, name: true, date: true } },
+        class: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ])
+  const openCompetitions = publicCompetitionCandidates.filter(
+    (competition) =>
+      getCompetitionRegistrationStatus(competition) === "OPEN"
+  )
 
-  const statusLabel: Record<string, string> = { SETUP: "Ettevalmistus", ACTIVE: "Aktiivne", FINISHED: "Lõppenud" }
+  const statusLabel: Record<string, string> = {
+    SETUP: "Ettevalmistus",
+    ACTIVE: "Toimub",
+    FINISHED: "Lõppenud",
+    CANCELLED: "Tühistatud",
+    ARCHIVED: "Arhiveeritud",
+  }
   const statusColor: Record<string, string> = {
     SETUP: "bg-gray-100 text-gray-600",
     ACTIVE: "bg-green-100 text-green-700",
     FINISHED: "bg-blue-100 text-blue-700",
+    CANCELLED: "bg-red-100 text-red-700",
+    ARCHIVED: "bg-slate-100 text-slate-600",
   }
   const workflowStatusLabel: Record<string, string> = {
     DRAFT: "Mustand",
@@ -58,7 +102,15 @@ export default async function DashboardPage() {
     APPROVED: "Kinnitatud",
     CHANGES_REQUESTED: "Vajab parandamist",
   }
-  const mayCreateCompetition = canCreateCompetition(session.user.role)
+  const mayCreateCompetition = canCreateCompetition(currentUser.role)
+  const applicationStatusLabel: Record<string, string> = {
+    DRAFT: "Mustand",
+    PENDING_REVIEW: "Ootab ülevaatamist",
+    CONFIRMED: "Registreeritud",
+    WAITLISTED: "Ootenimekirjas",
+    REJECTED: "Tagasi lükatud",
+    WITHDRAWN: "Loobunud",
+  }
 
   return (
     <div>
@@ -74,7 +126,88 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {competitions.length === 0 && representativeAssignments.length === 0 ? (
+      {openCompetitions.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-end justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Registreerimiseks avatud
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Vali võistlus ja registreeri oma võistkond.
+              </p>
+            </div>
+            <Link
+              href="/competitions"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              Kõik avalikud võistlused
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {openCompetitions.map((competition) => (
+              <Link
+                key={competition.id}
+                href={`/competitions/${competition.id}`}
+                className="bg-white border border-green-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                  Registreerimine avatud
+                </span>
+                <h3 className="font-semibold text-gray-900 mt-3">
+                  {competition.name}
+                </h3>
+                {competition.date && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    📅 {competition.date.toLocaleDateString("et-EE")}
+                  </p>
+                )}
+                {competition.location && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    📍 {competition.location}
+                  </p>
+                )}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {registrationApplications.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            Minu registreerimised
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {registrationApplications.map((application) => (
+              <Link
+                key={application.id}
+                href={`/competitions/${application.competition.id}`}
+                className="bg-white border rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                <p className="text-xs text-blue-600">
+                  {application.competition.name}
+                </p>
+                <h3 className="font-semibold text-gray-900 mt-1">
+                  {application.teamName}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Klass: {application.class.name}
+                </p>
+                <span className="inline-flex mt-3 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                  {applicationStatusLabel[application.status] ??
+                    application.status}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {competitions.length === 0 &&
+      representativeAssignments.length === 0 &&
+      openCompetitions.length === 0 &&
+      registrationApplications.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">🏁</p>
           <p className="font-medium">Ühtegi võistlust veel pole</p>
@@ -94,8 +227,8 @@ export default async function DashboardPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <h2 className="font-semibold text-gray-900 leading-tight">{c.name}</h2>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-2 shrink-0 ${statusColor[c.status]}`}>
-                  {statusLabel[c.status]}
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-2 shrink-0 ${statusColor[c.status] ?? statusColor.SETUP}`}>
+                  {statusLabel[c.status] ?? c.status}
                 </span>
               </div>
               {(c.date || c.endDate) && (
@@ -108,7 +241,7 @@ export default async function DashboardPage() {
                 <span>🏳 {c._count.elements} elementi</span>
                 <span>👥 {c._count.teams} võistkonda</span>
               </div>
-              {session.user.role === "ADMIN" && (
+              {currentUser.role === "ADMIN" && (
                 <p className="text-xs text-gray-400 mt-2">Korraldaja: {c.organizer.name}</p>
               )}
             </Link>
