@@ -1,7 +1,17 @@
+import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canManageTeamRegistration } from "@/lib/competitionAccess"
+import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  type FormAnswers,
+  type MemberAnswer,
+  parseFormAnswer,
+  serializeFormAnswer,
+  toFormFieldDefinition,
+  validateFormAnswers,
+} from "@/lib/registrationForm"
 import {
   canEditMandate,
   canEditWorkflow,
@@ -22,8 +32,66 @@ const teamInclude = {
       endDate: true,
       location: true,
       status: true,
+      registrationFinalizedAt: true,
+      mandateOverride: true,
+      mandateOpensAt: true,
+      mandateClosesAt: true,
+      mandateFinalizedAt: true,
+      registrationFormFields: {
+        where: { isActive: true },
+        orderBy: [{ order: "asc" as const }, { createdAt: "asc" as const }],
+        select: {
+          id: true,
+          key: true,
+          label: true,
+          helpText: true,
+          type: true,
+          semanticKey: true,
+          options: true,
+          memberFields: true,
+          showInRegistration: true,
+          requiredInRegistration: true,
+          showInMandate: true,
+          requiredInMandate: true,
+          editableInMandate: true,
+          conditionFieldKey: true,
+          conditionOperator: true,
+          conditionValue: true,
+          order: true,
+        },
+      },
     },
   },
+  formValues: {
+    select: { fieldId: true, value: true },
+  },
+  registrationApplication: { select: { id: true } },
+} satisfies Prisma.TeamInclude
+
+type TeamWithForm = Prisma.TeamGetPayload<{ include: typeof teamInclude }>
+
+function responseTeam(team: TeamWithForm) {
+  const fields = team.competition.registrationFormFields.map(
+    toFormFieldDefinition
+  )
+  const fieldById = new Map(
+    team.competition.registrationFormFields.map((field) => [field.id, field])
+  )
+  const formValues: FormAnswers = {}
+  for (const storedValue of team.formValues) {
+    const field = fieldById.get(storedValue.fieldId)
+    const value = parseFormAnswer(storedValue.value)
+    if (field && value !== undefined) formValues[field.key] = value
+  }
+  const { registrationFormFields, ...competition } = team.competition
+  void registrationFormFields
+  return {
+    ...team,
+    competition,
+    formFields: fields,
+    formValues,
+    mandatePhaseStatus: getCompetitionMandateStatus(team.competition),
+  }
 }
 
 async function getAssignedTeam(
@@ -66,7 +134,7 @@ export async function GET(
     return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   }
 
-  return NextResponse.json(team)
+  return NextResponse.json(responseTeam(team))
 }
 
 export async function PATCH(
@@ -134,7 +202,7 @@ export async function PATCH(
       },
       include: teamInclude,
     })
-    return NextResponse.json(updated)
+    return NextResponse.json(responseTeam(updated))
   }
 
   if (!canEditMandate(registrationStatus, mandateStatus)) {
@@ -143,14 +211,82 @@ export async function PATCH(
       { status: 409 }
     )
   }
-  if (!Array.isArray(body.members) || body.members.length > 100) {
+  if (
+    team.registrationApplication &&
+    getCompetitionMandateStatus(team.competition) !== "OPEN"
+  ) {
     return NextResponse.json(
-      { error: "Liikmete nimekiri on vigane või liiga pikk" },
+      { error: "Mandaat ei ole praegu avatud" },
+      { status: 409 }
+    )
+  }
+
+  const formFields = team.competition.registrationFormFields.map(
+    toFormFieldDefinition
+  )
+  const existingAnswers: FormAnswers = {}
+  const fieldById = new Map(
+    team.competition.registrationFormFields.map((field) => [field.id, field])
+  )
+  for (const storedValue of team.formValues) {
+    const field = fieldById.get(storedValue.fieldId)
+    const value = parseFormAnswer(storedValue.value)
+    if (field && value !== undefined) existingAnswers[field.key] = value
+  }
+  const submittedAnswers =
+    body.formValues && typeof body.formValues === "object"
+      ? (body.formValues as FormAnswers)
+      : {}
+  const answersForValidation = { ...submittedAnswers }
+  for (const field of formFields) {
+    if (
+      !field.editableInMandate &&
+      existingAnswers[field.key] !== undefined
+    ) {
+      answersForValidation[field.key] = existingAnswers[field.key]
+    }
+  }
+  const validated = validateFormAnswers(
+    formFields,
+    answersForValidation,
+    "MANDATE"
+  )
+  const firstError = Object.entries(validated.errors)[0]
+  if (firstError) {
+    const field = formFields.find(({ key }) => key === firstError[0])
+    return NextResponse.json(
+      { error: `${field?.label ?? "Vormiväli"}: ${firstError[1]}` },
       { status: 400 }
     )
   }
 
-  const members = body.members
+  const memberFieldAnswers = formFields.flatMap((field) => {
+    if (field.type !== "MEMBER_LIST") return []
+    const value = validated.answers[field.key]
+    return Array.isArray(value)
+      ? value.filter(
+          (member): member is MemberAnswer =>
+            typeof member === "object" &&
+            member !== null &&
+            typeof member.name === "string"
+        )
+      : []
+  })
+  const hasMemberField = formFields.some(
+    (field) => field.type === "MEMBER_LIST" && field.showInMandate
+  )
+
+  if (!Array.isArray(body.members) || body.members.length > 100) {
+    if (!hasMemberField) {
+      return NextResponse.json(
+        { error: "Liikmete nimekiri on vigane või liiga pikk" },
+        { status: 400 }
+      )
+    }
+  }
+
+  const legacyMembers = Array.isArray(body.members) ? body.members : []
+  const members = legacyMembers
     .map((member: unknown) => {
       const value = member as { name?: unknown; role?: unknown }
       const name =
@@ -159,8 +295,16 @@ export async function PATCH(
       return { name, role }
     })
     .filter((member: { name: string }) => member.name.length > 0)
+  const savedMembers = hasMemberField
+    ? memberFieldAnswers.map((member) => ({
+        name: member.name.trim(),
+        role: "COMPETITOR",
+      }))
+    : members
 
-  if (members.some((member: { name: string }) => member.name.length > 200)) {
+  if (
+    savedMembers.some((member: { name: string }) => member.name.length > 200)
+  ) {
     return NextResponse.json(
       { error: "Liikme nimi on liiga pikk" },
       { status: 400 }
@@ -169,15 +313,49 @@ export async function PATCH(
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.teamMember.deleteMany({ where: { teamId } })
-    if (members.length > 0) {
+    if (savedMembers.length > 0) {
       await tx.teamMember.createMany({
-        data: members.map((member: { name: string; role: string }) => ({
+        data: savedMembers.map((member: { name: string; role: string }) => ({
           teamId,
           name: member.name,
           role: member.role,
         })),
       })
     }
+
+    const activeFieldIds = new Map(
+      team.competition.registrationFormFields.map((field) => [
+        field.key,
+        field.id,
+      ])
+    )
+    for (const [key, value] of Object.entries(validated.answers)) {
+      const fieldId = activeFieldIds.get(key)
+      if (!fieldId) continue
+      await tx.teamFormFieldValue.upsert({
+        where: { teamId_fieldId: { teamId, fieldId } },
+        create: {
+          teamId,
+          fieldId,
+          value: serializeFormAnswer(value),
+        },
+        update: { value: serializeFormAnswer(value) },
+      })
+    }
+    const retainedFieldIds = Object.keys(validated.answers)
+      .map((key) => activeFieldIds.get(key))
+      .filter((fieldId): fieldId is string => Boolean(fieldId))
+    await tx.teamFormFieldValue.deleteMany({
+      where: {
+        teamId,
+        fieldId: {
+          in: team.competition.registrationFormFields
+            .map(({ id }) => id)
+            .filter((id) => !retainedFieldIds.includes(id)),
+        },
+      },
+    })
+
     return tx.team.update({
       where: { id: teamId },
       data: { workflowUpdatedAt: new Date() },
@@ -185,5 +363,5 @@ export async function PATCH(
     })
   })
 
-  return NextResponse.json(updated)
+  return NextResponse.json(responseTeam(updated))
 }

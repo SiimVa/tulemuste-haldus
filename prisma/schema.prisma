@@ -169,6 +169,7 @@ model Competition {
   members                  CompetitionMember[]
   registrationClasses      CompetitionClass[]
   registrationApplications RegistrationApplication[]
+  registrationFormFields   CompetitionFormField[]
   phaseEvents              CompetitionPhaseEvent[]
 }
 
@@ -210,10 +211,60 @@ model RegistrationApplication {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
-  events RegistrationApplicationEvent[]
+  events      RegistrationApplicationEvent[]
+  fieldValues RegistrationApplicationFieldValue[]
 
   @@index([competitionId, status, submittedAt])
   @@index([submittedById, createdAt])
+}
+
+// Korraldaja seadistatav registreerimise ja mandaadi vormiväli.
+// options ja memberFields on JSON massiivid. semanticKey seob maakonna ja
+// võistkonna liigi hilisema kohtade jaotamise reeglimootoriga.
+model CompetitionFormField {
+  id                     String      @id @default(cuid())
+  competitionId          String
+  competition            Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  key                    String
+  label                  String
+  helpText               String?
+  type                   String
+  semanticKey            String?
+  options                String      @default("[]")
+  memberFields           String      @default("[\"name\"]")
+  showInRegistration     Boolean     @default(true)
+  requiredInRegistration Boolean     @default(false)
+  showInMandate          Boolean     @default(true)
+  requiredInMandate      Boolean     @default(false)
+  editableInMandate      Boolean     @default(true)
+  conditionFieldKey      String?
+  conditionOperator      String?
+  conditionValue         String?
+  order                  Int         @default(0)
+  isActive               Boolean     @default(true)
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  registrationValues RegistrationApplicationFieldValue[]
+  teamValues         TeamFormFieldValue[]
+
+  @@unique([competitionId, key])
+  @@unique([competitionId, semanticKey])
+  @@index([competitionId, isActive, order])
+}
+
+model RegistrationApplicationFieldValue {
+  id            String                  @id @default(cuid())
+  applicationId String
+  application   RegistrationApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fieldId       String
+  field         CompetitionFormField    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value         String
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@unique([applicationId, fieldId])
+  @@index([fieldId])
 }
 
 model RegistrationApplicationEvent {
@@ -355,11 +406,26 @@ model Team {
   miscEntries             MiscEntry[]
   representative          TeamRepresentative?
   registrationApplication RegistrationApplication?
+  formValues              TeamFormFieldValue[]
 
   @@unique([competitionId, code])
   @@unique([id, competitionId])
   @@index([competitionId, registrationStatus])
   @@index([competitionId, mandateStatus])
+}
+
+model TeamFormFieldValue {
+  id        String               @id @default(cuid())
+  teamId    String
+  team      Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  fieldId   String
+  field     CompetitionFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value     String
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@unique([teamId, fieldId])
+  @@index([fieldId])
 }
 
 // role: "COMPETITOR" | "SUPPORT"

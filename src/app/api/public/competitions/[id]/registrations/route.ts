@@ -4,12 +4,20 @@ import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import { initialRegistrationStatus } from "@/lib/registrationApplications"
+import {
+  serializeFormAnswer,
+  toFormFieldDefinition,
+  validateFormAnswers,
+} from "@/lib/registrationForm"
+
+class RegistrationValidationError extends Error {}
 
 async function createApplication(
   competitionId: string,
   submittedById: string,
   teamName: string,
-  classId: string
+  classId: string,
+  rawAnswers: unknown
 ) {
   return prisma.$transaction(
     async (tx) => {
@@ -28,6 +36,29 @@ async function createApplication(
             where: { id: classId, isActive: true },
             select: { id: true },
           },
+          registrationFormFields: {
+            where: { isActive: true },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              key: true,
+              label: true,
+              helpText: true,
+              type: true,
+              semanticKey: true,
+              options: true,
+              memberFields: true,
+              showInRegistration: true,
+              requiredInRegistration: true,
+              showInMandate: true,
+              requiredInMandate: true,
+              editableInMandate: true,
+              conditionFieldKey: true,
+              conditionOperator: true,
+              conditionValue: true,
+              order: true,
+            },
+          },
         },
       })
       if (
@@ -42,6 +73,22 @@ async function createApplication(
       }
       if (competition.registrationClasses.length !== 1) {
         throw new Error("Valitud klass ei kuulu sellele võistlusele")
+      }
+
+      const formFields = competition.registrationFormFields.map(
+        toFormFieldDefinition
+      )
+      const validated = validateFormAnswers(
+        formFields,
+        rawAnswers,
+        "REGISTRATION"
+      )
+      const firstError = Object.entries(validated.errors)[0]
+      if (firstError) {
+        const field = formFields.find(({ key }) => key === firstError[0])
+        throw new RegistrationValidationError(
+          `${field?.label ?? "Vormiväli"}: ${firstError[1]}`
+        )
       }
 
       const confirmedCount = await tx.registrationApplication.count({
@@ -61,6 +108,22 @@ async function createApplication(
           status,
           submittedAt: now,
           decidedAt: status === "CONFIRMED" ? now : null,
+          fieldValues: {
+            create: Object.entries(validated.answers).map(([key, value]) => {
+              const field = competition.registrationFormFields.find(
+                (item) => item.key === key
+              )
+              if (!field) {
+                throw new RegistrationValidationError(
+                  "Vorm sisaldab tundmatut välja"
+                )
+              }
+              return {
+                fieldId: field.id,
+                value: serializeFormAnswer(value),
+              }
+            }),
+          },
           events: {
             create: {
               toStatus: status,
@@ -110,7 +173,8 @@ export async function POST(
         id,
         session.user.id,
         teamName,
-        classId
+        classId,
+        body.answers
       )
       return NextResponse.json(application)
     } catch (error) {
@@ -123,7 +187,10 @@ export async function POST(
       }
       const message =
         error instanceof Error ? error.message : "Registreerimine ebaõnnestus"
-      return NextResponse.json({ error: message }, { status: 409 })
+      return NextResponse.json(
+        { error: message },
+        { status: error instanceof RegistrationValidationError ? 400 : 409 }
+      )
     }
   }
 

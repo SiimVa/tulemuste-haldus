@@ -6,6 +6,11 @@ import {
   getCompetitionRegistrationStatus,
 } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  formatFormAnswer,
+  parseFormAnswer,
+  toFormFieldDefinition,
+} from "@/lib/registrationForm"
 
 export async function GET(
   _req: Request,
@@ -57,6 +62,31 @@ export async function GET(
             },
           },
         },
+        formValues: {
+          include: {
+            field: {
+              select: {
+                id: true,
+                key: true,
+                label: true,
+                helpText: true,
+                type: true,
+                semanticKey: true,
+                options: true,
+                memberFields: true,
+                showInRegistration: true,
+                requiredInRegistration: true,
+                showInMandate: true,
+                requiredInMandate: true,
+                editableInMandate: true,
+                conditionFieldKey: true,
+                conditionOperator: true,
+                conditionValue: true,
+                order: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { code: "asc" },
     }),
@@ -66,6 +96,31 @@ export async function GET(
         class: { select: { id: true, name: true } },
         submittedBy: { select: { id: true, name: true, email: true } },
         team: { select: { id: true, code: true } },
+        fieldValues: {
+          include: {
+            field: {
+              select: {
+                id: true,
+                key: true,
+                label: true,
+                helpText: true,
+                type: true,
+                semanticKey: true,
+                options: true,
+                memberFields: true,
+                showInRegistration: true,
+                requiredInRegistration: true,
+                showInMandate: true,
+                requiredInMandate: true,
+                editableInMandate: true,
+                conditionFieldKey: true,
+                conditionOperator: true,
+                conditionValue: true,
+                order: true,
+              },
+            },
+          },
+        },
       },
       orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
     }),
@@ -81,7 +136,37 @@ export async function GET(
       registrationStatus: getCompetitionRegistrationStatus(competition),
       mandateStatus: getCompetitionMandateStatus(competition),
     },
-    applications,
-    legacyTeams: teams,
+    applications: applications.map(({ fieldValues, ...application }) => ({
+      ...application,
+      details: fieldValues
+        .sort((a, b) => a.field.order - b.field.order)
+        .map(({ field, value }) => {
+          const definition = toFormFieldDefinition(field)
+          return {
+            fieldId: field.id,
+            label: field.label,
+            value: formatFormAnswer(
+              definition,
+              parseFormAnswer(value)
+            ),
+          }
+        }),
+    })),
+    legacyTeams: teams.map(({ formValues, ...team }) => ({
+      ...team,
+      details: formValues
+        .sort((a, b) => a.field.order - b.field.order)
+        .map(({ field, value }) => {
+          const definition = toFormFieldDefinition(field)
+          return {
+            fieldId: field.id,
+            label: field.label,
+            value: formatFormAnswer(
+              definition,
+              parseFormAnswer(value)
+            ),
+          }
+        }),
+    })),
   })
 }

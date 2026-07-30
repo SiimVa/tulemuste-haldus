@@ -4,6 +4,7 @@ import { RegistrationPanel } from "@/components/registration/RegistrationPanel"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { toFormFieldDefinition } from "@/lib/registrationForm"
 
 const STATUS_LABEL = {
   NOT_OPEN: "Registreerimine pole veel avatud",
@@ -40,6 +41,29 @@ export default async function PublicCompetitionPage({
         where: { isActive: true },
         orderBy: [{ order: "asc" }, { name: "asc" }],
         select: { id: true, name: true },
+      },
+      registrationFormFields: {
+        where: { isActive: true, showInRegistration: true },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          key: true,
+          label: true,
+          helpText: true,
+          type: true,
+          semanticKey: true,
+          options: true,
+          memberFields: true,
+          showInRegistration: true,
+          requiredInRegistration: true,
+          showInMandate: true,
+          requiredInMandate: true,
+          editableInMandate: true,
+          conditionFieldKey: true,
+          conditionOperator: true,
+          conditionValue: true,
+          order: true,
+        },
       },
       registrationApplications: {
         where: {
@@ -143,6 +167,9 @@ export default async function PublicCompetitionPage({
           registrationOpen={registrationStatus === "OPEN"}
           loggedIn={Boolean(session?.user)}
           classes={competition.registrationClasses}
+          formFields={competition.registrationFormFields.map(
+            toFormFieldDefinition
+          )}
           applications={competition.registrationApplications}
         />
       </main>

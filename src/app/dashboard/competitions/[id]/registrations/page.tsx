@@ -22,6 +22,7 @@ type RegistrationTeam = {
   representative: {
     member: { user: { id: string; name: string; email: string } }
   } | null
+  details: { fieldId: string; label: string; value: string }[]
 }
 
 type PhaseStatus = "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
@@ -33,6 +34,7 @@ type RegistrationApplication = {
   class: { id: string; name: string }
   submittedBy: { id: string; name: string; email: string }
   team: { id: string; code: string } | null
+  details: { fieldId: string; label: string; value: string }[]
 }
 type RegistrationOverview = {
   registrationStatus: PhaseStatus
@@ -302,6 +304,20 @@ export default function RegistrationsPage({
                   {application.class.name} · {application.submittedBy.name} ·{" "}
                   {application.submittedBy.email}
                 </p>
+                {application.details.length > 0 && (
+                  <dl className="grid sm:grid-cols-2 gap-x-5 gap-y-2 mt-4">
+                    {application.details.map((detail) => (
+                      <div key={detail.fieldId}>
+                        <dt className="text-xs text-gray-400">
+                          {detail.label}
+                        </dt>
+                        <dd className="text-sm text-gray-700 whitespace-pre-line">
+                          {detail.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </div>
               {application.status === "WAITLISTED" &&
                 !overview?.registrationFinalizedAt && (
@@ -430,6 +446,20 @@ export default function RegistrationsPage({
                       </li>
                     ))}
                   </ul>
+                )}
+                {team.details.length > 0 && (
+                  <dl className="mt-3 space-y-2">
+                    {team.details.map((detail) => (
+                      <div key={detail.fieldId}>
+                        <dt className="text-xs text-gray-400">
+                          {detail.label}
+                        </dt>
+                        <dd className="text-xs text-gray-600 whitespace-pre-line">
+                          {detail.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                 )}
                 {team.mandateReviewNote && (
                   <p className="text-xs text-amber-700 mt-3">
