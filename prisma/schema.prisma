@@ -173,8 +173,8 @@ model Competition {
   phaseEvents              CompetitionPhaseEvent[]
 }
 
-// Korraldaja määratud klassid. Registreerimisel valitakse klass alati sellest
-// nimekirjast, et vabatekstina suvalisi klasse ei tekiks.
+// Korraldaja määratud klassid. Null klassi tähendab klassideta võistlust,
+// üks klass määratakse automaatselt ja mitme klassi korral valib registreerija.
 model CompetitionClass {
   id            String      @id @default(cuid())
   competitionId String
@@ -194,22 +194,22 @@ model CompetitionClass {
 // Registreerimisavaldus on Team-ist eraldi. Team luuakse alles osalejate
 // nimekirja kinnitamisel.
 model RegistrationApplication {
-  id            String           @id @default(cuid())
+  id            String            @id @default(cuid())
   competitionId String
-  competition   Competition      @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  competition   Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   submittedById String
-  submittedBy   User             @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedBy   User              @relation(fields: [submittedById], references: [id], onDelete: Restrict)
   teamName      String
-  classId       String
-  class         CompetitionClass @relation(fields: [classId], references: [id], onDelete: Restrict)
-  status        String           @default("DRAFT")
+  classId       String?
+  class         CompetitionClass? @relation(fields: [classId], references: [id], onDelete: Restrict)
+  status        String            @default("DRAFT")
   submittedAt   DateTime?
   decidedAt     DateTime?
   withdrawnAt   DateTime?
-  teamId        String?          @unique
-  team          Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  teamId        String?           @unique
+  team          Team?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   events      RegistrationApplicationEvent[]
   fieldValues RegistrationApplicationFieldValue[]

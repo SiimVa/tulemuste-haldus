@@ -424,7 +424,7 @@ test.describe.serial("võistluse põhivoog", () => {
           mandateOpensAt: null,
           mandateClosesAt: null,
           mandateOverride: "AUTO",
-          classes: [{ name: "Põhiklass" }],
+          classes: [],
           formFields,
         },
       }
@@ -448,7 +448,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.goto(`/competitions/${competitionId}`)
 
     await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 1")
-    await page.getByLabel("Klass").selectOption({ label: "Põhiklass" })
+    await expect(page.getByLabel("Klass")).toHaveCount(0)
     await page.getByLabel("Maakond").selectOption("Harjumaa")
     await page.getByLabel("Võistkonna liik").selectOption("Noored Kotkad")
     await page.getByLabel("Rühma nimi").fill("Harju rühm")

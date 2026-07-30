@@ -377,15 +377,17 @@ export default function RepresentativeTeamPage({
               className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
             />
           </label>
-          <label className="text-sm text-gray-600">
-            Klass
-            <input
-              value={teamClass}
-              onChange={(event) => setTeamClass(event.target.value)}
-              disabled={!registrationEditable}
-              className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
-            />
-          </label>
+          {(team.class || !team.registrationApplication) && (
+            <label className="text-sm text-gray-600">
+              Klass
+              <input
+                value={teamClass}
+                onChange={(event) => setTeamClass(event.target.value)}
+                disabled={!registrationEditable}
+                className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
+              />
+            </label>
+          )}
         </div>
 
         {registrationEditable && (

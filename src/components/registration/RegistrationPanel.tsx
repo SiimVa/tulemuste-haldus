@@ -17,7 +17,7 @@ type Application = {
   teamName: string
   status: string
   submittedAt: string | Date | null
-  class: { name: string }
+  class: { name: string } | null
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -55,7 +55,9 @@ export function RegistrationPanel({
 }) {
   const router = useRouter()
   const [teamName, setTeamName] = useState("")
-  const [classId, setClassId] = useState(classes[0]?.id ?? "")
+  const [classId, setClassId] = useState(
+    classes.length === 1 ? classes[0].id : ""
+  )
   const [answers, setAnswers] = useState<FormAnswers>({})
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -151,9 +153,11 @@ export function RegistrationPanel({
                   <p className="text-sm font-medium text-gray-900">
                     {application.teamName}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Klass: {application.class.name}
-                  </p>
+                  {application.class && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Klass: {application.class.name}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span
@@ -205,10 +209,6 @@ export function RegistrationPanel({
               Logi sisse ja registreeri
             </Link>
           </div>
-        ) : classes.length === 0 ? (
-          <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-3">
-            Korraldaja pole veel klasse määranud.
-          </p>
         ) : (
           <form onSubmit={submit} className="space-y-4 mt-4">
             <div>
@@ -227,27 +227,41 @@ export function RegistrationPanel({
                 className="w-full px-3 py-2 border rounded-lg text-sm"
               />
             </div>
-            <div>
-              <label
-                htmlFor="registration-class"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
-                Klass *
-              </label>
-              <select
-                id="registration-class"
-                required
-                value={classId}
-                onChange={(event) => setClassId(event.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              >
-                {classes.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {classes.length === 1 && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Klass</p>
+                <p className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-sm text-gray-700">
+                  {classes[0].name}
+                  <span className="text-xs text-gray-400 ml-2">
+                    määratakse automaatselt
+                  </span>
+                </p>
+              </div>
+            )}
+            {classes.length > 1 && (
+              <div>
+                <label
+                  htmlFor="registration-class"
+                  className="text-sm font-medium text-gray-700 mb-1 block"
+                >
+                  Klass *
+                </label>
+                <select
+                  id="registration-class"
+                  required
+                  value={classId}
+                  onChange={(event) => setClassId(event.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                >
+                  <option value="">Vali klass</option>
+                  {classes.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {formFields.some((field) => field.showInRegistration) && (
               <DynamicFormFields
                 fields={formFields}

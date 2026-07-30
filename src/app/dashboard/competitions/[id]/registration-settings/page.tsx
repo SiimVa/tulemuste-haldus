@@ -311,8 +311,9 @@ export default function RegistrationSettingsPage({
             <div>
               <h2 className="font-semibold text-gray-900">Klassid</h2>
               <p className="text-xs text-gray-500 mt-1">
-                Registreerija valib klassi sellest nimekirjast. Vähemalt üks
-                klass on registreerimiseks vajalik.
+                Klassid on valikulised. Üks klass määratakse automaatselt;
+                mitme klassi korral valib registreerija klassi rippmenüüst.
+                Tühja nimekirja korral klassi ei küsita.
               </p>
             </div>
             <div className="space-y-2">
