@@ -21,7 +21,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       code,
       class: teamClass,
       members: members
-        ? { create: members.map((m: { name: string; role?: string }) => ({ name: m.name, role: m.role ?? "COMPETITOR" })) }
+        ? {
+            create: members.map((m: { name: string; role?: string }) => ({
+              competitionId,
+              name: m.name,
+              role: m.role ?? "COMPETITOR",
+            })),
+          }
         : undefined,
     },
     include: { members: true },

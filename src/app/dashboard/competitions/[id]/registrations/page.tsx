@@ -18,7 +18,12 @@ type RegistrationTeam = {
   registrationReviewNote: string | null
   mandateStatus: WorkflowStatus
   mandateReviewNote: string | null
-  members: { id: string; name: string; role: string }[]
+  members: {
+    id: string
+    name: string
+    role: string
+    user: { id: string; name: string } | null
+  }[]
   representative: {
     member: { user: { id: string; name: string; email: string } }
   } | null
@@ -502,6 +507,11 @@ export default function RegistrationsPage({
                       <li key={member.id}>
                         {member.name} ·{" "}
                         {member.role === "SUPPORT" ? "Tugiliige" : "Võistleja"}
+                        {member.user && (
+                          <span className="ml-1 text-green-700">
+                            · Konto seotud
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>

@@ -1,15 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { canAccessCompetition } from "@/lib/competitionAccess"
 import { prisma } from "@/lib/prisma"
-
-async function checkAccess(competitionId: string, userId: string, role: string) {
-  if (role === "ADMIN") return true
-  const comp = await prisma.competition.findUnique({
-    where: { id: competitionId },
-    include: { members: { where: { userId }, select: { id: true } } },
-  })
-  return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
-}
 
 // PATCH — uuenda võistlejate punktide nähtavuse seadeid (osaline)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +9,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
 
-  const ok = await checkAccess(id, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(id, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
 
   const body = await req.json()

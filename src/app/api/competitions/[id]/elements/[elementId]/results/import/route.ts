@@ -3,16 +3,10 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import * as XLSX from "xlsx"
 import { recomputeElementScores } from "@/lib/recompute"
-import { elementBelongsToCompetition } from "@/lib/competitionAccess"
-
-async function checkAccess(competitionId: string, userId: string, role: string) {
-  if (role === "ADMIN") return true
-  const comp = await prisma.competition.findUnique({
-    where: { id: competitionId },
-    include: { members: { where: { userId }, select: { id: true } } },
-  })
-  return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
-}
+import {
+  canAccessCompetition,
+  elementBelongsToCompetition,
+} from "@/lib/competitionAccess"
 
 function isTimeValue(val: string): boolean {
   // accepts mm:ss (e.g. "1:23") or h:mm:ss (e.g. "1:23:45")
@@ -66,7 +60,10 @@ export async function POST(
 
   const { id: competitionId, elementId } = await params
 
-  const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(competitionId, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   if (!await elementBelongsToCompetition(elementId, competitionId)) {
     return NextResponse.json({ error: "Elementi ei leitud" }, { status: 404 })

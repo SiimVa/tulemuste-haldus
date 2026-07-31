@@ -14,7 +14,19 @@ type Team = {
   hcFromElementOrder?: number | null
   dqFromElementOrder?: number | null
   dnsFlag?: boolean
-  members: { name: string; role: string }[]
+  members: {
+    id: string
+    name: string
+    role: string
+    userId: string | null
+  }[]
+}
+
+type EditableMember = {
+  id?: string
+  name: string
+  role: string
+  userId?: string | null
 }
 
 type Element = { id: string; name: string; code: string; order: number }
@@ -28,7 +40,12 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   const [form, setForm] = useState({ name: "", code: "", class: "" })
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<{ name: string; code: string; class: string; members: string[] }>({ name: "", code: "", class: "", members: [] })
+  const [editForm, setEditForm] = useState<{
+    name: string
+    code: string
+    class: string
+    members: EditableMember[]
+  }>({ name: "", code: "", class: "", members: [] })
   const [editSaving, setEditSaving] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
@@ -74,7 +91,12 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
 
   function startEdit(team: Team) {
     setEditingId(team.id)
-    setEditForm({ name: team.name, code: team.code, class: team.class ?? "", members: (team.members ?? []).map((m) => m.name) })
+    setEditForm({
+      name: team.name,
+      code: team.code,
+      class: team.class ?? "",
+      members: (team.members ?? []).map((member) => ({ ...member })),
+    })
   }
 
   async function saveEdit(teamId: string) {
@@ -86,7 +108,9 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
         name: editForm.name,
         code: editForm.code,
         class: editForm.class,
-        members: editForm.members.map((name) => name.trim()).filter(Boolean),
+        members: editForm.members
+          .map((member) => ({ ...member, name: member.name.trim() }))
+          .filter((member) => Boolean(member.name)),
       }),
     })
     if (res.ok) {
@@ -454,23 +478,36 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs text-gray-500">Liikmed</label>
                     <button type="button"
-                      onClick={() => setEditForm({ ...editForm, members: [...editForm.members, ""] })}
+                      onClick={() =>
+                        setEditForm({
+                          ...editForm,
+                          members: [
+                            ...editForm.members,
+                            { name: "", role: "COMPETITOR" },
+                          ],
+                        })
+                      }
                       className="text-xs text-blue-600 hover:text-blue-700 font-medium">+ Lisa liige</button>
                   </div>
                   {editForm.members.length === 0 ? (
                     <p className="text-xs text-gray-400 py-1">Liikmeid pole. Lisa "+ Lisa liige" nupuga.</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {editForm.members.map((m, mi) => (
-                        <div key={mi} className="flex items-center gap-2">
-                          <input type="text" value={m}
+                      {editForm.members.map((member, mi) => (
+                        <div key={member.id ?? mi} className="flex items-center gap-2">
+                          <input type="text" value={member.name}
                             onChange={(e) => {
                               const upd = [...editForm.members]
-                              upd[mi] = e.target.value
+                              upd[mi] = { ...member, name: e.target.value }
                               setEditForm({ ...editForm, members: upd })
                             }}
                             placeholder="Liikme nimi"
                             className="flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          {member.userId && (
+                            <span className="text-xs text-green-700">
+                              Konto seotud
+                            </span>
+                          )}
                           <button type="button"
                             onClick={() => setEditForm({ ...editForm, members: editForm.members.filter((_, idx) => idx !== mi) })}
                             className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>

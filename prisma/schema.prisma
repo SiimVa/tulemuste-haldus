@@ -37,6 +37,7 @@ model User {
   registrationApplications RegistrationApplication[]
   registrationEvents       RegistrationApplicationEvent[] @relation("RegistrationEventActor")
   competitionPhaseEvents   CompetitionPhaseEvent[]
+  teamMemberships          TeamMember[]
 }
 
 model Account {
@@ -173,6 +174,7 @@ model Competition {
   registrationFormFields      CompetitionFormField[]
   registrationAllocationRules RegistrationAllocationRule[]
   phaseEvents                 CompetitionPhaseEvent[]
+  teamMembers                 TeamMember[]
 }
 
 // Korraldaja määratud klassid. Null klassi tähendab klassideta võistlust,
@@ -459,11 +461,19 @@ model TeamFormFieldValue {
 // role: "COMPETITOR" | "SUPPORT"
 
 model TeamMember {
-  id     String @id @default(cuid())
-  teamId String
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  name   String
-  role   String @default("COMPETITOR")
+  id            String      @id @default(cuid())
+  teamId        String
+  competitionId String
+  team          Team        @relation(fields: [teamId, competitionId], references: [id, competitionId], onDelete: Cascade)
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String
+  role          String      @default("COMPETITOR")
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([competitionId, userId])
+  @@index([teamId])
+  @@index([userId])
 }
 
 // ─── Tulemused ───────────────────────────────────────────────────────────────

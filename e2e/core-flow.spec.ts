@@ -670,13 +670,50 @@ test.describe.serial("võistluse põhivoog", () => {
       .getByLabel("Kontaktisiku e-post")
       .fill("rapla@example.com")
     await page.getByRole("button", { name: "+ Lisa liige" }).click()
-    await page.getByLabel("Liige 1 nimi").fill("Mari Mets")
-    await page.getByLabel("Liige 1 e-post").fill("mari@example.com")
+    await page.getByLabel("Liige 1 nimi").fill(otherOrganizer.name)
+    await page.getByLabel("Liige 1 e-post").fill(otherOrganizer.email)
     await page.getByLabel("Liige 1 sünniaeg").fill("2010-05-02")
     await page.getByRole("button", { name: "Esita mandaat" }).click()
     await expect(
       page.getByText("Mandaat esitatud korraldajale")
     ).toBeVisible()
+    await expect(page.getByText("Kontoga seotud liikmed")).toBeVisible()
+
+    const conflictingAssignment = assignments.find(
+      (item: { team: { name: string; competition: { id: string } } }) =>
+        item.team.competition.id === competitionId &&
+        item.team.name === "Avalik testvõistkond 2"
+    )
+    expect(conflictingAssignment).toBeTruthy()
+    const conflictingTeamResponse = await page.request.get(
+      `/api/representative/teams/${conflictingAssignment.team.id}`
+    )
+    expect(conflictingTeamResponse.status()).toBe(200)
+    const conflictingTeam = await conflictingTeamResponse.json()
+    const duplicateMemberResponse = await page.request.patch(
+      `/api/representative/teams/${conflictingAssignment.team.id}`,
+      {
+        data: {
+          phase: "MANDATE",
+          members: [],
+          formValues: {
+            ...conflictingTeam.formValues,
+            contact_email: "tartu@example.com",
+            members: [
+              {
+                name: otherOrganizer.name,
+                email: otherOrganizer.email,
+                birthDate: "2010-05-02",
+              },
+            ],
+          },
+        },
+      }
+    )
+    expect(duplicateMemberResponse.status()).toBe(409)
+    expect((await duplicateMemberResponse.json()).error).toContain(
+      "on sellel võistlusel juba võistkonna"
+    )
 
     await representativeContext.close()
     await adminContext.close()
@@ -688,8 +725,38 @@ test.describe.serial("võistluse põhivoog", () => {
 
     await login(page, otherOrganizer.email, otherOrganizer.password)
 
+    await expect(
+      page.getByRole("heading", { name: "Minu võistkonnad" })
+    ).toBeVisible()
+    await expect(
+      page.getByText("Avalik testvõistkond 3", { exact: false })
+    ).toBeVisible()
+
     const apiResponse = await page.request.get(`/api/competitions/${competitionId}`)
     expect(apiResponse.status()).toBe(403)
+
+    const applyDefaultsResponse = await page.request.post(
+      `/api/competitions/${competitionId}/apply-defaults`
+    )
+    expect(applyDefaultsResponse.status()).toBe(403)
+
+    const visibilityResponse = await page.request.patch(
+      `/api/competitions/${competitionId}/athlete-visibility`,
+      { data: { revealAll: false } }
+    )
+    expect(visibilityResponse.status()).toBe(403)
+
+    const teamImportResponse = await page.request.post(
+      `/api/competitions/${competitionId}/teams/import`,
+      { data: { rows: [{ code: "X", name: "Lubamatu võistkond" }] } }
+    )
+    expect(teamImportResponse.status()).toBe(403)
+
+    const resultImportResponse = await page.request.post(
+      `/api/competitions/${competitionId}/elements/${elementId}/results/import`,
+      { data: {} }
+    )
+    expect(resultImportResponse.status()).toBe(403)
 
     const pageResponse = await page.goto(`/dashboard/competitions/${competitionId}`)
     expect(pageResponse?.status()).toBe(404)

@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     representativeAssignments,
     publicCompetitionCandidates,
     registrationApplications,
+    teamMemberships,
   ] = await Promise.all([
     prisma.competition.findMany({
       where,
@@ -75,6 +76,35 @@ export default async function DashboardPage() {
         class: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.teamMember.findMany({
+      where: { userId: currentUser.id },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        team: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            class: true,
+            competition: {
+              select: {
+                id: true,
+                name: true,
+                date: true,
+                endDate: true,
+                location: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { competition: { date: "desc" } },
+        { team: { code: "asc" } },
+      ],
     }),
   ])
   const openCompetitions = publicCompetitionCandidates.filter(
@@ -217,10 +247,44 @@ export default async function DashboardPage() {
         </section>
       )}
 
+      {teamMemberships.length > 0 && (
+        <section className="mb-10">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              Minu võistkonnad
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Võistkonnad, mille liikmeks on sinu kasutajakonto seotud.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {teamMemberships.map(({ id, name: memberName, role, team }) => (
+              <article key={id} className="bg-white border rounded-xl p-5">
+                <p className="text-xs font-medium text-blue-600 mb-1">
+                  {team.competition.name}
+                </p>
+                <h3 className="font-semibold text-gray-900">
+                  {team.code} · {team.name}
+                </h3>
+                {team.class && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Klass: {team.class}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-3">
+                  {memberName} · {role === "SUPPORT" ? "Tugiliige" : "Võistleja"}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       {competitions.length === 0 &&
       representativeAssignments.length === 0 &&
       openCompetitions.length === 0 &&
-      registrationApplications.length === 0 ? (
+      registrationApplications.length === 0 &&
+      teamMemberships.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">🏁</p>
           <p className="font-medium">Ühtegi võistlust veel pole</p>

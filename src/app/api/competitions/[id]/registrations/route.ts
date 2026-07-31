@@ -50,7 +50,12 @@ export async function GET(
       where: { competitionId },
       include: {
         members: {
-          select: { id: true, name: true, role: true },
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            user: { select: { id: true, name: true } },
+          },
           orderBy: { name: "asc" },
         },
         representative: {

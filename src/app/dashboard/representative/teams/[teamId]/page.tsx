@@ -21,6 +21,8 @@ type TeamMember = {
   id?: string
   name: string
   role: "COMPETITOR" | "SUPPORT"
+  userId?: string | null
+  user?: { id: string; name: string } | null
 }
 
 type Team = {
@@ -500,6 +502,23 @@ export default function RepresentativeTeamPage({
                   )}
                 </div>
               ))}
+              </div>
+            )}
+
+            {team.members.some((member) => member.user) && (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+                <p className="text-xs font-medium text-green-800">
+                  Kontoga seotud liikmed
+                </p>
+                <ul className="mt-2 space-y-1 text-sm text-green-800">
+                  {team.members
+                    .filter((member) => member.user)
+                    .map((member) => (
+                      <li key={member.id ?? member.name}>
+                        {member.name} · Konto seotud
+                      </li>
+                    ))}
+                </ul>
               </div>
             )}
 
