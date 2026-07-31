@@ -332,7 +332,7 @@ test.describe.serial("võistluse põhivoog", () => {
         helpText: "Vali võistkonna maakond",
         type: "SELECT",
         semanticKey: "COUNTY",
-        options: ["Harjumaa", "Raplamaa"],
+        options: ["Harjumaa", "Raplamaa", "Tartumaa"],
         memberFields: ["name"],
         showInRegistration: true,
         requiredInRegistration: true,
@@ -507,8 +507,79 @@ test.describe.serial("võistluse põhivoog", () => {
       secondApplication.getByText("Ootenimekirjas", { exact: true })
     ).toBeVisible()
     await expect(
+      secondApplication.getByText("Ootenimekirja koht: 1.", { exact: true })
+    ).toBeVisible()
+    await expect(
       page.getByText("Garanteeritud koht: Iga maakonna üks kiireim")
     ).toHaveCount(2)
+
+    await secondApplication.getByRole("button", { name: "Muuda" }).click()
+    await expect(
+      page.getByRole("heading", { name: "Muuda registreeringut" })
+    ).toBeVisible()
+    await expect(page.getByLabel("Võistkonna nimi")).toHaveValue(
+      "Avalik testvõistkond 2"
+    )
+    await expect(page.getByLabel("Rühma nimi")).toHaveValue(
+      "Harju teine rühm"
+    )
+    await page.getByLabel("Maakond").selectOption("Tartumaa")
+    await page.getByRole("button", { name: "Salvesta muudatused" }).click()
+    await expect(
+      page.getByText(
+        "Muudatused salvestatud. Uus staatus: Registreeritud."
+      )
+    ).toBeVisible()
+    await expect(
+      secondApplication.getByText("Registreeritud", { exact: true })
+    ).toBeVisible()
+    await expect(
+      secondApplication.getByText(/Ootenimekirja koht:/)
+    ).toHaveCount(0)
+    const thirdApplication = page
+      .getByText("Avalik testvõistkond 3", { exact: true })
+      .locator("..")
+      .locator("..")
+    await expect(
+      thirdApplication.getByText("Ootenimekirjas", { exact: true })
+    ).toBeVisible()
+    await expect(
+      thirdApplication.getByText("Ootenimekirja koht: 1.", { exact: true })
+    ).toBeVisible()
+
+    await adminPage.goto(
+      `/dashboard/competitions/${competitionId}/registrations`
+    )
+    const organizerSecondApplication = adminPage
+      .locator("article")
+      .filter({ hasText: "Avalik testvõistkond 2" })
+    await organizerSecondApplication
+      .getByText(/Muudatuste ajalugu/)
+      .click()
+    await expect(
+      organizerSecondApplication.getByText("Muudetud väljad: Maakond")
+    ).toBeVisible()
+
+    const applicationsResponse = await adminPage.request.get(
+      `/api/competitions/${competitionId}/registrations`
+    )
+    const applicationsPayload = await applicationsResponse.json()
+    const secondApplicationId = applicationsPayload.applications.find(
+      (item: { teamName: string }) =>
+        item.teamName === "Avalik testvõistkond 2"
+    )?.id
+    expect(secondApplicationId).toBeTruthy()
+    const unauthorizedEdit = await adminPage.request.patch(
+      `/api/registration-applications/${secondApplicationId}`,
+      {
+        data: {
+          teamName: "Lubamatu muudatus",
+          classId: null,
+          answers: {},
+        },
+      }
+    )
+    expect(unauthorizedEdit.status()).toBe(409)
 
     page.once("dialog", (dialog) => dialog.accept())
     await page
@@ -520,6 +591,12 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       secondApplication.getByText("Registreeritud", { exact: true })
     ).toBeVisible()
+    await expect(
+      thirdApplication.getByText("Registreeritud", { exact: true })
+    ).toBeVisible()
+    await expect(
+      thirdApplication.getByText(/Ootenimekirja koht:/)
+    ).toHaveCount(0)
 
     const closedResponse = await adminPage.request.patch(
       `/api/competitions/${competitionId}/registration-settings`,

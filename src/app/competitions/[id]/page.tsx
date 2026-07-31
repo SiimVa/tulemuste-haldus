@@ -4,7 +4,10 @@ import { RegistrationPanel } from "@/components/registration/RegistrationPanel"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
-import { toFormFieldDefinition } from "@/lib/registrationForm"
+import {
+  parseFormAnswer,
+  toFormFieldDefinition,
+} from "@/lib/registrationForm"
 
 const STATUS_LABEL = {
   NOT_OPEN: "Registreerimine pole veel avatud",
@@ -75,8 +78,15 @@ export default async function PublicCompetitionPage({
           teamName: true,
           status: true,
           allocationReason: true,
+          waitlistPosition: true,
           submittedAt: true,
-          class: { select: { name: true } },
+          class: { select: { id: true, name: true } },
+          fieldValues: {
+            select: {
+              value: true,
+              field: { select: { key: true } },
+            },
+          },
         },
       },
       _count: {
@@ -171,7 +181,17 @@ export default async function PublicCompetitionPage({
           formFields={competition.registrationFormFields.map(
             toFormFieldDefinition
           )}
-          applications={competition.registrationApplications}
+          applications={competition.registrationApplications.map(
+            ({ fieldValues, ...application }) => ({
+              ...application,
+              formValues: Object.fromEntries(
+                fieldValues.flatMap(({ field, value }) => {
+                  const parsed = parseFormAnswer(value)
+                  return parsed === undefined ? [] : [[field.key, parsed]]
+                })
+              ),
+            })
+          )}
         />
       </main>
     </div>

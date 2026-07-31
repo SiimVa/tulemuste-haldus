@@ -206,6 +206,7 @@ model RegistrationApplication {
   class            CompetitionClass? @relation(fields: [classId], references: [id], onDelete: Restrict)
   status           String            @default("DRAFT")
   allocationReason String?
+  waitlistPosition Int?
   submittedAt      DateTime?
   decidedAt        DateTime?
   withdrawnAt      DateTime?
@@ -218,6 +219,7 @@ model RegistrationApplication {
   fieldValues RegistrationApplicationFieldValue[]
 
   @@index([competitionId, status, submittedAt])
+  @@index([competitionId, status, waitlistPosition], map: "RegistrationApplication_waitlist_order_idx")
   @@index([submittedById, createdAt])
 }
 

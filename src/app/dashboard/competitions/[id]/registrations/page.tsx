@@ -31,11 +31,20 @@ type RegistrationApplication = {
   teamName: string
   status: string
   allocationReason: string | null
+  waitlistPosition: number | null
   submittedAt: string | null
   class: { id: string; name: string } | null
   submittedBy: { id: string; name: string; email: string }
   team: { id: string; code: string } | null
   details: { fieldId: string; label: string; value: string }[]
+  events: {
+    id: string
+    fromStatus: string | null
+    toStatus: string
+    note: string | null
+    createdAt: string
+    actor: { name: string } | null
+  }[]
 }
 type RegistrationOverview = {
   registrationStatus: PhaseStatus
@@ -226,7 +235,7 @@ export default function RegistrationsPage({
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
           <section className="bg-white border rounded-xl p-4">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">Registreerimine</p>
                 <p className="font-semibold text-gray-900 mt-1">
                   {PHASE_LABEL[overview.registrationStatus]}
@@ -286,7 +295,7 @@ export default function RegistrationsPage({
               key={application.id}
               className="bg-white border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4"
             >
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-gray-400">#{index + 1}</span>
                   <h3 className="font-semibold text-gray-900">
@@ -311,6 +320,12 @@ export default function RegistrationsPage({
                     {application.allocationReason}
                   </p>
                 )}
+                {application.status === "WAITLISTED" &&
+                  application.waitlistPosition && (
+                    <p className="text-sm font-medium text-amber-700 mt-1">
+                      Ootenimekirja koht: {application.waitlistPosition}.
+                    </p>
+                  )}
                 {application.details.length > 0 && (
                   <dl className="grid sm:grid-cols-2 gap-x-5 gap-y-2 mt-4">
                     {application.details.map((detail) => (
@@ -324,6 +339,42 @@ export default function RegistrationsPage({
                       </div>
                     ))}
                   </dl>
+                )}
+                {application.events.length > 0 && (
+                  <details className="mt-4 border-t pt-3">
+                    <summary className="text-xs text-blue-600 cursor-pointer">
+                      Muudatuste ajalugu ({application.events.length})
+                    </summary>
+                    <ul className="mt-3 space-y-3">
+                      {application.events.map((event) => (
+                        <li key={event.id} className="text-xs text-gray-600">
+                          <p>
+                            {new Date(event.createdAt).toLocaleString("et-EE", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                            {" · "}
+                            {event.actor?.name ?? "Süsteem"}
+                            {" · "}
+                            {event.fromStatus &&
+                            event.fromStatus !== event.toStatus
+                              ? `${
+                                  APPLICATION_LABEL[event.fromStatus] ??
+                                  event.fromStatus
+                                } → ${
+                                  APPLICATION_LABEL[event.toStatus] ??
+                                  event.toStatus
+                                }`
+                              : APPLICATION_LABEL[event.toStatus] ??
+                                event.toStatus}
+                          </p>
+                          {event.note && (
+                            <p className="text-gray-500 mt-0.5">{event.note}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 )}
               </div>
               {application.status === "WAITLISTED" &&

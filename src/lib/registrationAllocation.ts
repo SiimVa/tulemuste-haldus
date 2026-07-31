@@ -143,7 +143,7 @@ export function allocateRegistrationPlaces({
     }
   }
 
-  const limit = Math.max(0, capacity)
+  const admissionLimit = Math.max(0, capacity)
   const selected = new Set<string>()
   const selectedOrder: string[] = []
   const classCounts = new Map<string, number>()
@@ -151,7 +151,7 @@ export function allocateRegistrationPlaces({
   const balanceClasses = classBalanceMode === "BALANCED"
 
   function add(candidate: AllocationCandidate, reason: string) {
-    if (selected.has(candidate.id) || selected.size >= limit) return false
+    if (selected.has(candidate.id)) return false
     selected.add(candidate.id)
     selectedOrder.push(candidate.id)
     const key = classKey(candidate)
@@ -169,7 +169,7 @@ export function allocateRegistrationPlaces({
   const priorityRules = orderedRules.filter(({ type }) => type === "PRIORITY")
 
   for (const rule of guaranteeRules) {
-    if (selected.size >= limit) break
+    if (selected.size >= orderedCandidates.length) break
     const quota = rule.quota ?? 0
     if (quota < 1) continue
 
@@ -193,10 +193,10 @@ export function allocateRegistrationPlaces({
     )
 
     let progressed = true
-    while (selected.size < limit && progressed) {
+    while (selected.size < orderedCandidates.length && progressed) {
       progressed = false
       for (const [value, group] of orderedGroups) {
-        if (selected.size >= limit) break
+        if (selected.size >= orderedCandidates.length) break
         if ((groupCounts.get(value) ?? 0) >= quota) continue
         const candidate = nextCandidate(
           group,
@@ -214,7 +214,7 @@ export function allocateRegistrationPlaces({
   }
 
   for (const rule of priorityRules) {
-    if (selected.size >= limit) break
+    if (selected.size >= orderedCandidates.length) break
     const matching = orderedCandidates.filter((candidate) =>
       matchesRule(candidate, rule)
     )
@@ -224,7 +224,7 @@ export function allocateRegistrationPlaces({
       classCounts,
       balanceClasses
     )
-    while (candidate && selected.size < limit) {
+    while (candidate && selected.size < orderedCandidates.length) {
       add(candidate, `Prioriteet: ${rule.label}`)
       candidate = nextCandidate(
         matching,
@@ -241,7 +241,7 @@ export function allocateRegistrationPlaces({
     classCounts,
     balanceClasses
   )
-  while (fallback && selected.size < limit) {
+  while (fallback && selected.size < orderedCandidates.length) {
     add(
       fallback,
       balanceClasses
@@ -256,11 +256,10 @@ export function allocateRegistrationPlaces({
     )
   }
 
-  const waitlistedIds = orderedCandidates
-    .filter(({ id }) => !selected.has(id))
-    .map(({ id }) => id)
+  const confirmedIds = selectedOrder.slice(0, admissionLimit)
+  const waitlistedIds = selectedOrder.slice(admissionLimit)
   for (const id of waitlistedIds) {
     reasons[id] = "Ootenimekiri: vabu prioriteetseid kohti ei ole"
   }
-  return { confirmedIds: selectedOrder, waitlistedIds, reasons }
+  return { confirmedIds, waitlistedIds, reasons }
 }

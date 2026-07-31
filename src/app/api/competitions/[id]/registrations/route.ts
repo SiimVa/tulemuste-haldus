@@ -96,6 +96,17 @@ export async function GET(
         class: { select: { id: true, name: true } },
         submittedBy: { select: { id: true, name: true, email: true } },
         team: { select: { id: true, code: true } },
+        events: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            fromStatus: true,
+            toStatus: true,
+            note: true,
+            createdAt: true,
+            actor: { select: { name: true } },
+          },
+        },
         fieldValues: {
           include: {
             field: {

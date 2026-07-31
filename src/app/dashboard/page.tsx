@@ -201,6 +201,12 @@ export default async function DashboardPage() {
                     {application.allocationReason}
                   </p>
                 )}
+                {application.status === "WAITLISTED" &&
+                  application.waitlistPosition && (
+                    <p className="text-sm font-medium text-amber-700 mt-2">
+                      Ootenimekirja koht: {application.waitlistPosition}.
+                    </p>
+                  )}
                 <span className="inline-flex mt-3 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
                   {applicationStatusLabel[application.status] ??
                     application.status}
