@@ -4,7 +4,213 @@ import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
-import { canWithdrawRegistration } from "@/lib/registrationApplications"
+import {
+  canEditRegistration,
+  canWithdrawRegistration,
+} from "@/lib/registrationApplications"
+import {
+  RegistrationClassError,
+  resolveRegistrationClass,
+} from "@/lib/registrationClasses"
+import {
+  parseFormAnswer,
+  serializeFormAnswer,
+  toFormFieldDefinition,
+  validateFormAnswers,
+} from "@/lib/registrationForm"
+
+class RegistrationUpdateValidationError extends Error {}
+
+function comparableStoredAnswer(value: string | undefined) {
+  if (value === undefined) return undefined
+  const parsed = parseFormAnswer(value)
+  return parsed === undefined ? undefined : serializeFormAnswer(parsed)
+}
+
+async function updateApplication(
+  applicationId: string,
+  userId: string,
+  teamName: string,
+  requestedClassId: string | null,
+  rawAnswers: unknown
+) {
+  return prisma.$transaction(
+    async (tx) => {
+      const application = await tx.registrationApplication.findUnique({
+        where: { id: applicationId },
+        include: {
+          fieldValues: {
+            select: { fieldId: true, value: true },
+          },
+          competition: {
+            select: {
+              registrationOverride: true,
+              registrationOpensAt: true,
+              registrationClosesAt: true,
+              registrationFinalizedAt: true,
+              registrationClasses: {
+                where: { isActive: true },
+                orderBy: [{ order: "asc" }, { name: "asc" }],
+                select: { id: true },
+              },
+              registrationFormFields: {
+                where: { isActive: true, showInRegistration: true },
+                orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+                select: {
+                  id: true,
+                  key: true,
+                  label: true,
+                  helpText: true,
+                  type: true,
+                  semanticKey: true,
+                  options: true,
+                  memberFields: true,
+                  showInRegistration: true,
+                  requiredInRegistration: true,
+                  showInMandate: true,
+                  requiredInMandate: true,
+                  editableInMandate: true,
+                  conditionFieldKey: true,
+                  conditionOperator: true,
+                  conditionValue: true,
+                  order: true,
+                },
+              },
+            },
+          },
+        },
+      })
+      if (!application || application.submittedById !== userId) {
+        throw new Error("Registreerimisavaldust ei leitud")
+      }
+      if (
+        getCompetitionRegistrationStatus(application.competition) !== "OPEN"
+      ) {
+        throw new Error("Pärast registreerimise sulgemist võta ühendust korraldajaga")
+      }
+      if (
+        application.competition.registrationFinalizedAt ||
+        application.teamId ||
+        !canEditRegistration(application.status)
+      ) {
+        throw new Error("Seda registreerimisavaldust ei saa enam muuta")
+      }
+
+      const classId = resolveRegistrationClass(
+        application.competition.registrationClasses.map(({ id }) => id),
+        requestedClassId
+      )
+      const formFields =
+        application.competition.registrationFormFields.map(
+          toFormFieldDefinition
+        )
+      const validated = validateFormAnswers(
+        formFields,
+        rawAnswers,
+        "REGISTRATION"
+      )
+      const firstError = Object.entries(validated.errors)[0]
+      if (firstError) {
+        const field = formFields.find(({ key }) => key === firstError[0])
+        throw new RegistrationUpdateValidationError(
+          `${field?.label ?? "Vormiväli"}: ${firstError[1]}`
+        )
+      }
+
+      const previousValues = new Map(
+        application.fieldValues.map(({ fieldId, value }) => [fieldId, value])
+      )
+      const changedFields: string[] = []
+      if (application.teamName !== teamName) {
+        changedFields.push("Võistkonna nimi")
+      }
+      if (application.classId !== classId) {
+        changedFields.push("Klass")
+      }
+
+      const values = Object.entries(validated.answers).map(([key, value]) => {
+        const field = application.competition.registrationFormFields.find(
+          (item) => item.key === key
+        )
+        if (!field) {
+          throw new RegistrationUpdateValidationError(
+            "Vorm sisaldab tundmatut välja"
+          )
+        }
+        const serialized = serializeFormAnswer(value)
+        if (comparableStoredAnswer(previousValues.get(field.id)) !== serialized) {
+          changedFields.push(field.label)
+        }
+        previousValues.delete(field.id)
+        return { fieldId: field.id, value: serialized }
+      })
+      for (const field of application.competition.registrationFormFields) {
+        if (previousValues.has(field.id)) {
+          changedFields.push(field.label)
+        }
+      }
+
+      if (changedFields.length === 0) {
+        return tx.registrationApplication.findUniqueOrThrow({
+          where: { id: application.id },
+          include: { class: { select: { id: true, name: true } } },
+        })
+      }
+
+      const activeFieldIds =
+        application.competition.registrationFormFields.map(({ id }) => id)
+      if (activeFieldIds.length > 0) {
+        await tx.registrationApplicationFieldValue.deleteMany({
+          where: {
+            applicationId: application.id,
+            fieldId: { in: activeFieldIds },
+          },
+        })
+      }
+      if (values.length > 0) {
+        await tx.registrationApplicationFieldValue.createMany({
+          data: values.map((value) => ({
+            applicationId: application.id,
+            ...value,
+          })),
+        })
+      }
+
+      await tx.registrationApplication.update({
+        where: { id: application.id },
+        data: {
+          teamName,
+          classId,
+          events: {
+            create: {
+              fromStatus: application.status,
+              toStatus: application.status,
+              actorId: userId,
+              note: `Muudetud väljad: ${Array.from(
+                new Set(changedFields)
+              ).join(", ")}`,
+            },
+          },
+        },
+      })
+
+      await recalculateRegistrationAllocation(
+        tx,
+        application.competitionId,
+        {
+          actorId: userId,
+          eventNote: "Registreeringu muutmise järel arvutatud koht",
+        }
+      )
+
+      return tx.registrationApplication.findUniqueOrThrow({
+        where: { id: application.id },
+        include: { class: { select: { id: true, name: true } } },
+      })
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+  )
+}
 
 async function withdrawApplication(applicationId: string, userId: string) {
   return prisma.$transaction(
@@ -38,6 +244,7 @@ async function withdrawApplication(applicationId: string, userId: string) {
         data: {
           status: "WITHDRAWN",
           allocationReason: null,
+          waitlistPosition: null,
           withdrawnAt: now,
           events: {
             create: {
@@ -96,4 +303,63 @@ export async function DELETE(
   }
 
   return NextResponse.json({ error: "Loobumine ebaõnnestus" }, { status: 409 })
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  const { id } = await params
+  const body = await req.json()
+  const teamName = typeof body.teamName === "string" ? body.teamName.trim() : ""
+  const classId =
+    typeof body.classId === "string" && body.classId ? body.classId : null
+  if (!teamName || teamName.length > 200) {
+    return NextResponse.json(
+      { error: "Võistkonna nimi on kohustuslik ja võib olla kuni 200 tähemärki" },
+      { status: 400 }
+    )
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const application = await updateApplication(
+        id,
+        session.user.id,
+        teamName,
+        classId,
+        body.answers
+      )
+      return NextResponse.json(application)
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034" &&
+        attempt < 2
+      ) {
+        continue
+      }
+      const message =
+        error instanceof Error ? error.message : "Muutmine ebaõnnestus"
+      return NextResponse.json(
+        { error: message },
+        {
+          status:
+            error instanceof RegistrationUpdateValidationError ||
+            error instanceof RegistrationClassError
+              ? 400
+              : 409,
+        }
+      )
+    }
+  }
+
+  return NextResponse.json(
+    { error: "Muutmine ebaõnnestus, proovi uuesti" },
+    { status: 409 }
+  )
 }

@@ -55,6 +55,7 @@ export async function recalculateRegistrationAllocation(
           id: true,
           status: true,
           allocationReason: true,
+          waitlistPosition: true,
           submittedAt: true,
           createdAt: true,
           classId: true,
@@ -104,6 +105,9 @@ export async function recalculateRegistrationAllocation(
     classBalanceMode,
   })
   const confirmed = new Set(allocation.confirmedIds)
+  const waitlistPositions = new Map(
+    allocation.waitlistedIds.map((id, index) => [id, index + 1])
+  )
   const transitions: {
     id: string
     fromStatus: string
@@ -116,10 +120,15 @@ export async function recalculateRegistrationAllocation(
       ? "CONFIRMED"
       : "WAITLISTED"
     const allocationReason = allocation.reasons[application.id] ?? null
+    const waitlistPosition =
+      nextStatus === "WAITLISTED"
+        ? waitlistPositions.get(application.id) ?? null
+        : null
     const statusChanged = application.status !== nextStatus
     if (
       !statusChanged &&
-      application.allocationReason === allocationReason
+      application.allocationReason === allocationReason &&
+      application.waitlistPosition === waitlistPosition
     ) {
       continue
     }
@@ -128,6 +137,7 @@ export async function recalculateRegistrationAllocation(
       data: {
         status: nextStatus,
         allocationReason,
+        waitlistPosition,
         decidedAt: nextStatus === "CONFIRMED" ? now : null,
         ...(statusChanged
           ? {
@@ -153,4 +163,37 @@ export async function recalculateRegistrationAllocation(
   }
 
   return { allocation, transitions }
+}
+
+export async function reindexWaitlistPositions(
+  tx: TransactionClient,
+  competitionId: string
+) {
+  const applications = await tx.registrationApplication.findMany({
+    where: { competitionId, status: "WAITLISTED" },
+    select: {
+      id: true,
+      waitlistPosition: true,
+      submittedAt: true,
+      createdAt: true,
+    },
+  })
+  applications.sort(
+    (a, b) =>
+      (a.waitlistPosition ?? Number.MAX_SAFE_INTEGER) -
+        (b.waitlistPosition ?? Number.MAX_SAFE_INTEGER) ||
+      (a.submittedAt?.getTime() ?? a.createdAt.getTime()) -
+        (b.submittedAt?.getTime() ?? b.createdAt.getTime()) ||
+      a.createdAt.getTime() - b.createdAt.getTime() ||
+      a.id.localeCompare(b.id)
+  )
+
+  for (const [index, application] of applications.entries()) {
+    const waitlistPosition = index + 1
+    if (application.waitlistPosition === waitlistPosition) continue
+    await tx.registrationApplication.update({
+      where: { id: application.id },
+      data: { waitlistPosition },
+    })
+  }
 }

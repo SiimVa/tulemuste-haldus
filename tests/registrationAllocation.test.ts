@@ -104,6 +104,31 @@ test("prioriteedietapid rakenduvad pärast garantiisid määratud järjekorras",
   assert.deepEqual(result.waitlistedIds, ["youth2"])
 })
 
+test("ootenimekirja järjestus järgib samu prioriteedireegleid", () => {
+  const youthPriority: AllocationRuleDefinition = {
+    label: "Noorteorganisatsioonide võistkonnad",
+    type: "PRIORITY",
+    source: "FORM_FIELD",
+    fieldId: "teamType",
+    values: ["Noored Kotkad", "Kodutütred"],
+    quota: null,
+    order: 0,
+  }
+  const result = allocateRegistrationPlaces({
+    candidates: [
+      candidate("parent1", 1, "Harjumaa", "Lapsevanemad"),
+      candidate("youth1", 2, "Harjumaa", "Noored Kotkad"),
+      candidate("youth2", 3, "Raplamaa", "Kodutütred"),
+      candidate("parent2", 4, "Raplamaa", "Lapsevanemad"),
+    ],
+    capacity: 1,
+    rules: [youthPriority],
+    classBalanceMode: "OFF",
+  })
+  assert.deepEqual(result.confirmedIds, ["youth1"])
+  assert.deepEqual(result.waitlistedIds, ["youth2", "parent1", "parent2"])
+})
+
 test("klassitasakaal eelistab sama etapi sees väiksema kohtade arvuga klassi", () => {
   const candidates = [
     candidate("a1", 1, "Harjumaa", "Noored Kotkad", "A"),

@@ -27,3 +27,9 @@ export function canWithdrawRegistration(
     status === "PENDING_REVIEW"
   )
 }
+
+export function canEditRegistration(
+  status: string
+): status is "CONFIRMED" | "WAITLISTED" | "PENDING_REVIEW" {
+  return canWithdrawRegistration(status)
+}

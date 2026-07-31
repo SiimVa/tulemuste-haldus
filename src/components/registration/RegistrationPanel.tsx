@@ -17,8 +17,10 @@ type Application = {
   teamName: string
   status: string
   allocationReason: string | null
+  waitlistPosition: number | null
   submittedAt: string | Date | null
-  class: { name: string } | null
+  class: { id: string; name: string } | null
+  formValues: FormAnswers
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -60,11 +62,37 @@ export function RegistrationPanel({
     classes.length === 1 ? classes[0].id : ""
   )
   const [answers, setAnswers] = useState<FormAnswers>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [withdrawing, setWithdrawing] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
+
+  function resetForm() {
+    setTeamName("")
+    setClassId(classes.length === 1 ? classes[0].id : "")
+    setAnswers({})
+    setFormErrors({})
+    setEditingId(null)
+  }
+
+  function edit(application: Application) {
+    setEditingId(application.id)
+    setTeamName(application.teamName)
+    setClassId(
+      application.class?.id ?? (classes.length === 1 ? classes[0].id : "")
+    )
+    setAnswers(application.formValues)
+    setFormErrors({})
+    setError("")
+    setMessage("")
+    window.setTimeout(() => {
+      document
+        .getElementById("registration-form")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 0)
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -82,10 +110,15 @@ export function RegistrationPanel({
       setError("Kontrolli kohustuslikke ja vigaseid vormivälju")
       return
     }
+    const editingApplication = applications.find(
+      ({ id }) => id === editingId
+    )
     const response = await fetch(
-      `/api/public/competitions/${competitionId}/registrations`,
+      editingId
+        ? `/api/registration-applications/${editingId}`
+        : `/api/public/competitions/${competitionId}/registrations`,
       {
-        method: "POST",
+        method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamName,
@@ -96,16 +129,27 @@ export function RegistrationPanel({
     )
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      setError(data.error ?? "Registreerimine ebaõnnestus")
-    } else {
-      setTeamName("")
-      setAnswers({})
-      setFormErrors({})
-      setMessage(
-        data.status === "WAITLISTED"
-          ? "Võistkond lisati ootenimekirja."
-          : "Võistkond on registreeritud."
+      setError(
+        data.error ??
+          (editingId ? "Muutmine ebaõnnestus" : "Registreerimine ebaõnnestus")
       )
+    } else {
+      resetForm()
+      if (editingId) {
+        setMessage(
+          editingApplication?.status !== data.status
+            ? `Muudatused salvestatud. Uus staatus: ${
+                STATUS_LABEL[data.status] ?? data.status
+              }.`
+            : "Muudatused salvestatud."
+        )
+      } else {
+        setMessage(
+          data.status === "WAITLISTED"
+            ? "Võistkond lisati ootenimekirja."
+            : "Võistkond on registreeritud."
+        )
+      }
       router.refresh()
     }
     setSaving(false)
@@ -173,14 +217,24 @@ export function RegistrationPanel({
                     ["CONFIRMED", "WAITLISTED", "PENDING_REVIEW"].includes(
                       application.status
                     ) && (
-                      <button
-                        type="button"
-                        onClick={() => withdraw(application.id)}
-                        disabled={withdrawing === application.id}
-                        className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                      >
-                        Loobu
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => edit(application)}
+                          disabled={saving || withdrawing === application.id}
+                          className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          Muuda
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => withdraw(application.id)}
+                          disabled={withdrawing === application.id}
+                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          Loobu
+                        </button>
+                      </>
                     )}
                 </div>
                 {application.allocationReason && (
@@ -188,14 +242,22 @@ export function RegistrationPanel({
                     {application.allocationReason}
                   </p>
                 )}
+                {application.status === "WAITLISTED" &&
+                  application.waitlistPosition && (
+                    <p className="w-full text-sm font-medium text-amber-700">
+                      Ootenimekirja koht: {application.waitlistPosition}.
+                    </p>
+                  )}
               </div>
             ))}
           </div>
         </section>
       )}
 
-      <section className="bg-white border rounded-xl p-5">
-        <h2 className="font-semibold text-gray-900">Registreeri võistkond</h2>
+      <section id="registration-form" className="bg-white border rounded-xl p-5">
+        <h2 className="font-semibold text-gray-900">
+          {editingId ? "Muuda registreeringut" : "Registreeri võistkond"}
+        </h2>
 
         {!registrationOpen ? (
           <p className="text-sm text-gray-500 mt-3">
@@ -217,6 +279,13 @@ export function RegistrationPanel({
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4 mt-4">
+            {editingId && (
+              <p className="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
+                Klassi või kohtade jaotamise reeglites kasutatavate väljade
+                muutmine võib viia võistkonna ootenimekirja või vabastada talle
+                koha.
+              </p>
+            )}
             <div>
               <label
                 htmlFor="registration-team-name"
@@ -277,13 +346,31 @@ export function RegistrationPanel({
                 errors={formErrors}
               />
             )}
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? "Registreerin..." : "Registreeri võistkond"}
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving
+                  ? editingId
+                    ? "Salvestan..."
+                    : "Registreerin..."
+                  : editingId
+                    ? "Salvesta muudatused"
+                    : "Registreeri võistkond"}
+              </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={saving}
+                  className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Loobu muutmisest
+                </button>
+              )}
+            </div>
           </form>
         )}
 

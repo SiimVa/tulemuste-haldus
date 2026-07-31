@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  canEditRegistration,
   canWithdrawRegistration,
   initialRegistrationStatus,
 } from "../src/lib/registrationApplications"
@@ -20,4 +21,12 @@ test("ainult aktiivsest avaldusest saab loobuda", () => {
   assert.equal(canWithdrawRegistration("PENDING_REVIEW"), true)
   assert.equal(canWithdrawRegistration("REJECTED"), false)
   assert.equal(canWithdrawRegistration("WITHDRAWN"), false)
+})
+
+test("ainult aktiivset avaldust saab registreerimise ajal muuta", () => {
+  assert.equal(canEditRegistration("CONFIRMED"), true)
+  assert.equal(canEditRegistration("WAITLISTED"), true)
+  assert.equal(canEditRegistration("PENDING_REVIEW"), true)
+  assert.equal(canEditRegistration("REJECTED"), false)
+  assert.equal(canEditRegistration("WITHDRAWN"), false)
 })

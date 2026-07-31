@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { reindexWaitlistPositions } from "@/lib/registrationAllocation.server"
 
 const ACTION_STATUS = {
   CONFIRM: "CONFIRMED",
@@ -87,6 +88,7 @@ export async function PATCH(
           where: { id: application.id },
           data: {
             status: nextStatus,
+            waitlistPosition: null,
             allocationReason:
               nextStatus === "CONFIRMED"
                 ? note || "Korraldaja kinnitatud pärast registreerimise lõppu"
@@ -113,6 +115,7 @@ export async function PATCH(
           },
         })
 
+        await reindexWaitlistPositions(tx, competitionId)
         return result
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
