@@ -18,10 +18,22 @@ import {
   isTeamWorkflowPhase,
   isTeamWorkflowStatus,
 } from "@/lib/teamWorkflow"
+import {
+  cleanupCompetitorRoles,
+  ensureCompetitorRoles,
+  resolveTeamMemberAccounts,
+  TeamMemberAccountConflictError,
+} from "@/lib/teamMemberAccounts.server"
 
 const teamInclude = {
   members: {
-    select: { id: true, name: true, role: true },
+    select: {
+      id: true,
+      name: true,
+      role: true,
+      userId: true,
+      user: { select: { id: true, name: true } },
+    },
     orderBy: { name: "asc" as const },
   },
   competition: {
@@ -286,7 +298,7 @@ export async function PATCH(
   }
 
   const legacyMembers = Array.isArray(body.members) ? body.members : []
-  const members = legacyMembers
+  const members: { name: string; role: string }[] = legacyMembers
     .map((member: unknown) => {
       const value = member as { name?: unknown; role?: unknown }
       const name =
@@ -299,8 +311,9 @@ export async function PATCH(
     ? memberFieldAnswers.map((member) => ({
         name: member.name.trim(),
         role: "COMPETITOR",
+        email: member.email,
       }))
-    : members
+    : members.map((member) => ({ ...member, email: undefined }))
 
   if (
     savedMembers.some((member: { name: string }) => member.name.length > 200)
@@ -311,57 +324,84 @@ export async function PATCH(
     )
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.teamMember.deleteMany({ where: { teamId } })
-    if (savedMembers.length > 0) {
-      await tx.teamMember.createMany({
-        data: savedMembers.map((member: { name: string; role: string }) => ({
-          teamId,
-          name: member.name,
-          role: member.role,
-        })),
-      })
-    }
+  try {
+    const updated = await prisma.$transaction(async (tx) => {
+      const resolvedMembers = await resolveTeamMemberAccounts(
+        tx,
+        team.competitionId,
+        team.id,
+        savedMembers
+      )
+      const previousUserIds = team.members.flatMap(({ userId }) =>
+        userId ? [userId] : []
+      )
+      await tx.teamMember.deleteMany({ where: { teamId } })
+      if (resolvedMembers.length > 0) {
+        await tx.teamMember.createMany({
+          data: resolvedMembers.map((member) => ({
+            teamId,
+            competitionId: team.competitionId,
+            name: member.name,
+            role: member.role,
+            userId: member.userId,
+          })),
+        })
+      }
+      const nextUserIds = resolvedMembers.flatMap(({ userId }) =>
+        userId ? [userId] : []
+      )
+      await ensureCompetitorRoles(tx, team.competitionId, nextUserIds)
+      await cleanupCompetitorRoles(
+        tx,
+        team.competitionId,
+        previousUserIds.filter((userId) => !nextUserIds.includes(userId))
+      )
 
-    const activeFieldIds = new Map(
-      team.competition.registrationFormFields.map((field) => [
-        field.key,
-        field.id,
-      ])
-    )
-    for (const [key, value] of Object.entries(validated.answers)) {
-      const fieldId = activeFieldIds.get(key)
-      if (!fieldId) continue
-      await tx.teamFormFieldValue.upsert({
-        where: { teamId_fieldId: { teamId, fieldId } },
-        create: {
+      const activeFieldIds = new Map(
+        team.competition.registrationFormFields.map((field) => [
+          field.key,
+          field.id,
+        ])
+      )
+      for (const [key, value] of Object.entries(validated.answers)) {
+        const fieldId = activeFieldIds.get(key)
+        if (!fieldId) continue
+        await tx.teamFormFieldValue.upsert({
+          where: { teamId_fieldId: { teamId, fieldId } },
+          create: {
+            teamId,
+            fieldId,
+            value: serializeFormAnswer(value),
+          },
+          update: { value: serializeFormAnswer(value) },
+        })
+      }
+      const retainedFieldIds = Object.keys(validated.answers)
+        .map((key) => activeFieldIds.get(key))
+        .filter((fieldId): fieldId is string => Boolean(fieldId))
+      await tx.teamFormFieldValue.deleteMany({
+        where: {
           teamId,
-          fieldId,
-          value: serializeFormAnswer(value),
+          fieldId: {
+            in: team.competition.registrationFormFields
+              .map(({ id }) => id)
+              .filter((id) => !retainedFieldIds.includes(id)),
+          },
         },
-        update: { value: serializeFormAnswer(value) },
       })
-    }
-    const retainedFieldIds = Object.keys(validated.answers)
-      .map((key) => activeFieldIds.get(key))
-      .filter((fieldId): fieldId is string => Boolean(fieldId))
-    await tx.teamFormFieldValue.deleteMany({
-      where: {
-        teamId,
-        fieldId: {
-          in: team.competition.registrationFormFields
-            .map(({ id }) => id)
-            .filter((id) => !retainedFieldIds.includes(id)),
-        },
-      },
+
+      return tx.team.update({
+        where: { id: teamId },
+        data: { workflowUpdatedAt: new Date() },
+        include: teamInclude,
+      })
     })
 
-    return tx.team.update({
-      where: { id: teamId },
-      data: { workflowUpdatedAt: new Date() },
-      include: teamInclude,
-    })
-  })
-
-  return NextResponse.json(responseTeam(updated))
+    return NextResponse.json(responseTeam(updated))
+  } catch (error) {
+    if (error instanceof TeamMemberAccountConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
+    throw error
+  }
 }

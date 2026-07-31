@@ -7,6 +7,10 @@ import {
   type MemberAnswer,
   parseFormAnswer,
 } from "@/lib/registrationForm"
+import {
+  ensureCompetitorRoles,
+  resolveTeamMemberAccounts,
+} from "@/lib/teamMemberAccounts.server"
 
 function nextTeamCode(existing: Set<string>, sequence: number): string {
   let number = sequence
@@ -105,8 +109,18 @@ export async function POST(
               member !== null &&
               typeof member.name === "string" &&
               Boolean(member.name.trim())
-          )
+            )
         })
+        const resolvedMembers = await resolveTeamMemberAccounts(
+          tx,
+          competitionId,
+          null,
+          members.map((member) => ({
+            name: member.name.trim(),
+            role: "COMPETITOR",
+            email: member.email,
+          }))
+        )
         const team = await tx.team.create({
           data: {
             competitionId,
@@ -121,13 +135,20 @@ export async function POST(
               })),
             },
             members: {
-              create: members.map((member) => ({
-                name: member.name.trim(),
-                role: "COMPETITOR",
+              create: resolvedMembers.map((member) => ({
+                competitionId,
+                name: member.name,
+                role: member.role,
+                userId: member.userId,
               })),
             },
           },
         })
+        await ensureCompetitorRoles(
+          tx,
+          competitionId,
+          resolvedMembers.flatMap(({ userId }) => (userId ? [userId] : []))
+        )
         const representativeMembership = await tx.competitionMember.upsert({
           where: {
             competitionId_userId: {

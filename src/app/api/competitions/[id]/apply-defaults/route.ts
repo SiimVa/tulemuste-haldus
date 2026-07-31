@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { canAccessCompetition } from "@/lib/competitionAccess"
 import { prisma } from "@/lib/prisma"
 import { recomputeCompetitionScores } from "@/lib/recompute"
-
-async function checkAccess(competitionId: string, userId: string, role: string) {
-  if (role === "ADMIN") return true
-  const comp = await prisma.competition.findUnique({
-    where: { id: competitionId },
-    include: { members: { where: { userId }, select: { id: true } } },
-  })
-  return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
-}
 
 // Elemendi tüüp → max väärtus seosed
 const MAX_VALUE_TYPES = ["CHECKPOINT", "PENALTY_BOX"] as const
@@ -26,7 +18,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId } = await params
 
-  const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(competitionId, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
 
   const competition = await prisma.competition.findUnique({

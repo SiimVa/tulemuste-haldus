@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { canAccessCompetition } from "@/lib/competitionAccess"
 import { prisma } from "@/lib/prisma"
 import * as XLSX from "xlsx"
-
-async function checkAccess(competitionId: string, userId: string, role: string) {
-  if (role === "ADMIN") return true
-  const comp = await prisma.competition.findUnique({
-    where: { id: competitionId },
-    include: { members: { where: { userId }, select: { id: true } } },
-  })
-  return comp?.organizerId === userId || (comp?.members?.length ?? 0) > 0
-}
 
 type RowData = { code: string; name: string; class?: string; members?: string }
 
@@ -53,7 +45,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId } = await params
 
-  const ok = await checkAccess(competitionId, session.user.id, session.user.role ?? "")
+  const ok = await canAccessCompetition(competitionId, {
+    id: session.user.id,
+    role: session.user.role,
+  })
   if (!ok) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
 
   let rows: RowData[] = []
@@ -131,7 +126,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       for (const memberName of memberNames) {
         try {
           await prisma.teamMember.create({
-            data: { teamId: team.id, name: memberName, role: "COMPETITOR" },
+            data: {
+              teamId: team.id,
+              competitionId,
+              name: memberName,
+              role: "COMPETITOR",
+            },
           })
         } catch {
           errors.push(`Liikme lisamine ebaõnnestus: ${memberName} (võistkond ${name})`)

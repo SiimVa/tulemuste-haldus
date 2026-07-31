@@ -5,6 +5,7 @@ import {
   canAccessCompetition,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
+import { cleanupCompetitorRoles } from "@/lib/teamMemberAccounts.server"
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; teamId: string }> }) {
   const session = await auth()
@@ -40,19 +41,65 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
       // Liikmete asendamine (kui body.members on antud massiivina)
       if (Array.isArray(body.members)) {
-        const valid = body.members
-          .map((m: unknown) =>
-            typeof m === "string"
-              ? { name: m.trim(), role: "COMPETITOR" }
-              : { name: String((m as { name?: string }).name ?? "").trim(), role: (m as { role?: string }).role || "COMPETITOR" }
-          )
+        const existingMembers = await tx.teamMember.findMany({
+          where: { teamId },
+          select: { id: true, userId: true },
+        })
+        const existingById = new Map(
+          existingMembers.map((member) => [member.id, member])
+        )
+        const valid: {
+          name: string
+          role: string
+          userId: string | null
+        }[] = body.members
+          .map((member: unknown) => {
+            if (typeof member === "string") {
+              return {
+                name: member.trim(),
+                role: "COMPETITOR",
+                userId: null,
+              }
+            }
+            const value = member as {
+              id?: unknown
+              name?: unknown
+              role?: unknown
+            }
+            const previous =
+              typeof value.id === "string"
+                ? existingById.get(value.id)
+                : undefined
+            return {
+              name: String(value.name ?? "").trim(),
+              role: value.role === "SUPPORT" ? "SUPPORT" : "COMPETITOR",
+              userId: previous?.userId ?? null,
+            }
+          })
           .filter((m: { name: string }) => m.name !== "")
+        const previousUserIds = existingMembers.flatMap(({ userId }) =>
+          userId ? [userId] : []
+        )
         await tx.teamMember.deleteMany({ where: { teamId } })
         if (valid.length > 0) {
           await tx.teamMember.createMany({
-            data: valid.map((m: { name: string; role: string }) => ({ teamId, name: m.name, role: m.role })),
+            data: valid.map((member) => ({
+              teamId,
+              competitionId,
+              name: member.name,
+              role: member.role,
+              userId: member.userId,
+            })),
           })
         }
+        const nextUserIds = valid.flatMap(({ userId }) =>
+          userId ? [userId] : []
+        )
+        await cleanupCompetitorRoles(
+          tx,
+          competitionId,
+          previousUserIds.filter((userId) => !nextUserIds.includes(userId))
+        )
       }
 
       return tx.team.findUnique({ where: { id: teamId }, include: { members: true } })
@@ -78,6 +125,17 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Võistkonda ei leitud" }, { status: 404 })
   }
 
-  await prisma.team.delete({ where: { id: teamId } })
+  await prisma.$transaction(async (tx) => {
+    const linkedUserIds = await tx.teamMember.findMany({
+      where: { teamId, userId: { not: null } },
+      select: { userId: true },
+    })
+    await tx.team.delete({ where: { id: teamId } })
+    await cleanupCompetitorRoles(
+      tx,
+      competitionId,
+      linkedUserIds.flatMap(({ userId }) => (userId ? [userId] : []))
+    )
+  })
   return NextResponse.json({ ok: true })
 }
