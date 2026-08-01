@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { linkPendingTeamMembersToUser } from "@/lib/teamMemberAccounts.server"
 import bcrypt from "bcryptjs"
 
 export async function GET() {
@@ -27,14 +28,24 @@ export async function POST(req: Request) {
   if (existing) return NextResponse.json({ error: "E-post on juba kasutusel" }, { status: 400 })
 
   const passwordHash = await bcrypt.hash(password, 12)
-  const user = await prisma.user.create({
-    data: {
-      email: normalizedEmail,
-      name: normalizedName,
-      passwordHash,
-      role: "USER",
-    },
-    select: { id: true, email: true, name: true, role: true, createdAt: true },
+  const user = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        email: normalizedEmail,
+        name: normalizedName,
+        passwordHash,
+        role: "USER",
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+      },
+    })
+    await linkPendingTeamMembersToUser(tx, createdUser)
+    return createdUser
   })
   return NextResponse.json(user)
 }

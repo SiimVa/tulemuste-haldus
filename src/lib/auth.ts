@@ -5,6 +5,7 @@ import Google, { type GoogleProfile } from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { linkPendingTeamMembersToUser } from "@/lib/teamMemberAccounts.server"
 
 const providers: NextAuthConfig["providers"] = [
   Credentials({
@@ -67,6 +68,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   providers,
+  events: {
+    async signIn({ user }) {
+      if (!user.id || !user.email) return
+      await prisma.$transaction((tx) =>
+        linkPendingTeamMembersToUser(tx, {
+          id: user.id as string,
+          email: user.email as string,
+        })
+      )
+    },
+  },
   callbacks: {
     async signIn({ account, profile }) {
       if (account?.provider === "google") {

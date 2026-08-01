@@ -43,7 +43,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (Array.isArray(body.members)) {
         const existingMembers = await tx.teamMember.findMany({
           where: { teamId },
-          select: { id: true, userId: true },
+          select: { id: true, email: true, userId: true },
         })
         const existingById = new Map(
           existingMembers.map((member) => [member.id, member])
@@ -51,6 +51,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const valid: {
           name: string
           role: string
+          email: string | null
           userId: string | null
         }[] = body.members
           .map((member: unknown) => {
@@ -58,6 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               return {
                 name: member.trim(),
                 role: "COMPETITOR",
+                email: null,
                 userId: null,
               }
             }
@@ -73,6 +75,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             return {
               name: String(value.name ?? "").trim(),
               role: value.role === "SUPPORT" ? "SUPPORT" : "COMPETITOR",
+              email: previous?.email ?? null,
               userId: previous?.userId ?? null,
             }
           })
@@ -88,6 +91,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               competitionId,
               name: member.name,
               role: member.role,
+              email: member.email,
               userId: member.userId,
             })),
           })

@@ -31,6 +31,7 @@ const teamInclude = {
       id: true,
       name: true,
       role: true,
+      email: true,
       userId: true,
       user: { select: { id: true, name: true } },
     },
@@ -343,6 +344,7 @@ export async function PATCH(
             competitionId: team.competitionId,
             name: member.name,
             role: member.role,
+            email: member.email,
             userId: member.userId,
           })),
         })

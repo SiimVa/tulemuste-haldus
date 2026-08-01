@@ -142,11 +142,6 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(athleteResponse.status(), await athleteResponse.text()).toBe(200)
     athleteToken = (await athleteResponse.json()).token
 
-    const userResponse = await page.request.post("/api/users", {
-      data: otherOrganizer,
-    })
-    expect(userResponse.status(), await userResponse.text()).toBe(200)
-
     const representativeResponse = await page.request.post("/api/users", {
       data: representative,
     })
@@ -677,22 +672,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       page.getByText("Mandaat esitatud korraldajale")
     ).toBeVisible()
-    await expect(page.getByText("Kontoga seotud liikmed")).toBeVisible()
-
-    const linkedTeamResultResponse = await adminPage.request.post(
-      `/api/elements/${elementId}/results`,
-      {
-        data: {
-          teamId: assignment.team.id,
-          values: { aeg: "2:34" },
-          exceptionLabel: null,
-        },
-      }
-    )
-    expect(
-      linkedTeamResultResponse.status(),
-      await linkedTeamResultResponse.text()
-    ).toBe(200)
+    await expect(page.getByText("Kontoga seotud liikmed")).toHaveCount(0)
 
     const conflictingAssignment = assignments.find(
       (item: { team: { name: string; competition: { id: string } } }) =>
@@ -729,6 +709,28 @@ test.describe.serial("võistluse põhivoog", () => {
     expect((await duplicateMemberResponse.json()).error).toContain(
       "on sellel võistlusel juba võistkonna"
     )
+
+    const userResponse = await adminPage.request.post("/api/users", {
+      data: otherOrganizer,
+    })
+    expect(userResponse.status(), await userResponse.text()).toBe(200)
+    await page.reload()
+    await expect(page.getByText("Kontoga seotud liikmed")).toBeVisible()
+
+    const linkedTeamResultResponse = await adminPage.request.post(
+      `/api/elements/${elementId}/results`,
+      {
+        data: {
+          teamId: assignment.team.id,
+          values: { aeg: "2:34" },
+          exceptionLabel: null,
+        },
+      }
+    )
+    expect(
+      linkedTeamResultResponse.status(),
+      await linkedTeamResultResponse.text()
+    ).toBe(200)
 
     await representativeContext.close()
     await adminContext.close()

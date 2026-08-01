@@ -11,6 +11,7 @@ export type LinkableTeamMember = {
 export type ResolvedTeamMember = {
   name: string
   role: string
+  email: string | null
   userId: string | null
 }
 
@@ -46,35 +47,87 @@ export async function resolveTeamMemberAccounts(
   const resolved = members.map((member) => ({
     name: member.name,
     role: member.role,
+    email: normalizeEmail(member.email) || null,
     userId: userByEmail.get(normalizeEmail(member.email)) ?? null,
   }))
+  const submittedEmails = resolved.flatMap(({ email }) =>
+    email ? [email] : []
+  )
   const userIds = resolved.flatMap(({ userId }) => (userId ? [userId] : []))
 
+  if (new Set(submittedEmails).size !== submittedEmails.length) {
+    throw new TeamMemberAccountConflictError(
+      "Sama e-posti aadressi ei saa võistkonda mitu korda lisada"
+    )
+  }
   if (new Set(userIds).size !== userIds.length) {
     throw new TeamMemberAccountConflictError(
       "Sama kasutajakontot ei saa lisada võistkonda mitu korda"
     )
   }
-  if (userIds.length === 0) return resolved
+  if (submittedEmails.length === 0 && userIds.length === 0) return resolved
 
   const conflict = await tx.teamMember.findFirst({
     where: {
       competitionId,
-      userId: { in: userIds },
       ...(teamId ? { teamId: { not: teamId } } : {}),
+      OR: [
+        ...(submittedEmails.length > 0
+          ? [{ email: { in: submittedEmails } }]
+          : []),
+        ...(userIds.length > 0 ? [{ userId: { in: userIds } }] : []),
+      ],
     },
     select: {
+      email: true,
       user: { select: { email: true } },
       team: { select: { name: true } },
     },
   })
   if (conflict) {
     throw new TeamMemberAccountConflictError(
-      `Kasutaja ${conflict.user?.email ?? ""} on sellel võistlusel juba võistkonna „${conflict.team.name}” liige`
+      `E-post ${conflict.user?.email ?? conflict.email ?? ""} on sellel võistlusel juba võistkonna „${conflict.team.name}” juures kasutusel`
     )
   }
 
   return resolved
+}
+
+export async function linkPendingTeamMembersToUser(
+  tx: TransactionClient,
+  user: { id: string; email: string }
+) {
+  const email = normalizeEmail(user.email)
+  if (!email) return 0
+
+  const pendingMembers = await tx.teamMember.findMany({
+    where: { email, userId: null },
+    select: { id: true, competitionId: true },
+  })
+  const linkedCompetitionIds: string[] = []
+
+  for (const pendingMember of pendingMembers) {
+    const existingMembership = await tx.teamMember.findFirst({
+      where: {
+        competitionId: pendingMember.competitionId,
+        userId: user.id,
+      },
+      select: { id: true },
+    })
+    if (existingMembership) continue
+
+    await tx.teamMember.update({
+      where: { id: pendingMember.id },
+      data: { userId: user.id },
+    })
+    linkedCompetitionIds.push(pendingMember.competitionId)
+  }
+
+  for (const competitionId of new Set(linkedCompetitionIds)) {
+    await ensureCompetitorRoles(tx, competitionId, [user.id])
+  }
+
+  return linkedCompetitionIds.length
 }
 
 export async function ensureCompetitorRoles(
