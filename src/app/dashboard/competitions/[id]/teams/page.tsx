@@ -18,6 +18,7 @@ type Team = {
     id: string
     name: string
     role: string
+    email: string | null
     userId: string | null
   }[]
 }
@@ -26,6 +27,7 @@ type EditableMember = {
   id?: string
   name: string
   role: string
+  email?: string | null
   userId?: string | null
 }
 

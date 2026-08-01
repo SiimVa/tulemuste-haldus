@@ -468,11 +468,14 @@ model TeamMember {
   competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   name          String
   role          String      @default("COMPETITOR")
+  email         String?
   userId        String?
   user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@unique([competitionId, userId])
+  @@unique([competitionId, email])
   @@index([teamId])
+  @@index([email])
   @@index([userId])
 }
 

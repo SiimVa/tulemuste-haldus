@@ -139,6 +139,7 @@ export async function POST(
                 competitionId,
                 name: member.name,
                 role: member.role,
+                email: member.email,
                 userId: member.userId,
               })),
             },
