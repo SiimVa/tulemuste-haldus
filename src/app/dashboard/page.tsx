@@ -259,7 +259,11 @@ export default async function DashboardPage() {
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {teamMemberships.map(({ id, name: memberName, role, team }) => (
-              <article key={id} className="bg-white border rounded-xl p-5">
+              <Link
+                key={id}
+                href={`/dashboard/teams/${team.id}/results`}
+                className="bg-white border rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
                 <p className="text-xs font-medium text-blue-600 mb-1">
                   {team.competition.name}
                 </p>
@@ -274,7 +278,10 @@ export default async function DashboardPage() {
                 <p className="text-xs text-gray-500 mt-3">
                   {memberName} · {role === "SUPPORT" ? "Tugiliige" : "Võistleja"}
                 </p>
-              </article>
+                <p className="text-sm font-medium text-blue-600 mt-4">
+                  Vaata tulemusi →
+                </p>
+              </Link>
             ))}
           </div>
         </section>

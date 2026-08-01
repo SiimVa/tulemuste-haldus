@@ -679,6 +679,21 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBeVisible()
     await expect(page.getByText("Kontoga seotud liikmed")).toBeVisible()
 
+    const linkedTeamResultResponse = await adminPage.request.post(
+      `/api/elements/${elementId}/results`,
+      {
+        data: {
+          teamId: assignment.team.id,
+          values: { aeg: "2:34" },
+          exceptionLabel: null,
+        },
+      }
+    )
+    expect(
+      linkedTeamResultResponse.status(),
+      await linkedTeamResultResponse.text()
+    ).toBe(200)
+
     const conflictingAssignment = assignments.find(
       (item: { team: { name: string; competition: { id: string } } }) =>
         item.team.competition.id === competitionId &&
@@ -719,7 +734,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await adminContext.close()
   })
 
-  test("teine korraldaja ei pääse võistluse andmetele ligi", async ({ browser }) => {
+  test("seotud võistleja näeb oma tulemusi, kuid mitte haldust", async ({ browser }) => {
     const context = await browser.newContext()
     const page = await context.newPage()
 
@@ -731,6 +746,24 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       page.getByText("Avalik testvõistkond 3", { exact: false })
     ).toBeVisible()
+    await page
+      .locator(`a[href^="/dashboard/teams/"][href$="/results"]`)
+      .filter({ hasText: "Avalik testvõistkond 3" })
+      .click()
+    await expect(
+      page.getByRole("heading", { name: "Võistkonna tulemused" })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("heading", { name: "Avalik testvõistkond 3" })
+    ).toBeVisible()
+    await expect(page.getByText("Kontrollpunkt 1", { exact: true })).toBeVisible()
+    await expect(page.getByText("2:34", { exact: true })).toBeVisible()
+    await expect(page.getByText("154p", { exact: true }).first()).toBeVisible()
+
+    const otherTeamResultsResponse = await page.goto(
+      `/dashboard/teams/${teamId}/results`
+    )
+    expect(otherTeamResultsResponse?.status()).toBe(404)
 
     const apiResponse = await page.request.get(`/api/competitions/${competitionId}`)
     expect(apiResponse.status()).toBe(403)
