@@ -515,7 +515,7 @@ export default function RegistrationSettingsPage({
               <div className="space-y-2">
                 {form.teamMemberRoles.map((role, index) => (
                   <div
-                    key={`${index}-${role.name}`}
+                    key={index}
                     className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
                   >
                     <input
