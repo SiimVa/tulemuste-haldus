@@ -119,6 +119,8 @@ export async function POST(
             name: member.name.trim(),
             role: "COMPETITOR",
             email: member.email,
+            isCaptain: Boolean(member.isCaptain),
+            assignmentRole: member.assignmentRole,
           }))
         )
         const team = await tx.team.create({
@@ -140,6 +142,8 @@ export async function POST(
                 role: member.role,
                 email: member.email,
                 userId: member.userId,
+                isCaptain: member.isCaptain,
+                assignmentRole: member.assignmentRole,
               })),
             },
           },

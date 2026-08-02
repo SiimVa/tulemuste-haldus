@@ -22,6 +22,8 @@ type RegistrationTeam = {
     id: string
     name: string
     role: string
+    isCaptain: boolean
+    assignmentRole: string | null
     user: { id: string; name: string } | null
   }[]
   representative: {
@@ -507,6 +509,9 @@ export default function RegistrationsPage({
                       <li key={member.id}>
                         {member.name} ·{" "}
                         {member.role === "SUPPORT" ? "Tugiliige" : "Võistleja"}
+                        {member.isCaptain && " · Kapten"}
+                        {member.assignmentRole &&
+                          ` · ${member.assignmentRole}`}
                         {member.user && (
                           <span className="ml-1 text-green-700">
                             · Konto seotud

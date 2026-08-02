@@ -24,6 +24,10 @@ import {
   resolveTeamMemberAccounts,
   TeamMemberAccountConflictError,
 } from "@/lib/teamMemberAccounts.server"
+import {
+  parseTeamMemberRoles,
+  validateTeamMemberAssignments,
+} from "@/lib/teamComposition"
 
 const teamInclude = {
   members: {
@@ -33,6 +37,8 @@ const teamInclude = {
       role: true,
       email: true,
       userId: true,
+      isCaptain: true,
+      assignmentRole: true,
       user: { select: { id: true, name: true } },
     },
     orderBy: { name: "asc" as const },
@@ -50,6 +56,9 @@ const teamInclude = {
       mandateOpensAt: true,
       mandateClosesAt: true,
       mandateFinalizedAt: true,
+      representativeRequired: true,
+      captainRequired: true,
+      teamMemberRoles: true,
       registrationFormFields: {
         where: { isActive: true },
         orderBy: [{ order: "asc" as const }, { createdAt: "asc" as const }],
@@ -78,6 +87,7 @@ const teamInclude = {
   formValues: {
     select: { fieldId: true, value: true },
   },
+  representative: { select: { id: true } },
   registrationApplication: { select: { id: true } },
 } satisfies Prisma.TeamInclude
 
@@ -96,13 +106,24 @@ function responseTeam(team: TeamWithForm) {
     const value = parseFormAnswer(storedValue.value)
     if (field && value !== undefined) formValues[field.key] = value
   }
-  const { registrationFormFields, ...competition } = team.competition
+  const {
+    registrationFormFields,
+    teamMemberRoles,
+    representativeRequired,
+    captainRequired,
+    ...competition
+  } = team.competition
   void registrationFormFields
   return {
     ...team,
     competition,
     formFields: fields,
     formValues,
+    composition: {
+      representativeRequired,
+      captainRequired,
+      memberRoles: parseTeamMemberRoles(teamMemberRoles),
+    },
     mandatePhaseStatus: getCompetitionMandateStatus(team.competition),
   }
 }
@@ -299,13 +320,32 @@ export async function PATCH(
   }
 
   const legacyMembers = Array.isArray(body.members) ? body.members : []
-  const members: { name: string; role: string }[] = legacyMembers
+  const members: {
+    name: string
+    role: string
+    isCaptain: boolean
+    assignmentRole: string | undefined
+  }[] = legacyMembers
     .map((member: unknown) => {
-      const value = member as { name?: unknown; role?: unknown }
+      const value = member as {
+        name?: unknown
+        role?: unknown
+        isCaptain?: unknown
+        assignmentRole?: unknown
+      }
       const name =
         typeof value.name === "string" ? value.name.trim() : ""
       const role = value.role === "SUPPORT" ? "SUPPORT" : "COMPETITOR"
-      return { name, role }
+      const assignmentRole =
+        typeof value.assignmentRole === "string" && value.assignmentRole.trim()
+          ? value.assignmentRole.trim()
+          : undefined
+      return {
+        name,
+        role,
+        isCaptain: Boolean(value.isCaptain),
+        assignmentRole,
+      }
     })
     .filter((member: { name: string }) => member.name.length > 0)
   const savedMembers = hasMemberField
@@ -313,6 +353,8 @@ export async function PATCH(
         name: member.name.trim(),
         role: "COMPETITOR",
         email: member.email,
+        isCaptain: Boolean(member.isCaptain),
+        assignmentRole: member.assignmentRole,
       }))
     : members.map((member) => ({ ...member, email: undefined }))
 
@@ -323,6 +365,19 @@ export async function PATCH(
       { error: "Liikme nimi on liiga pikk" },
       { status: 400 }
     )
+  }
+
+  const composition = {
+    representativeRequired: team.competition.representativeRequired,
+    captainRequired: team.competition.captainRequired,
+    memberRoles: parseTeamMemberRoles(team.competition.teamMemberRoles),
+  }
+  const assignmentError = validateTeamMemberAssignments(
+    savedMembers,
+    composition
+  )
+  if (assignmentError) {
+    return NextResponse.json({ error: assignmentError }, { status: 400 })
   }
 
   try {
@@ -346,6 +401,8 @@ export async function PATCH(
             role: member.role,
             email: member.email,
             userId: member.userId,
+            isCaptain: member.isCaptain,
+            assignmentRole: member.assignmentRole,
           })),
         })
       }

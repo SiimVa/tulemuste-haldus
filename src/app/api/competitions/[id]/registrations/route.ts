@@ -54,6 +54,8 @@ export async function GET(
             id: true,
             name: true,
             role: true,
+            isCaptain: true,
+            assignmentRole: true,
             user: { select: { id: true, name: true } },
           },
           orderBy: { name: "asc" },

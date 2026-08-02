@@ -473,6 +473,12 @@ test.describe.serial("võistluse põhivoog", () => {
           mandateOpensAt: null,
           mandateClosesAt: null,
           mandateOverride: "AUTO",
+          representativeRequired: true,
+          captainRequired: true,
+          teamMemberRoles: [
+            { name: "Meedik", required: true },
+            { name: "Radist", required: false },
+          ],
           classes: [],
           formFields,
           allocationRules: [
@@ -726,6 +732,12 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.getByLabel("Liige 1 nimi").fill(otherOrganizer.name)
     await page.getByLabel("Liige 1 e-post").fill(otherOrganizer.email)
     await page.getByLabel("Liige 1 sünniaeg").fill("2010-05-02")
+    await page.getByRole("button", { name: "Esita mandaat" }).click()
+    await expect(
+      page.getByText("Võistkonnale tuleb valida kapten", { exact: true })
+    ).toBeVisible()
+    await page.getByLabel("Kapten").check()
+    await page.getByLabel("Liige 1 roll").selectOption("Meedik")
     await page.getByRole("button", { name: "Esita mandaat" }).click()
     await expect(
       page.getByText("Mandaat esitatud korraldajale")

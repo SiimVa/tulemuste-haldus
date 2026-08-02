@@ -11,6 +11,10 @@ import {
   isTeamWorkflowPhase,
   isTeamWorkflowStatus,
 } from "@/lib/teamWorkflow"
+import {
+  parseTeamMemberRoles,
+  validateTeamComposition,
+} from "@/lib/teamComposition"
 
 export async function POST(
   req: Request,
@@ -63,8 +67,18 @@ export async function POST(
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     include: {
-      members: { select: { role: true } },
-      competition: { select: { status: true } },
+      members: {
+        select: { role: true, isCaptain: true, assignmentRole: true },
+      },
+      representative: { select: { id: true } },
+      competition: {
+        select: {
+          status: true,
+          representativeRequired: true,
+          captainRequired: true,
+          teamMemberRoles: true,
+        },
+      },
     },
   })
   if (!team) {
@@ -100,6 +114,20 @@ export async function POST(
       { error: "Mandaadis peab olema vähemalt üks võistleja" },
       { status: 409 }
     )
+  }
+  if (body.phase === "MANDATE" && body.decision === "APPROVE") {
+    const compositionError = validateTeamComposition(
+      team.members,
+      {
+        representativeRequired: team.competition.representativeRequired,
+        captainRequired: team.competition.captainRequired,
+        memberRoles: parseTeamMemberRoles(team.competition.teamMemberRoles),
+      },
+      Boolean(team.representative)
+    )
+    if (compositionError) {
+      return NextResponse.json({ error: compositionError }, { status: 409 })
+    }
   }
 
   const status =

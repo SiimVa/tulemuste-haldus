@@ -16,6 +16,10 @@ import {
 } from "@/lib/registrationAllocation"
 import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
 import {
+  normalizeTeamMemberRoles,
+  parseTeamMemberRoles,
+} from "@/lib/teamComposition"
+import {
   type FormFieldDefinition,
   FORM_FIELD_TYPES,
   FORM_SEMANTIC_KEYS,
@@ -382,6 +386,9 @@ export async function GET(
       mandateClosesAt: true,
       mandateOverride: true,
       mandateFinalizedAt: true,
+      representativeRequired: true,
+      captainRequired: true,
+      teamMemberRoles: true,
       registrationClasses: {
         where: { isActive: true },
         orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -408,6 +415,7 @@ export async function GET(
 
   return NextResponse.json({
     ...responseData(competition),
+    teamMemberRoles: parseTeamMemberRoles(competition.teamMemberRoles),
     registrationFormFields: competition.registrationFormFields.map(
       toFormFieldDefinition
     ),
@@ -528,6 +536,10 @@ export async function PATCH(
     }
     const formFields = parseFormFields(body.formFields)
     const allocationRules = parseAllocationRules(body.allocationRules)
+    const teamMemberRoles =
+      body.teamMemberRoles === undefined
+        ? null
+        : normalizeTeamMemberRoles(body.teamMemberRoles)
 
     const updated = await prisma.$transaction(async (tx) => {
       const current = await tx.competition.findUnique({
@@ -726,6 +738,18 @@ export async function PATCH(
           mandateOpensAt,
           mandateClosesAt,
           mandateOverride: body.mandateOverride,
+          representativeRequired:
+            body.representativeRequired === undefined
+              ? current.representativeRequired
+              : Boolean(body.representativeRequired),
+          captainRequired:
+            body.captainRequired === undefined
+              ? current.captainRequired
+              : Boolean(body.captainRequired),
+          teamMemberRoles:
+            teamMemberRoles === null
+              ? current.teamMemberRoles
+              : JSON.stringify(teamMemberRoles),
         },
         include: {
           registrationClasses: {
@@ -782,6 +806,7 @@ export async function PATCH(
 
     return NextResponse.json({
       ...responseData(updated),
+      teamMemberRoles: parseTeamMemberRoles(updated.teamMemberRoles),
       registrationFormFields: updated.registrationFormFields.map(
         toFormFieldDefinition
       ),

@@ -11,6 +11,10 @@ import {
   resolveTeamMemberAccounts,
   TeamMemberAccountConflictError,
 } from "@/lib/teamMemberAccounts.server"
+import {
+  parseTeamMemberRoles,
+  validateTeamMemberAssignments,
+} from "@/lib/teamComposition"
 
 class TeamMemberInputError extends Error {}
 
@@ -50,9 +54,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
       // Liikmete asendamine (kui body.members on antud massiivina)
       if (Array.isArray(body.members)) {
+        const competition = await tx.competition.findUnique({
+          where: { id: competitionId },
+          select: {
+            representativeRequired: true,
+            captainRequired: true,
+            teamMemberRoles: true,
+          },
+        })
+        if (!competition) {
+          throw new TeamMemberInputError("Võistlust ei leitud")
+        }
         const existingMembers = await tx.teamMember.findMany({
           where: { teamId },
-          select: { id: true, email: true, userId: true },
+          select: {
+            id: true,
+            email: true,
+            userId: true,
+            isCaptain: true,
+            assignmentRole: true,
+          },
         })
         const existingById = new Map(
           existingMembers.map((member) => [member.id, member])
@@ -62,6 +83,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           role: string
           email: string | null
           userId: string | null
+          isCaptain: boolean
+          assignmentRole: string | null
         }[] = body.members
           .map((member: unknown) => {
             if (typeof member === "string") {
@@ -70,6 +93,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 role: "COMPETITOR",
                 email: null,
                 userId: null,
+                isCaptain: false,
+                assignmentRole: null,
               }
             }
             const value = member as {
@@ -77,6 +102,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               name?: unknown
               role?: unknown
               email?: unknown
+              isCaptain?: unknown
+              assignmentRole?: unknown
             }
             const previous =
               typeof value.id === "string"
@@ -106,9 +133,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               role: value.role === "SUPPORT" ? "SUPPORT" : "COMPETITOR",
               email: email || null,
               userId: previous?.userId ?? null,
+              isCaptain:
+                value.isCaptain === undefined
+                  ? Boolean(previous?.isCaptain)
+                  : Boolean(value.isCaptain),
+              assignmentRole:
+                value.assignmentRole === undefined
+                  ? previous?.assignmentRole ?? null
+                  : typeof value.assignmentRole === "string" &&
+                      value.assignmentRole.trim()
+                    ? value.assignmentRole.trim()
+                    : null,
             }
           })
           .filter((m: { name: string }) => m.name !== "")
+        const composition = {
+          representativeRequired: competition.representativeRequired,
+          captainRequired: competition.captainRequired,
+          memberRoles: parseTeamMemberRoles(competition.teamMemberRoles),
+        }
+        const assignmentError = validateTeamMemberAssignments(
+          valid,
+          composition
+        )
+        if (assignmentError) {
+          throw new TeamMemberInputError(assignmentError)
+        }
         const resolvedMembers = await resolveTeamMemberAccounts(
           tx,
           competitionId,
@@ -117,6 +167,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             name: member.name,
             role: member.role,
             email: member.email ?? undefined,
+            isCaptain: member.isCaptain,
+            assignmentRole: member.assignmentRole ?? undefined,
           }))
         )
         const previousUserIds = existingMembers.flatMap(({ userId }) =>
@@ -132,6 +184,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               role: member.role,
               email: member.email,
               userId: member.userId,
+              isCaptain: member.isCaptain,
+              assignmentRole: member.assignmentRole,
             })),
           })
         }

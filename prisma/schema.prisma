@@ -164,6 +164,12 @@ model Competition {
   mandateOverride              String    @default("AUTO")
   mandateFinalizedAt           DateTime?
 
+  // Võistkonna koosseisu nõuded mandaadis. teamMemberRoles on JSON massiiv:
+  // [{"name":"Meedik","required":true}]
+  representativeRequired Boolean @default(false)
+  captainRequired        Boolean @default(false)
+  teamMemberRoles        String  @default("[]")
+
   elements                    ScoringElement[]
   teams                       Team[]
   accessTokens                AccessToken[]
@@ -461,20 +467,23 @@ model TeamFormFieldValue {
 // role: "COMPETITOR" | "SUPPORT"
 
 model TeamMember {
-  id            String      @id @default(cuid())
-  teamId        String
-  competitionId String
-  team          Team        @relation(fields: [teamId, competitionId], references: [id, competitionId], onDelete: Cascade)
-  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  name          String
-  role          String      @default("COMPETITOR")
-  email         String?
-  userId        String?
-  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id             String      @id @default(cuid())
+  teamId         String
+  competitionId  String
+  team           Team        @relation(fields: [teamId, competitionId], references: [id, competitionId], onDelete: Cascade)
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name           String
+  role           String      @default("COMPETITOR")
+  email          String?
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  isCaptain      Boolean     @default(false)
+  assignmentRole String?
 
   @@unique([competitionId, userId])
   @@unique([competitionId, email])
   @@index([teamId])
+  @@index([teamId, isCaptain])
   @@index([email])
   @@index([userId])
 }

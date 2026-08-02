@@ -11,6 +11,7 @@ import {
   type MemberAnswer,
   validateFormAnswers,
 } from "@/lib/registrationForm"
+import type { TeamCompositionSettings } from "@/lib/teamComposition"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -22,6 +23,8 @@ type TeamMember = {
   id?: string
   name: string
   role: "COMPETITOR" | "SUPPORT"
+  isCaptain: boolean
+  assignmentRole: string | null
   userId?: string | null
   user?: { id: string; name: string } | null
 }
@@ -43,6 +46,8 @@ type Team = {
   formFields: FormFieldDefinition[]
   formValues: FormAnswers
   mandatePhaseStatus: "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
+  composition: TeamCompositionSettings
+  representative: { id: string } | null
   registrationApplication: { id: string } | null
   competition: {
     id: string
@@ -275,6 +280,15 @@ export default function RepresentativeTeamPage({
     )
   }
 
+  function setCaptain(index: number, selected: boolean) {
+    setMembers((current) =>
+      current.map((member, memberIndex) => ({
+        ...member,
+        isCaptain: selected && memberIndex === index,
+      }))
+    )
+  }
+
   function updateFormValue(key: string, value: FormAnswer) {
     setFormValues((current) => ({ ...current, [key]: value }))
     setFormErrors((current) => {
@@ -455,7 +469,33 @@ export default function RepresentativeTeamPage({
                 onChange={updateFormValue}
                 errors={formErrors}
                 disabled={!mandateEditable}
+                teamComposition={team.composition}
               />
+            )}
+
+            {(team.composition.representativeRequired ||
+              team.composition.captainRequired ||
+              team.composition.memberRoles.length > 0) && (
+              <div className="rounded-lg border bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                <p className="font-medium text-gray-700">Koosseisu nõuded</p>
+                <ul className="mt-1 list-disc pl-5 space-y-0.5 text-xs">
+                  {team.composition.representativeRequired && (
+                    <li>
+                      Esindaja on kohustuslik
+                      {team.representative ? " · Määratud" : " · Määramata"}
+                    </li>
+                  )}
+                  {team.composition.captainRequired && (
+                    <li>Vali üks võistleja kapteniks</li>
+                  )}
+                  {team.composition.memberRoles.map((role) => (
+                    <li key={role.name}>
+                      {role.name}
+                      {role.required ? " · Kohustuslik" : " · Vabatahtlik"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {memberFormFields.length === 0 && (
@@ -464,7 +504,7 @@ export default function RepresentativeTeamPage({
                 <p className="text-sm text-gray-400">Liikmeid pole veel lisatud.</p>
               )}
               {members.map((member, index) => (
-                <div key={`${member.id ?? "new"}-${index}`} className="flex gap-2">
+                <div key={`${member.id ?? "new"}-${index}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
                   <input
                     value={member.name}
                     onChange={(event) =>
@@ -479,6 +519,9 @@ export default function RepresentativeTeamPage({
                     onChange={(event) =>
                       updateMember(index, {
                         role: event.target.value as TeamMember["role"],
+                        ...(event.target.value === "SUPPORT"
+                          ? { isCaptain: false }
+                          : {}),
                       })
                     }
                     disabled={!mandateEditable}
@@ -487,6 +530,40 @@ export default function RepresentativeTeamPage({
                     <option value="COMPETITOR">Võistleja</option>
                     <option value="SUPPORT">Tugiliige</option>
                   </select>
+                  {team.composition.captainRequired && (
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={member.isCaptain}
+                        disabled={!mandateEditable || member.role !== "COMPETITOR"}
+                        onChange={(event) =>
+                          setCaptain(index, event.target.checked)
+                        }
+                      />
+                      Kapten
+                    </label>
+                  )}
+                  {team.composition.memberRoles.length > 0 && (
+                    <select
+                      aria-label={`Liige ${index + 1} roll`}
+                      value={member.assignmentRole ?? ""}
+                      disabled={!mandateEditable}
+                      onChange={(event) =>
+                        updateMember(index, {
+                          assignmentRole: event.target.value || null,
+                        })
+                      }
+                      className="px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                    >
+                      <option value="">Roll puudub</option>
+                      {team.composition.memberRoles.map((role) => (
+                        <option key={role.name} value={role.name}>
+                          {role.name}
+                          {role.required ? " *" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {mandateEditable && (
                     <button
                       type="button"
@@ -531,7 +608,12 @@ export default function RepresentativeTeamPage({
                     onClick={() =>
                       setMembers((current) => [
                         ...current,
-                        { name: "", role: "COMPETITOR" },
+                        {
+                          name: "",
+                          role: "COMPETITOR",
+                          isCaptain: false,
+                          assignmentRole: null,
+                        },
                       ])
                     }
                     className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50"
