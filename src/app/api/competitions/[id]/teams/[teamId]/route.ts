@@ -5,7 +5,16 @@ import {
   canAccessCompetition,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
-import { cleanupCompetitorRoles } from "@/lib/teamMemberAccounts.server"
+import {
+  cleanupCompetitorRoles,
+  ensureCompetitorRoles,
+  resolveTeamMemberAccounts,
+  TeamMemberAccountConflictError,
+} from "@/lib/teamMemberAccounts.server"
+
+class TeamMemberInputError extends Error {}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; teamId: string }> }) {
   const session = await auth()
@@ -67,26 +76,56 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               id?: unknown
               name?: unknown
               role?: unknown
+              email?: unknown
             }
             const previous =
               typeof value.id === "string"
                 ? existingById.get(value.id)
                 : undefined
+            const rawEmail =
+              value.email === undefined ? previous?.email ?? "" : value.email
+            if (rawEmail !== null && typeof rawEmail !== "string") {
+              throw new TeamMemberInputError("Kontrolli liikme e-posti aadressi")
+            }
+            const email =
+              typeof rawEmail === "string"
+                ? rawEmail.trim().toLowerCase()
+                : ""
+            if (email.length > 320) {
+              throw new TeamMemberInputError(
+                "Liikme e-posti aadress on liiga pikk"
+              )
+            }
+            if (email && !EMAIL_PATTERN.test(email)) {
+              throw new TeamMemberInputError(
+                "Kontrolli liikme e-posti aadressi"
+              )
+            }
             return {
               name: String(value.name ?? "").trim(),
               role: value.role === "SUPPORT" ? "SUPPORT" : "COMPETITOR",
-              email: previous?.email ?? null,
+              email: email || null,
               userId: previous?.userId ?? null,
             }
           })
           .filter((m: { name: string }) => m.name !== "")
+        const resolvedMembers = await resolveTeamMemberAccounts(
+          tx,
+          competitionId,
+          teamId,
+          valid.map((member) => ({
+            name: member.name,
+            role: member.role,
+            email: member.email ?? undefined,
+          }))
+        )
         const previousUserIds = existingMembers.flatMap(({ userId }) =>
           userId ? [userId] : []
         )
         await tx.teamMember.deleteMany({ where: { teamId } })
-        if (valid.length > 0) {
+        if (resolvedMembers.length > 0) {
           await tx.teamMember.createMany({
-            data: valid.map((member) => ({
+            data: resolvedMembers.map((member) => ({
               teamId,
               competitionId,
               name: member.name,
@@ -96,9 +135,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             })),
           })
         }
-        const nextUserIds = valid.flatMap(({ userId }) =>
+        const nextUserIds = resolvedMembers.flatMap(({ userId }) =>
           userId ? [userId] : []
         )
+        await ensureCompetitorRoles(tx, competitionId, nextUserIds)
         await cleanupCompetitorRoles(
           tx,
           competitionId,
@@ -110,6 +150,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     })
     return NextResponse.json(team)
   } catch (e) {
+    if (e instanceof TeamMemberInputError) {
+      return NextResponse.json({ error: e.message }, { status: 400 })
+    }
+    if (e instanceof TeamMemberAccountConflictError) {
+      return NextResponse.json({ error: e.message }, { status: 409 })
+    }
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: msg }, { status: 500 })
   }

@@ -49,6 +49,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
     members: EditableMember[]
   }>({ name: "", code: "", class: "", members: [] })
   const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState("")
   const [importing, setImporting] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const [dnfTeamId, setDnfTeamId] = useState<string | null>(null)
@@ -92,6 +93,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   }
 
   function startEdit(team: Team) {
+    setEditError("")
     setEditingId(team.id)
     setEditForm({
       name: team.name,
@@ -103,24 +105,36 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
 
   async function saveEdit(teamId: string) {
     setEditSaving(true)
-    const res = await fetch(`/api/competitions/${competitionId}/teams/${teamId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editForm.name,
-        code: editForm.code,
-        class: editForm.class,
-        members: editForm.members
-          .map((member) => ({ ...member, name: member.name.trim() }))
-          .filter((member) => Boolean(member.name)),
-      }),
-    })
-    if (res.ok) {
-      const updated = await res.json()
-      setTeams(teams.map((t) => (t.id === teamId ? { ...t, ...updated } : t)))
+    setEditError("")
+    try {
+      const res = await fetch(`/api/competitions/${competitionId}/teams/${teamId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editForm.name,
+          code: editForm.code,
+          class: editForm.class,
+          members: editForm.members
+            .map((member) => ({
+              ...member,
+              name: member.name.trim(),
+              email: member.email?.trim() || null,
+            }))
+            .filter((member) => Boolean(member.name)),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setEditError(data.error ?? "Võistkonna salvestamine ebaõnnestus")
+        return
+      }
+      setTeams(teams.map((t) => (t.id === teamId ? { ...t, ...data } : t)))
       setEditingId(null)
+    } catch {
+      setEditError("Võistkonna salvestamine ebaõnnestus")
+    } finally {
+      setEditSaving(false)
     }
-    setEditSaving(false)
   }
 
   function openHc(team: Team) {
@@ -496,34 +510,58 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                   ) : (
                     <div className="space-y-1.5">
                       {editForm.members.map((member, mi) => (
-                        <div key={member.id ?? mi} className="flex items-center gap-2">
+                        <div key={member.id ?? mi} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-center">
                           <input type="text" value={member.name}
                             onChange={(e) => {
                               const upd = [...editForm.members]
                               upd[mi] = { ...member, name: e.target.value }
                               setEditForm({ ...editForm, members: upd })
                             }}
+                            aria-label={`Liige ${mi + 1} nimi`}
                             placeholder="Liikme nimi"
-                            className="flex-1 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                          {member.userId && (
-                            <span className="text-xs text-green-700">
-                              Konto seotud
-                            </span>
-                          )}
+                            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          <input type="email" value={member.email ?? ""}
+                            onChange={(e) => {
+                              const upd = [...editForm.members]
+                              upd[mi] = { ...member, email: e.target.value }
+                              setEditForm({ ...editForm, members: upd })
+                            }}
+                            aria-label={`Liige ${mi + 1} e-post`}
+                            placeholder="Liikme e-post"
+                            className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          <span className={`text-xs whitespace-nowrap ${
+                            member.userId
+                              ? "text-green-700"
+                              : member.email
+                                ? "text-amber-700"
+                                : "text-gray-400"
+                          }`}>
+                            {member.userId
+                              ? "Konto seotud"
+                              : member.email
+                                ? "Kontot pole veel"
+                                : "E-post puudub"}
+                          </span>
                           <button type="button"
                             onClick={() => setEditForm({ ...editForm, members: editForm.members.filter((_, idx) => idx !== mi) })}
+                            aria-label={`Eemalda liige ${mi + 1}`}
                             className="text-red-400 hover:text-red-600 text-sm px-1">✕</button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
+                {editError && (
+                  <p className="mb-3 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-sm">
+                    {editError}
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button onClick={() => saveEdit(team.id)} disabled={editSaving}
                     className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                     {editSaving ? "Salvestan..." : "Salvesta"}
                   </button>
-                  <button onClick={() => setEditingId(null)}
+                  <button onClick={() => { setEditingId(null); setEditError("") }}
                     className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
                     Tühista
                   </button>

@@ -79,6 +79,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.getByRole("button", { name: "Muuda" }).click()
     await page.getByRole("button", { name: "+ Lisa liige" }).click()
     await page.getByPlaceholder("Liikme nimi").fill("Hiljem lisatud liige")
+    await page.getByPlaceholder("Liikme e-post").fill(admin.email.toUpperCase())
     await page.getByRole("button", { name: "Salvesta", exact: true }).click()
     await expect(page.getByText("1 liiget", { exact: true })).toBeVisible()
 
@@ -86,13 +87,21 @@ test.describe.serial("võistluse põhivoog", () => {
       `/api/competitions/${competitionId}`
     )
     const updatedCompetition = await updatedCompetitionResponse.json()
-    expect(
-      updatedCompetition.teams.find(
-        (team: { id: string }) => team.id === teamId
-      )?.members
-    ).toEqual([
-      expect.objectContaining({ name: "Hiljem lisatud liige" }),
-    ])
+    const updatedMember = updatedCompetition.teams.find(
+      (team: { id: string }) => team.id === teamId
+    )?.members[0]
+    expect(updatedMember).toEqual(
+      expect.objectContaining({
+        name: "Hiljem lisatud liige",
+        email: admin.email,
+      })
+    )
+    expect(updatedMember.userId).toBeTruthy()
+
+    await page.getByRole("button", { name: "Muuda" }).click()
+    await expect(page.getByLabel("Liige 1 e-post")).toHaveValue(admin.email)
+    await expect(page.getByText("Konto seotud", { exact: true })).toBeVisible()
+    await page.getByRole("button", { name: "Tühista" }).click()
 
     const elementResponse = await page.request.post(
       `/api/competitions/${competitionId}/elements`,
@@ -221,6 +230,32 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(secondTeamResponse.status(), await secondTeamResponse.text()).toBe(200)
     secondTeamId = (await secondTeamResponse.json()).id
     expect(secondTeamId).not.toBe("")
+
+    const invalidMemberEmailResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/teams/${secondTeamId}`,
+      {
+        data: {
+          members: [{ name: "Vigase e-postiga liige", email: "vigane" }],
+        },
+      }
+    )
+    expect(invalidMemberEmailResponse.status()).toBe(400)
+    expect((await invalidMemberEmailResponse.json()).error).toContain(
+      "Kontrolli liikme e-posti"
+    )
+
+    const duplicateMemberEmailResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/teams/${secondTeamId}`,
+      {
+        data: {
+          members: [{ name: "Teise võistkonna liige", email: admin.email }],
+        },
+      }
+    )
+    expect(duplicateMemberEmailResponse.status()).toBe(409)
+    expect((await duplicateMemberEmailResponse.json()).error).toContain(
+      "on sellel võistlusel juba võistkonna"
+    )
 
     const assignmentResponse = await adminPage.request.post(
       `/api/competitions/${competitionId}/representatives`,
@@ -768,13 +803,12 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       page.getByRole("heading", { name: "Minu võistkonnad" })
     ).toBeVisible()
-    await expect(
-      page.getByText("Avalik testvõistkond 3", { exact: false })
-    ).toBeVisible()
-    await page
+    const memberTeamCard = page
       .locator(`a[href^="/dashboard/teams/"][href$="/results"]`)
       .filter({ hasText: "Avalik testvõistkond 3" })
-      .click()
+    await expect(memberTeamCard).toBeVisible()
+    await expect(memberTeamCard).not.toContainText("REG-")
+    await memberTeamCard.click()
     await expect(
       page.getByRole("heading", { name: "Võistkonna tulemused" })
     ).toBeVisible()
