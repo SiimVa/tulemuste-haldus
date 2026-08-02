@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { teamDisplayName } from "@/lib/teamDisplay"
 import { use, useCallback, useEffect, useState } from "react"
 import { DynamicFormFields } from "@/components/registration/DynamicFormFields"
 import {
@@ -330,7 +331,7 @@ export default function RepresentativeTeamPage({
           {team.competition.name}
         </p>
         <h1 className="text-2xl font-bold text-gray-900 mt-1">
-          {team.code} · {team.name}
+          {teamDisplayName(team)}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           {[team.competition.location, team.competition.date

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import { canCreateCompetition } from "@/lib/permissions"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
+import { teamDisplayName } from "@/lib/teamDisplay"
 import Link from "next/link"
 
 export default async function DashboardPage() {
@@ -268,7 +269,7 @@ export default async function DashboardPage() {
                   {team.competition.name}
                 </p>
                 <h3 className="font-semibold text-gray-900">
-                  {team.code} · {team.name}
+                  {teamDisplayName(team)}
                 </h3>
                 {team.class && (
                   <p className="text-sm text-gray-500 mt-1">
@@ -354,7 +355,7 @@ export default async function DashboardPage() {
                   {team.competition.name}
                 </p>
                 <h3 className="font-semibold text-gray-900">
-                  {team.code} · {team.name}
+                  {teamDisplayName(team)}
                 </h3>
                 {team.class && (
                   <p className="text-sm text-gray-500 mt-1">
