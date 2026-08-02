@@ -9,6 +9,7 @@ import {
   isFormFieldVisible,
   type MemberAnswer,
 } from "@/lib/registrationForm"
+import type { TeamCompositionSettings } from "@/lib/teamComposition"
 
 function valueFor(
   field: FormFieldDefinition,
@@ -24,6 +25,7 @@ export function DynamicFormFields({
   onChange,
   errors = {},
   disabled = false,
+  teamComposition,
 }: {
   fields: FormFieldDefinition[]
   phase: FormPhase
@@ -31,6 +33,7 @@ export function DynamicFormFields({
   onChange: (key: string, value: FormAnswer) => void
   errors?: Record<string, string>
   disabled?: boolean
+  teamComposition?: TeamCompositionSettings
 }) {
   const visibleFields = [...fields]
     .sort((a, b) => a.order - b.order)
@@ -211,6 +214,7 @@ export function DynamicFormFields({
                     : []
                 }
                 disabled={fieldDisabled}
+                teamComposition={phase === "MANDATE" ? teamComposition : undefined}
                 onChange={(members) => onChange(field.key, members)}
               />
             )}
@@ -229,11 +233,13 @@ function MemberListInput({
   field,
   value,
   disabled,
+  teamComposition,
   onChange,
 }: {
   field: FormFieldDefinition
   value: MemberAnswer[]
   disabled: boolean
+  teamComposition?: TeamCompositionSettings
   onChange: (members: MemberAnswer[]) => void
 }) {
   function update(index: number, patch: Partial<MemberAnswer>) {
@@ -241,6 +247,15 @@ function MemberListInput({
       value.map((member, memberIndex) =>
         memberIndex === index ? { ...member, ...patch } : member
       )
+    )
+  }
+
+  function setCaptain(index: number, selected: boolean) {
+    onChange(
+      value.map((member, memberIndex) => ({
+        ...member,
+        isCaptain: selected && memberIndex === index,
+      }))
     )
   }
 
@@ -317,6 +332,49 @@ function MemberListInput({
               </label>
             )}
           </div>
+          {teamComposition &&
+            (teamComposition.captainRequired ||
+              teamComposition.memberRoles.length > 0) && (
+              <div className="grid sm:grid-cols-2 gap-2 pt-1">
+                {teamComposition.captainRequired && (
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(member.isCaptain)}
+                      disabled={disabled}
+                      onChange={(event) =>
+                        setCaptain(index, event.target.checked)
+                      }
+                    />
+                    Kapten
+                  </label>
+                )}
+                {teamComposition.memberRoles.length > 0 && (
+                  <label className="text-xs text-gray-500">
+                    Liikmeroll
+                    <select
+                      aria-label={`Liige ${index + 1} roll`}
+                      value={member.assignmentRole ?? ""}
+                      disabled={disabled}
+                      onChange={(event) =>
+                        update(index, {
+                          assignmentRole: event.target.value || undefined,
+                        })
+                      }
+                      className="mt-1 w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                    >
+                      <option value="">Roll puudub</option>
+                      {teamComposition.memberRoles.map((role) => (
+                        <option key={role.name} value={role.name}>
+                          {role.name}
+                          {role.required ? " *" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            )}
         </div>
       ))}
       {!disabled && (

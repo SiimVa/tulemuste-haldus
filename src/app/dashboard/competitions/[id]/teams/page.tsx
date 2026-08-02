@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
+import type { TeamMemberRoleDefinition } from "@/lib/teamComposition"
 
 type Team = {
   id: string
@@ -20,6 +21,8 @@ type Team = {
     role: string
     email: string | null
     userId: string | null
+    isCaptain: boolean
+    assignmentRole: string | null
   }[]
 }
 
@@ -29,6 +32,8 @@ type EditableMember = {
   role: string
   email?: string | null
   userId?: string | null
+  isCaptain?: boolean
+  assignmentRole?: string | null
 }
 
 type Element = { id: string; name: string; code: string; order: number }
@@ -37,6 +42,8 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
   const { id: competitionId } = use(params)
   const [teams, setTeams] = useState<Team[]>([])
   const [elements, setElements] = useState<Element[]>([])
+  const [captainRequired, setCaptainRequired] = useState(false)
+  const [teamMemberRoles, setTeamMemberRoles] = useState<TeamMemberRoleDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: "", code: "", class: "" })
@@ -70,6 +77,8 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
     const d = await r.json()
     setTeams(d.teams ?? [])
     setElements((d.elements ?? []).map((el: Element) => ({ id: el.id, name: el.name, code: el.code, order: el.order })))
+    setCaptainRequired(Boolean(d.captainRequired))
+    setTeamMemberRoles(d.teamMemberRoles ?? [])
     setLoading(false)
   }, [competitionId])
 
@@ -101,6 +110,16 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
       class: team.class ?? "",
       members: (team.members ?? []).map((member) => ({ ...member })),
     })
+  }
+
+  function setCaptain(index: number, selected: boolean) {
+    setEditForm((current) => ({
+      ...current,
+      members: current.members.map((member, memberIndex) => ({
+        ...member,
+        isCaptain: selected && memberIndex === index,
+      })),
+    }))
   }
 
   async function saveEdit(teamId: string) {
@@ -499,7 +518,12 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                           ...editForm,
                           members: [
                             ...editForm.members,
-                            { name: "", role: "COMPETITOR" },
+                            {
+                              name: "",
+                              role: "COMPETITOR",
+                              isCaptain: false,
+                              assignmentRole: null,
+                            },
                           ],
                         })
                       }
@@ -510,7 +534,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                   ) : (
                     <div className="space-y-1.5">
                       {editForm.members.map((member, mi) => (
-                        <div key={member.id ?? mi} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-center">
+                        <div key={member.id ?? mi} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto_auto] md:items-center">
                           <input type="text" value={member.name}
                             onChange={(e) => {
                               const upd = [...editForm.members]
@@ -529,6 +553,41 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                             aria-label={`Liige ${mi + 1} e-post`}
                             placeholder="Liikme e-post"
                             className="w-full px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                          {captainRequired && (
+                            <label className="flex items-center gap-1.5 text-xs text-gray-600 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(member.isCaptain)}
+                                onChange={(event) =>
+                                  setCaptain(mi, event.target.checked)
+                                }
+                              />
+                              Kapten
+                            </label>
+                          )}
+                          {teamMemberRoles.length > 0 && (
+                            <select
+                              aria-label={`Liige ${mi + 1} roll`}
+                              value={member.assignmentRole ?? ""}
+                              onChange={(event) => {
+                                const upd = [...editForm.members]
+                                upd[mi] = {
+                                  ...member,
+                                  assignmentRole: event.target.value || null,
+                                }
+                                setEditForm({ ...editForm, members: upd })
+                              }}
+                              className="px-2 py-1.5 border rounded-lg text-xs"
+                            >
+                              <option value="">Roll puudub</option>
+                              {teamMemberRoles.map((role) => (
+                                <option key={role.name} value={role.name}>
+                                  {role.name}
+                                  {role.required ? " *" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                           <span className={`text-xs whitespace-nowrap ${
                             member.userId
                               ? "text-green-700"

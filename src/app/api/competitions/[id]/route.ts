@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
+import { parseTeamMemberRoles } from "@/lib/teamComposition"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -38,7 +39,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (!competition) return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
   competition.teams.sort((a, b) => naturalCompare(a.code, b.code))
-  return NextResponse.json(competition)
+  return NextResponse.json({
+    ...competition,
+    teamMemberRoles: parseTeamMemberRoles(competition.teamMemberRoles),
+  })
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

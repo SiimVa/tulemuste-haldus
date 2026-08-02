@@ -6,6 +6,8 @@ export type LinkableTeamMember = {
   name: string
   role: string
   email?: string
+  isCaptain?: boolean
+  assignmentRole?: string
 }
 
 export type ResolvedTeamMember = {
@@ -13,6 +15,8 @@ export type ResolvedTeamMember = {
   role: string
   email: string | null
   userId: string | null
+  isCaptain: boolean
+  assignmentRole: string | null
 }
 
 export class TeamMemberAccountConflictError extends Error {}
@@ -49,6 +53,8 @@ export async function resolveTeamMemberAccounts(
     role: member.role,
     email: normalizeEmail(member.email) || null,
     userId: userByEmail.get(normalizeEmail(member.email)) ?? null,
+    isCaptain: Boolean(member.isCaptain),
+    assignmentRole: member.assignmentRole?.trim() || null,
   }))
   const submittedEmails = resolved.flatMap(({ email }) =>
     email ? [email] : []

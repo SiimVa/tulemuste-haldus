@@ -9,6 +9,7 @@ import type {
   ClassBalanceMode,
 } from "@/lib/registrationAllocation"
 import type { FormFieldDefinition } from "@/lib/registrationForm"
+import type { TeamMemberRoleDefinition } from "@/lib/teamComposition"
 
 type PhaseOverride = "AUTO" | "OPEN" | "CLOSED"
 type PhaseStatus = "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
@@ -29,6 +30,9 @@ type Settings = {
   mandateOverride: PhaseOverride
   mandateFinalizedAt: string | null
   mandateStatus: PhaseStatus
+  representativeRequired: boolean
+  captainRequired: boolean
+  teamMemberRoles: TeamMemberRoleDefinition[]
   registrationClasses: CompetitionClass[]
   registrationFormFields: FormFieldDefinition[]
   registrationAllocationRules: AllocationRuleDefinition[]
@@ -173,6 +177,9 @@ export default function RegistrationSettingsPage({
             data.registrationClassBalanceMode ?? "OFF",
           registrationAllocationRules:
             data.registrationAllocationRules ?? [],
+          representativeRequired: Boolean(data.representativeRequired),
+          captainRequired: Boolean(data.captainRequired),
+          teamMemberRoles: data.teamMemberRoles ?? [],
         })
       })
       .catch((reason) =>
@@ -219,6 +226,45 @@ export default function RegistrationSettingsPage({
     )
   }
 
+  function addMemberRole() {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            teamMemberRoles: [
+              ...current.teamMemberRoles,
+              { name: "", required: false },
+            ],
+          }
+        : current
+    )
+  }
+
+  function updateMemberRole(
+    index: number,
+    patch: Partial<TeamMemberRoleDefinition>
+  ) {
+    setForm((current) => {
+      if (!current) return current
+      const teamMemberRoles = [...current.teamMemberRoles]
+      teamMemberRoles[index] = { ...teamMemberRoles[index], ...patch }
+      return { ...current, teamMemberRoles }
+    })
+  }
+
+  function removeMemberRole(index: number) {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            teamMemberRoles: current.teamMemberRoles.filter(
+              (_, roleIndex) => roleIndex !== index
+            ),
+          }
+        : current
+    )
+  }
+
   async function save(event: React.FormEvent) {
     event.preventDefault()
     if (!form) return
@@ -244,6 +290,9 @@ export default function RegistrationSettingsPage({
           mandateOpensAt: toIso(form.mandateOpensAt),
           mandateClosesAt: toIso(form.mandateClosesAt),
           mandateOverride: form.mandateOverride,
+          representativeRequired: form.representativeRequired,
+          captainRequired: form.captainRequired,
+          teamMemberRoles: form.teamMemberRoles,
           classes: form.registrationClasses,
           formFields: form.registrationFormFields,
           allocationRules: form.registrationAllocationRules,
@@ -265,6 +314,9 @@ export default function RegistrationSettingsPage({
           data.registrationClassBalanceMode ?? "OFF",
         registrationAllocationRules:
           data.registrationAllocationRules ?? [],
+        representativeRequired: Boolean(data.representativeRequired),
+        captainRequired: Boolean(data.captainRequired),
+        teamMemberRoles: data.teamMemberRoles ?? [],
       })
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2500)
@@ -394,6 +446,112 @@ export default function RegistrationSettingsPage({
               setForm({ ...form, registrationFormFields })
             }
           />
+
+          <section className="bg-white border rounded-xl p-5 space-y-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">
+                Koosseisu nõuded
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Neid nõudeid kontrollitakse mandaadi esitamisel. Mustandit
+                saab salvestada ka poolelioleva koosseisuga.
+              </p>
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.representativeRequired}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    representativeRequired: event.target.checked,
+                  })
+                }
+                className="mt-1 accent-blue-600"
+              />
+              <span>
+                <span className="block text-sm text-gray-700">
+                  Esindaja on kohustuslik
+                </span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Esindaja võib olla ka ühe esindatava võistkonna liige.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.captainRequired}
+                onChange={(event) =>
+                  setForm({ ...form, captainRequired: event.target.checked })
+                }
+                className="mt-1 accent-blue-600"
+              />
+              <span className="text-sm text-gray-700">
+                Võistkonnal peab olema üks kapten
+              </span>
+            </label>
+
+            <div className="pt-2">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700">
+                    Liikmerollid
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Näiteks meedik, radist või autojuht.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addMemberRole}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  + Lisa roll
+                </button>
+              </div>
+              <div className="space-y-2">
+                {form.teamMemberRoles.map((role, index) => (
+                  <div
+                    key={`${index}-${role.name}`}
+                    className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+                  >
+                    <input
+                      type="text"
+                      value={role.name}
+                      onChange={(event) =>
+                        updateMemberRole(index, { name: event.target.value })
+                      }
+                      aria-label={`Liikmeroll ${index + 1}`}
+                      placeholder="nt Meedik"
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={role.required}
+                        onChange={(event) =>
+                          updateMemberRole(index, {
+                            required: event.target.checked,
+                          })
+                        }
+                      />
+                      Kohustuslik
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeMemberRole(index)}
+                      className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      Eemalda
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
           <AllocationRuleBuilder
             capacity={form.registrationCapacity}

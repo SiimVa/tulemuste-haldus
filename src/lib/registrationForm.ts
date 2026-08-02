@@ -38,6 +38,8 @@ export type MemberAnswer = {
   email?: string
   phone?: string
   birthDate?: string
+  isCaptain?: boolean
+  assignmentRole?: string
 }
 
 export type FormAnswer =
@@ -256,6 +258,10 @@ function normalizeMembers(
       }
       if (birthDate) member.birthDate = birthDate
     }
+    if (raw.isCaptain === true) member.isCaptain = true
+    const assignmentRole = normalizeString(raw.assignmentRole ?? "", 100)
+    if (assignmentRole === null) return { error: "Liikmeroll on liiga pikk" }
+    if (assignmentRole) member.assignmentRole = assignmentRole
     members.push(member)
   }
   return { value: members }

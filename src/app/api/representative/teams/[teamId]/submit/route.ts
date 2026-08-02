@@ -15,6 +15,10 @@ import {
   isTeamWorkflowPhase,
   isTeamWorkflowStatus,
 } from "@/lib/teamWorkflow"
+import {
+  parseTeamMemberRoles,
+  validateTeamComposition,
+} from "@/lib/teamComposition"
 
 export async function POST(
   req: Request,
@@ -29,7 +33,10 @@ export async function POST(
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     include: {
-      members: { select: { role: true } },
+      members: {
+        select: { role: true, isCaptain: true, assignmentRole: true },
+      },
+      representative: { select: { id: true } },
       formValues: { select: { fieldId: true, value: true } },
       registrationApplication: { select: { id: true } },
       competition: {
@@ -40,6 +47,9 @@ export async function POST(
           mandateOpensAt: true,
           mandateClosesAt: true,
           mandateFinalizedAt: true,
+          representativeRequired: true,
+          captainRequired: true,
+          teamMemberRoles: true,
           registrationFormFields: {
             where: { isActive: true },
             orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -169,6 +179,19 @@ export async function POST(
       },
       { status: 409 }
     )
+  }
+
+  const compositionError = validateTeamComposition(
+    team.members,
+    {
+      representativeRequired: team.competition.representativeRequired,
+      captainRequired: team.competition.captainRequired,
+      memberRoles: parseTeamMemberRoles(team.competition.teamMemberRoles),
+    },
+    Boolean(team.representative)
+  )
+  if (compositionError) {
+    return NextResponse.json({ error: compositionError }, { status: 409 })
   }
 
   const updated = await prisma.team.update({
