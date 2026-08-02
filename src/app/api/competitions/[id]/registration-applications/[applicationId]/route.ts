@@ -1,10 +1,14 @@
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
+import { isApprovalMode } from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
-import { reindexWaitlistPositions } from "@/lib/registrationAllocation.server"
+import {
+  recalculateRegistrationAllocation,
+  reindexWaitlistPositions,
+} from "@/lib/registrationAllocation.server"
 import {
   isFormFieldVisible,
   parseFormAnswer,
@@ -17,6 +21,7 @@ import {
 const ACTION_STATUS = {
   CONFIRM: "CONFIRMED",
   WAITLIST: "WAITLISTED",
+  REQUEST_CHANGES: "CHANGES_REQUESTED",
   REJECT: "REJECTED",
 } as const
 
@@ -230,6 +235,8 @@ export async function PATCH(
     action = "CONFIRM"
   } else if (body.action === "WAITLIST") {
     action = "WAITLIST"
+  } else if (body.action === "REQUEST_CHANGES") {
+    action = "REQUEST_CHANGES"
   } else if (body.action === "REJECT") {
     action = "REJECT"
   } else {
@@ -238,6 +245,12 @@ export async function PATCH(
   const note = typeof body.note === "string" ? body.note.trim() : ""
   if (note.length > 2000) {
     return NextResponse.json({ error: "Märkus on liiga pikk" }, { status: 400 })
+  }
+  if (action === "REQUEST_CHANGES" && !note) {
+    return NextResponse.json(
+      { error: "Täiendamisele saatmisel lisa märkus" },
+      { status: 400 }
+    )
   }
 
   try {
@@ -252,6 +265,7 @@ export async function PATCH(
                 registrationOpensAt: true,
                 registrationClosesAt: true,
                 registrationFinalizedAt: true,
+                registrationApprovalMode: true,
               },
             },
           },
@@ -261,7 +275,10 @@ export async function PATCH(
           throw new Error("Kinnitatud osalejate nimekirja ei saa muuta")
         }
         if (
-          getCompetitionRegistrationStatus(application.competition) === "OPEN"
+          getCompetitionRegistrationStatus(application.competition) ===
+            "OPEN" &&
+          application.competition.registrationApprovalMode === "AUTOMATIC" &&
+          action !== "REQUEST_CHANGES"
         ) {
           throw new Error(
             "Avatud registreerimise ajal määrab kohad automaatne jaotus"
@@ -282,10 +299,12 @@ export async function PATCH(
             waitlistPosition: null,
             allocationReason:
               nextStatus === "CONFIRMED"
-                ? note || "Korraldaja kinnitatud pärast registreerimise lõppu"
+                ? note || "Korraldaja kinnitatud"
                 : nextStatus === "WAITLISTED"
                   ? note || "Korraldaja jäetud ootenimekirja"
-                  : null,
+                  : nextStatus === "CHANGES_REQUESTED"
+                    ? note
+                    : null,
             decidedAt:
               nextStatus === "CONFIRMED" || nextStatus === "REJECTED"
                 ? now
@@ -306,7 +325,22 @@ export async function PATCH(
           },
         })
 
-        await reindexWaitlistPositions(tx, competitionId)
+        const approvalMode = isApprovalMode(
+          application.competition.registrationApprovalMode
+        )
+          ? application.competition.registrationApprovalMode
+          : "AUTOMATIC"
+        if (
+          approvalMode === "AUTOMATIC" &&
+          action === "REQUEST_CHANGES"
+        ) {
+          await recalculateRegistrationAllocation(tx, competitionId, {
+            actorId: actor.id,
+            eventNote: "Täiendamisele saatmise järel arvutatud koht",
+          })
+        } else {
+          await reindexWaitlistPositions(tx, competitionId)
+        }
         return result
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }

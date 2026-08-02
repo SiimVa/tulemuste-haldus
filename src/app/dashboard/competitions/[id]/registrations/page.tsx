@@ -64,7 +64,9 @@ type RegistrationApplication = {
 }
 type RegistrationOverview = {
   registrationStatus: PhaseStatus
+  registrationApprovalMode: "AUTOMATIC" | "MANUAL"
   mandateStatus: PhaseStatus
+  mandateApprovalMode: "AUTOMATIC" | "MANUAL"
   registrationFinalizedAt: string | null
   registrationCapacity: number | null
 }
@@ -93,6 +95,7 @@ const PHASE_LABEL: Record<PhaseStatus, string> = {
 const APPLICATION_LABEL: Record<string, string> = {
   DRAFT: "Mustand",
   PENDING_REVIEW: "Ootab ülevaatamist",
+  CHANGES_REQUESTED: "Vajab täiendamist",
   CONFIRMED: "Registreeritud",
   WAITLISTED: "Ootenimekirjas",
   REJECTED: "Tagasi lükatud",
@@ -103,6 +106,7 @@ const APPLICATION_COLOR: Record<string, string> = {
   CONFIRMED: "bg-green-100 text-green-700",
   WAITLISTED: "bg-amber-100 text-amber-800",
   PENDING_REVIEW: "bg-blue-100 text-blue-700",
+  CHANGES_REQUESTED: "bg-amber-100 text-amber-800",
   REJECTED: "bg-red-100 text-red-700",
   WITHDRAWN: "bg-gray-100 text-gray-600",
   DRAFT: "bg-gray-100 text-gray-700",
@@ -250,12 +254,15 @@ export default function RegistrationsPage({
 
   async function decideApplication(
     applicationId: string,
-    action: "CONFIRM" | "REJECT"
+    action: "CONFIRM" | "WAITLIST" | "REQUEST_CHANGES" | "REJECT"
   ) {
     const note =
-      action === "REJECT"
-        ? window.prompt("Soovi korral lisa tagasilükkamise põhjus:") ?? ""
-        : ""
+      action === "REQUEST_CHANGES"
+        ? window.prompt("Kirjelda, mida registreerija peab täiendama:")
+        : action === "REJECT"
+          ? window.prompt("Soovi korral lisa tagasilükkamise põhjus:") ?? ""
+          : ""
+    if (action === "REQUEST_CHANGES" && !note?.trim()) return
     setReviewing(`application-${applicationId}`)
     setError("")
     const response = await fetch(
@@ -273,6 +280,13 @@ export default function RegistrationsPage({
       await loadTeams()
     }
     setReviewing(null)
+  }
+
+  function canManuallyPlaceApplication() {
+    return (
+      overview?.registrationApprovalMode === "MANUAL" ||
+      overview?.registrationStatus !== "OPEN"
+    )
   }
 
   async function finalizeRegistrations() {
@@ -337,6 +351,12 @@ export default function RegistrationsPage({
                 <p className="font-semibold text-gray-900 mt-1">
                   {PHASE_LABEL[overview.registrationStatus]}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Kinnitamine:{" "}
+                  {overview.registrationApprovalMode === "AUTOMATIC"
+                    ? "automaatne"
+                    : "käsitsi"}
+                </p>
               </div>
               <Link
                 href={`/dashboard/competitions/${competitionId}/registration-settings`}
@@ -363,6 +383,12 @@ export default function RegistrationsPage({
             <p className="text-xs text-gray-500">Mandaat</p>
             <p className="font-semibold text-gray-900 mt-1">
               {PHASE_LABEL[overview.mandateStatus]}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Kinnitamine:{" "}
+              {overview.mandateApprovalMode === "AUTOMATIC"
+                ? "automaatne"
+                : "käsitsi"}
             </p>
           </section>
         </div>
@@ -520,30 +546,59 @@ export default function RegistrationsPage({
                   </details>
                 )}
               </div>
-              {application.status === "WAITLISTED" &&
-                overview?.registrationStatus !== "OPEN" &&
-                !overview?.registrationFinalizedAt && (
-                  <div className="flex gap-2">
+              {!overview?.registrationFinalizedAt &&
+                ["PENDING_REVIEW", "CONFIRMED", "WAITLISTED"].includes(
+                  application.status
+                ) && (
+                  <div className="flex flex-wrap gap-2">
+                    {canManuallyPlaceApplication() &&
+                      application.status !== "CONFIRMED" && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            decideApplication(application.id, "CONFIRM")
+                          }
+                          disabled={Boolean(reviewing)}
+                          className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
+                        >
+                          Kinnita
+                        </button>
+                      )}
+                    {canManuallyPlaceApplication() &&
+                      application.status !== "WAITLISTED" && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            decideApplication(application.id, "WAITLIST")
+                          }
+                          disabled={Boolean(reviewing)}
+                          className="px-3 py-2 border border-amber-300 text-amber-700 rounded-lg text-xs disabled:opacity-50"
+                        >
+                          Ootenimekirja
+                        </button>
+                      )}
                     <button
                       type="button"
                       onClick={() =>
-                        decideApplication(application.id, "CONFIRM")
+                        decideApplication(application.id, "REQUEST_CHANGES")
                       }
                       disabled={Boolean(reviewing)}
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
+                      className="px-3 py-2 border border-blue-200 text-blue-700 rounded-lg text-xs disabled:opacity-50"
                     >
-                      Võta vastu
+                      Saada täiendamisele
                     </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        decideApplication(application.id, "REJECT")
-                      }
-                      disabled={Boolean(reviewing)}
-                      className="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-xs disabled:opacity-50"
-                    >
-                      Lükka tagasi
-                    </button>
+                    {canManuallyPlaceApplication() && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          decideApplication(application.id, "REJECT")
+                        }
+                        disabled={Boolean(reviewing)}
+                        className="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-xs disabled:opacity-50"
+                      >
+                        Lükka tagasi
+                      </button>
+                    )}
                   </div>
                 )}
             </article>
@@ -602,18 +657,22 @@ export default function RegistrationsPage({
                     Märkus: {team.registrationReviewNote}
                   </p>
                 )}
-                {team.registrationStatus === "SUBMITTED" && (
+                {(["SUBMITTED", "APPROVED"] as WorkflowStatus[]).includes(
+                  team.registrationStatus
+                ) && (
                   <div className="flex gap-2 mt-4">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        review(team.id, "REGISTRATION", "APPROVE")
-                      }
-                      disabled={Boolean(reviewing)}
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
-                    >
-                      Kinnita
-                    </button>
+                    {team.registrationStatus === "SUBMITTED" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          review(team.id, "REGISTRATION", "APPROVE")
+                        }
+                        disabled={Boolean(reviewing)}
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
+                      >
+                        Kinnita
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() =>
@@ -676,16 +735,20 @@ export default function RegistrationsPage({
                     Märkus: {team.mandateReviewNote}
                   </p>
                 )}
-                {team.mandateStatus === "SUBMITTED" && (
+                {(["SUBMITTED", "APPROVED"] as WorkflowStatus[]).includes(
+                  team.mandateStatus
+                ) && (
                   <div className="flex gap-2 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => review(team.id, "MANDATE", "APPROVE")}
-                      disabled={Boolean(reviewing)}
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
-                    >
-                      Kinnita
-                    </button>
+                    {team.mandateStatus === "SUBMITTED" && (
+                      <button
+                        type="button"
+                        onClick={() => review(team.id, "MANDATE", "APPROVE")}
+                        disabled={Boolean(reviewing)}
+                        className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs disabled:opacity-50"
+                      >
+                        Kinnita
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() =>

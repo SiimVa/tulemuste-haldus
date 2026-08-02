@@ -97,10 +97,15 @@ export async function POST(
       : team.mandateStatus
   if (
     !isTeamWorkflowStatus(currentStatus) ||
-    !canReviewWorkflow(currentStatus)
+    !canReviewWorkflow(currentStatus, body.decision)
   ) {
     return NextResponse.json(
-      { error: "Läbi saab vaadata ainult esitatud etappi" },
+      {
+        error:
+          body.decision === "REQUEST_CHANGES"
+            ? "Parandamisele saab saata esitatud või kinnitatud etapi"
+            : "Kinnitada saab ainult esitatud etappi",
+      },
       { status: 409 }
     )
   }
@@ -141,6 +146,15 @@ export async function POST(
             registrationStatus: status,
             registrationReviewedAt: reviewedAt,
             registrationReviewNote: note || null,
+            ...(body.decision === "REQUEST_CHANGES" &&
+            team.mandateStatus !== "DRAFT"
+              ? {
+                  mandateStatus: "CHANGES_REQUESTED",
+                  mandateReviewedAt: reviewedAt,
+                  mandateReviewNote:
+                    "Registreerimise andmed vajavad täiendamist",
+                }
+              : {}),
           }
         : {
             mandateStatus: status,

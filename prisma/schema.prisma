@@ -159,10 +159,12 @@ model Competition {
   registrationFinalizedAt      DateTime?
   registrationCapacity         Int?
   registrationClassBalanceMode String    @default("OFF")
+  registrationApprovalMode     String    @default("AUTOMATIC")
   mandateOpensAt               DateTime?
   mandateClosesAt              DateTime?
   mandateOverride              String    @default("AUTO")
   mandateFinalizedAt           DateTime?
+  mandateApprovalMode          String    @default("MANUAL")
 
   // Võistkonna koosseisu nõuded mandaadis. teamMemberRoles on JSON massiiv:
   // [{"name":"Meedik","required":true}]

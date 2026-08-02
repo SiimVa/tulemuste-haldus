@@ -1,9 +1,16 @@
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
+import {
+  applicationStatusAfterSubmission,
+  isApprovalMode,
+} from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
-import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
+import {
+  recalculateRegistrationAllocation,
+  reindexWaitlistPositions,
+} from "@/lib/registrationAllocation.server"
 import {
   canEditRegistration,
   canWithdrawRegistration,
@@ -48,6 +55,7 @@ async function updateApplication(
               registrationOpensAt: true,
               registrationClosesAt: true,
               registrationFinalizedAt: true,
+              registrationApprovalMode: true,
               registrationClasses: {
                 where: { isActive: true },
                 orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -176,15 +184,25 @@ async function updateApplication(
         })
       }
 
+      const approvalMode = isApprovalMode(
+        application.competition.registrationApprovalMode
+      )
+        ? application.competition.registrationApprovalMode
+        : "AUTOMATIC"
+      const nextStatus = applicationStatusAfterSubmission(approvalMode)
       await tx.registrationApplication.update({
         where: { id: application.id },
         data: {
           teamName,
           classId,
+          status: nextStatus,
+          allocationReason: null,
+          waitlistPosition: null,
+          decidedAt: null,
           events: {
             create: {
               fromStatus: application.status,
-              toStatus: application.status,
+              toStatus: nextStatus,
               actorId: userId,
               note: `Muudetud väljad: ${Array.from(
                 new Set(changedFields)
@@ -194,14 +212,14 @@ async function updateApplication(
         },
       })
 
-      await recalculateRegistrationAllocation(
-        tx,
-        application.competitionId,
-        {
+      if (approvalMode === "AUTOMATIC") {
+        await recalculateRegistrationAllocation(tx, application.competitionId, {
           actorId: userId,
           eventNote: "Registreeringu muutmise järel arvutatud koht",
-        }
-      )
+        })
+      } else {
+        await reindexWaitlistPositions(tx, application.competitionId)
+      }
 
       return tx.registrationApplication.findUniqueOrThrow({
         where: { id: application.id },
@@ -224,6 +242,7 @@ async function withdrawApplication(applicationId: string, userId: string) {
               registrationOpensAt: true,
               registrationClosesAt: true,
               registrationFinalizedAt: true,
+              registrationApprovalMode: true,
             },
           },
         },
@@ -256,18 +275,28 @@ async function withdrawApplication(applicationId: string, userId: string) {
         },
       })
 
-      const allocation = await recalculateRegistrationAllocation(
-        tx,
-        application.competitionId,
-        {
-          actorId: userId,
-          eventNote: "Loobumise järel arvutatud koht",
-        }
+      const approvalMode = isApprovalMode(
+        application.competition.registrationApprovalMode
       )
-      const promotedId =
-        allocation.transitions.find(
-          ({ toStatus }) => toStatus === "CONFIRMED"
-        )?.id ?? null
+        ? application.competition.registrationApprovalMode
+        : "AUTOMATIC"
+      let promotedId: string | null = null
+      if (approvalMode === "AUTOMATIC") {
+        const allocation = await recalculateRegistrationAllocation(
+          tx,
+          application.competitionId,
+          {
+            actorId: userId,
+            eventNote: "Loobumise järel arvutatud koht",
+          }
+        )
+        promotedId =
+          allocation.transitions.find(
+            ({ toStatus }) => toStatus === "CONFIRMED"
+          )?.id ?? null
+      } else {
+        await reindexWaitlistPositions(tx, application.competitionId)
+      }
 
       return { application: updated, promotedId }
     },

@@ -64,7 +64,14 @@ export async function POST(
       const unresolved = await tx.registrationApplication.count({
         where: {
           competitionId,
-          status: { in: ["WAITLISTED", "PENDING_REVIEW", "DRAFT"] },
+          status: {
+            in: [
+              "WAITLISTED",
+              "PENDING_REVIEW",
+              "CHANGES_REQUESTED",
+              "DRAFT",
+            ],
+          },
         },
       })
       if (unresolved > 0) {

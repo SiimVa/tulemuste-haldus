@@ -137,6 +137,7 @@ export default async function DashboardPage() {
   const applicationStatusLabel: Record<string, string> = {
     DRAFT: "Mustand",
     PENDING_REVIEW: "Ootab ülevaatamist",
+    CHANGES_REQUESTED: "Vajab täiendamist",
     CONFIRMED: "Registreeritud",
     WAITLISTED: "Ootenimekirjas",
     REJECTED: "Tagasi lükatud",

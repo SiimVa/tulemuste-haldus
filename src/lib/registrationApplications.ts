@@ -1,6 +1,7 @@
 export const REGISTRATION_APPLICATION_STATUSES = [
   "DRAFT",
   "PENDING_REVIEW",
+  "CHANGES_REQUESTED",
   "CONFIRMED",
   "WAITLISTED",
   "REJECTED",
@@ -20,16 +21,25 @@ export function initialRegistrationStatus(
 
 export function canWithdrawRegistration(
   status: string
-): status is "CONFIRMED" | "WAITLISTED" | "PENDING_REVIEW" {
+): status is
+  | "CONFIRMED"
+  | "WAITLISTED"
+  | "PENDING_REVIEW"
+  | "CHANGES_REQUESTED" {
   return (
     status === "CONFIRMED" ||
     status === "WAITLISTED" ||
-    status === "PENDING_REVIEW"
+    status === "PENDING_REVIEW" ||
+    status === "CHANGES_REQUESTED"
   )
 }
 
 export function canEditRegistration(
   status: string
-): status is "CONFIRMED" | "WAITLISTED" | "PENDING_REVIEW" {
+): status is
+  | "CONFIRMED"
+  | "WAITLISTED"
+  | "PENDING_REVIEW"
+  | "CHANGES_REQUESTED" {
   return canWithdrawRegistration(status)
 }

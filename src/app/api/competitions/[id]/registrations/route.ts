@@ -40,10 +40,12 @@ export async function GET(
         registrationClosesAt: true,
         registrationFinalizedAt: true,
         registrationCapacity: true,
+        registrationApprovalMode: true,
         mandateOverride: true,
         mandateOpensAt: true,
         mandateClosesAt: true,
         mandateFinalizedAt: true,
+        mandateApprovalMode: true,
         registrationFormFields: {
           where: {
             isActive: true,
