@@ -26,6 +26,7 @@ type Application = {
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Mustand",
   PENDING_REVIEW: "Ootab ülevaatamist",
+  CHANGES_REQUESTED: "Vajab täiendamist",
   CONFIRMED: "Registreeritud",
   WAITLISTED: "Ootenimekirjas",
   REJECTED: "Tagasi lükatud",
@@ -36,6 +37,7 @@ const STATUS_COLOR: Record<string, string> = {
   CONFIRMED: "bg-green-100 text-green-700",
   WAITLISTED: "bg-amber-100 text-amber-800",
   PENDING_REVIEW: "bg-blue-100 text-blue-700",
+  CHANGES_REQUESTED: "bg-amber-100 text-amber-800",
   REJECTED: "bg-red-100 text-red-700",
   WITHDRAWN: "bg-gray-100 text-gray-600",
   DRAFT: "bg-gray-100 text-gray-700",
@@ -147,7 +149,9 @@ export function RegistrationPanel({
         setMessage(
           data.status === "WAITLISTED"
             ? "Võistkond lisati ootenimekirja."
-            : "Võistkond on registreeritud."
+            : data.status === "PENDING_REVIEW"
+              ? "Registreerimisavaldus saadeti korraldajale kinnitamiseks."
+              : "Võistkond on registreeritud."
         )
       }
       router.refresh()
@@ -214,9 +218,12 @@ export function RegistrationPanel({
                     {STATUS_LABEL[application.status] ?? application.status}
                   </span>
                   {registrationOpen &&
-                    ["CONFIRMED", "WAITLISTED", "PENDING_REVIEW"].includes(
-                      application.status
-                    ) && (
+                    [
+                      "CONFIRMED",
+                      "WAITLISTED",
+                      "PENDING_REVIEW",
+                      "CHANGES_REQUESTED",
+                    ].includes(application.status) && (
                       <>
                         <button
                           type="button"

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isApprovalMode } from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import {
@@ -382,10 +383,12 @@ export async function GET(
       registrationFinalizedAt: true,
       registrationCapacity: true,
       registrationClassBalanceMode: true,
+      registrationApprovalMode: true,
       mandateOpensAt: true,
       mandateClosesAt: true,
       mandateOverride: true,
       mandateFinalizedAt: true,
+      mandateApprovalMode: true,
       representativeRequired: true,
       captainRequired: true,
       teamMemberRoles: true,
@@ -454,6 +457,17 @@ export async function PATCH(
     ) {
       return NextResponse.json(
         { error: "Vigane käsitsi juhtimise valik" },
+        { status: 400 }
+      )
+    }
+    if (
+      (body.registrationApprovalMode !== undefined &&
+        !isApprovalMode(body.registrationApprovalMode)) ||
+      (body.mandateApprovalMode !== undefined &&
+        !isApprovalMode(body.mandateApprovalMode))
+    ) {
+      return NextResponse.json(
+        { error: "Vigane kinnitamise valik" },
         { status: 400 }
       )
     }
@@ -735,9 +749,13 @@ export async function PATCH(
           registrationOverride: body.registrationOverride,
           registrationCapacity,
           registrationClassBalanceMode: body.registrationClassBalanceMode,
+          registrationApprovalMode:
+            body.registrationApprovalMode ?? current.registrationApprovalMode,
           mandateOpensAt,
           mandateClosesAt,
           mandateOverride: body.mandateOverride,
+          mandateApprovalMode:
+            body.mandateApprovalMode ?? current.mandateApprovalMode,
           representativeRequired:
             body.representativeRequired === undefined
               ? current.representativeRequired
@@ -784,6 +802,24 @@ export async function PATCH(
           action: `OVERRIDE_${body.mandateOverride}`,
         })
       }
+      if (
+        body.registrationApprovalMode !== undefined &&
+        current.registrationApprovalMode !== body.registrationApprovalMode
+      ) {
+        events.push({
+          phase: "REGISTRATION",
+          action: `APPROVAL_${body.registrationApprovalMode}`,
+        })
+      }
+      if (
+        body.mandateApprovalMode !== undefined &&
+        current.mandateApprovalMode !== body.mandateApprovalMode
+      ) {
+        events.push({
+          phase: "MANDATE",
+          action: `APPROVAL_${body.mandateApprovalMode}`,
+        })
+      }
       if (events.length > 0) {
         await tx.competitionPhaseEvent.createMany({
           data: events.map((event) => ({
@@ -794,7 +830,10 @@ export async function PATCH(
         })
       }
 
-      if (getCompetitionRegistrationStatus(competition) === "OPEN") {
+      if (
+        competition.registrationApprovalMode === "AUTOMATIC" &&
+        getCompetitionRegistrationStatus(competition) === "OPEN"
+      ) {
         await recalculateRegistrationAllocation(tx, id, {
           actorId: actor.id,
           eventNote: "Jaotusreeglite muutmise järel arvutatud koht",

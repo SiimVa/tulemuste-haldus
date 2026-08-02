@@ -1,5 +1,9 @@
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
+import {
+  applicationStatusAfterSubmission,
+  isApprovalMode,
+} from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
@@ -36,6 +40,7 @@ async function createApplication(
           registrationClosesAt: true,
           registrationFinalizedAt: true,
           registrationCapacity: true,
+          registrationApprovalMode: true,
           registrationClasses: {
             where: { isActive: true },
             orderBy: [{ order: "asc" }, { name: "asc" }],
@@ -98,13 +103,17 @@ async function createApplication(
       }
 
       const now = new Date()
+      const approvalMode = isApprovalMode(competition.registrationApprovalMode)
+        ? competition.registrationApprovalMode
+        : "AUTOMATIC"
+      const initialStatus = applicationStatusAfterSubmission(approvalMode)
       const created = await tx.registrationApplication.create({
         data: {
           competitionId,
           submittedById,
           teamName,
           classId,
-          status: "WAITLISTED",
+          status: initialStatus,
           submittedAt: now,
           decidedAt: null,
           fieldValues: {
@@ -125,18 +134,23 @@ async function createApplication(
           },
           events: {
             create: {
-              toStatus: "WAITLISTED",
+              toStatus: initialStatus,
               actorId: submittedById,
-              note: "Saadetud automaatsesse kohtade jaotusse",
+              note:
+                approvalMode === "AUTOMATIC"
+                  ? "Saadetud automaatsesse kohtade jaotusse"
+                  : "Saadetud korraldajale kinnitamiseks",
             },
           },
         },
         select: { id: true },
       })
-      await recalculateRegistrationAllocation(tx, competitionId, {
-        actorId: submittedById,
-        eventNote: "Registreerimise järel arvutatud koht",
-      })
+      if (approvalMode === "AUTOMATIC") {
+        await recalculateRegistrationAllocation(tx, competitionId, {
+          actorId: submittedById,
+          eventNote: "Registreerimise järel arvutatud koht",
+        })
+      }
       return tx.registrationApplication.findUniqueOrThrow({
         where: { id: created.id },
         include: { class: { select: { id: true, name: true } } },

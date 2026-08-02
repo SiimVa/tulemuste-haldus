@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server"
+import {
+  isApprovalMode,
+  workflowStatusAfterSubmission,
+} from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
 import { canManageTeamRegistration } from "@/lib/competitionAccess"
 import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
@@ -43,10 +47,12 @@ export async function POST(
         select: {
           status: true,
           registrationFinalizedAt: true,
+          registrationApprovalMode: true,
           mandateOverride: true,
           mandateOpensAt: true,
           mandateClosesAt: true,
           mandateFinalizedAt: true,
+          mandateApprovalMode: true,
           representativeRequired: true,
           captainRequired: true,
           teamMemberRoles: true,
@@ -116,12 +122,20 @@ export async function POST(
       )
     }
 
+    const approvalMode = isApprovalMode(
+      team.competition.registrationApprovalMode
+    )
+      ? team.competition.registrationApprovalMode
+      : "AUTOMATIC"
+    const nextStatus = workflowStatusAfterSubmission(approvalMode)
+    const submittedAt = new Date()
     const updated = await prisma.team.update({
       where: { id: teamId },
       data: {
-        registrationStatus: "SUBMITTED",
-        registrationSubmittedAt: new Date(),
-        registrationReviewedAt: null,
+        registrationStatus: nextStatus,
+        registrationSubmittedAt: submittedAt,
+        registrationReviewedAt:
+          approvalMode === "AUTOMATIC" ? submittedAt : null,
         registrationReviewNote: null,
       },
       include: { members: true, competition: true },
@@ -194,12 +208,18 @@ export async function POST(
     return NextResponse.json({ error: compositionError }, { status: 409 })
   }
 
+  const approvalMode = isApprovalMode(team.competition.mandateApprovalMode)
+    ? team.competition.mandateApprovalMode
+    : "MANUAL"
+  const nextStatus = workflowStatusAfterSubmission(approvalMode)
+  const submittedAt = new Date()
   const updated = await prisma.team.update({
     where: { id: teamId },
     data: {
-      mandateStatus: "SUBMITTED",
-      mandateSubmittedAt: new Date(),
-      mandateReviewedAt: null,
+      mandateStatus: nextStatus,
+      mandateSubmittedAt: submittedAt,
+      mandateReviewedAt:
+        approvalMode === "AUTOMATIC" ? submittedAt : null,
       mandateReviewNote: null,
     },
     include: { members: true, competition: true },

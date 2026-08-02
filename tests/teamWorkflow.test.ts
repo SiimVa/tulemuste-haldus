@@ -31,9 +31,10 @@ test("mandaadi esitamiseks peab olema vähemalt üks võistleja", () => {
   assert.equal(canSubmitMandate("APPROVED", "DRAFT", 1), true)
 })
 
-test("korraldaja saab läbi vaadata ainult esitatud etappi", () => {
+test("korraldaja kinnitab esitatud etapi ja võib kinnitatud etapi tagasi saata", () => {
   assert.equal(canReviewWorkflow("SUBMITTED"), true)
   assert.equal(canReviewWorkflow("DRAFT"), false)
   assert.equal(canReviewWorkflow("APPROVED"), false)
+  assert.equal(canReviewWorkflow("APPROVED", "REQUEST_CHANGES"), true)
   assert.equal(canReviewWorkflow("CHANGES_REQUESTED"), false)
 })

@@ -58,6 +58,12 @@ export function canSubmitMandate(
   )
 }
 
-export function canReviewWorkflow(status: TeamWorkflowStatus) {
-  return status === "SUBMITTED"
+export function canReviewWorkflow(
+  status: TeamWorkflowStatus,
+  decision: TeamWorkflowDecision = "APPROVE"
+) {
+  return (
+    status === "SUBMITTED" ||
+    (decision === "REQUEST_CHANGES" && status === "APPROVED")
+  )
 }

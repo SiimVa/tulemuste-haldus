@@ -4,6 +4,7 @@ import Link from "next/link"
 import { use, useEffect, useState } from "react"
 import { AllocationRuleBuilder } from "@/components/registration/AllocationRuleBuilder"
 import { FormBuilder } from "@/components/registration/FormBuilder"
+import type { ApprovalMode } from "@/lib/approvalModes"
 import type {
   AllocationRuleDefinition,
   ClassBalanceMode,
@@ -24,11 +25,13 @@ type Settings = {
   registrationFinalizedAt: string | null
   registrationCapacity: number | ""
   registrationClassBalanceMode: ClassBalanceMode
+  registrationApprovalMode: ApprovalMode
   registrationStatus: PhaseStatus
   mandateOpensAt: string
   mandateClosesAt: string
   mandateOverride: PhaseOverride
   mandateFinalizedAt: string | null
+  mandateApprovalMode: ApprovalMode
   mandateStatus: PhaseStatus
   representativeRequired: boolean
   captainRequired: boolean
@@ -74,6 +77,7 @@ function phaseCard(
   const override = form[`${prefix}Override`] as PhaseOverride
   const opensAt = form[`${prefix}OpensAt`] as string
   const closesAt = form[`${prefix}ClosesAt`] as string
+  const approvalMode = form[`${prefix}ApprovalMode`] as ApprovalMode
 
   function update(key: string, value: string) {
     setForm((current) => current ? { ...current, [key]: value } : current)
@@ -107,6 +111,32 @@ function phaseCard(
           <option value="OPEN">Käsitsi avatud</option>
           <option value="CLOSED">Käsitsi suletud</option>
         </select>
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">
+          Kinnitamine
+        </label>
+        <select
+          aria-label={`${title} kinnitamine`}
+          value={approvalMode}
+          onChange={(event) =>
+            update(`${prefix}ApprovalMode`, event.target.value)
+          }
+          className="w-full px-3 py-2 border rounded-lg text-sm"
+        >
+          <option value="AUTOMATIC">Automaatne kinnitamine</option>
+          <option value="MANUAL">Käsitsi kinnitamine</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          {prefix === "registration"
+            ? approvalMode === "AUTOMATIC"
+              ? "Nõuetele vastav avaldus saab koha või ootenimekirja positsiooni automaatselt."
+              : "Iga avaldus ootab korraldaja kinnitamist või ootenimekirja määramist."
+            : approvalMode === "AUTOMATIC"
+              ? "Nõuetele vastav mandaat kinnitatakse kohe esitamisel."
+              : "Esitatud mandaat jääb korraldaja kinnitamist ootama."}
+        </p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
@@ -175,11 +205,14 @@ export default function RegistrationSettingsPage({
           registrationCapacity: data.registrationCapacity ?? "",
           registrationClassBalanceMode:
             data.registrationClassBalanceMode ?? "OFF",
+          registrationApprovalMode:
+            data.registrationApprovalMode ?? "AUTOMATIC",
           registrationAllocationRules:
             data.registrationAllocationRules ?? [],
           representativeRequired: Boolean(data.representativeRequired),
           captainRequired: Boolean(data.captainRequired),
           teamMemberRoles: data.teamMemberRoles ?? [],
+          mandateApprovalMode: data.mandateApprovalMode ?? "MANUAL",
         })
       })
       .catch((reason) =>
@@ -287,9 +320,11 @@ export default function RegistrationSettingsPage({
               ? null
               : Number(form.registrationCapacity),
           registrationClassBalanceMode: form.registrationClassBalanceMode,
+          registrationApprovalMode: form.registrationApprovalMode,
           mandateOpensAt: toIso(form.mandateOpensAt),
           mandateClosesAt: toIso(form.mandateClosesAt),
           mandateOverride: form.mandateOverride,
+          mandateApprovalMode: form.mandateApprovalMode,
           representativeRequired: form.representativeRequired,
           captainRequired: form.captainRequired,
           teamMemberRoles: form.teamMemberRoles,
@@ -312,11 +347,14 @@ export default function RegistrationSettingsPage({
         registrationCapacity: data.registrationCapacity ?? "",
         registrationClassBalanceMode:
           data.registrationClassBalanceMode ?? "OFF",
+        registrationApprovalMode:
+          data.registrationApprovalMode ?? "AUTOMATIC",
         registrationAllocationRules:
           data.registrationAllocationRules ?? [],
         representativeRequired: Boolean(data.representativeRequired),
         captainRequired: Boolean(data.captainRequired),
         teamMemberRoles: data.teamMemberRoles ?? [],
+        mandateApprovalMode: data.mandateApprovalMode ?? "MANUAL",
       })
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2500)

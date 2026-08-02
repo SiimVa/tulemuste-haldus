@@ -189,7 +189,11 @@ export default function RepresentativeTeamPage({
     if (!submitResponse.ok) {
       setError(submitData.error ?? "Registreerimise esitamine ebaõnnestus")
     } else {
-      setMessage("Registreerimine esitatud korraldajale")
+      setMessage(
+        submitData.registrationStatus === "APPROVED"
+          ? "Registreerimine kinnitati automaatselt"
+          : "Registreerimine esitatud korraldajale"
+      )
       await loadTeam()
     }
     setSaving(null)
@@ -266,7 +270,11 @@ export default function RepresentativeTeamPage({
     if (!submitResponse.ok) {
       setError(submitData.error ?? "Mandaadi esitamine ebaõnnestus")
     } else {
-      setMessage("Mandaat esitatud korraldajale")
+      setMessage(
+        submitData.mandateStatus === "APPROVED"
+          ? "Mandaat kinnitati automaatselt"
+          : "Mandaat esitatud korraldajale"
+      )
       await loadTeam()
     }
     setSaving(null)

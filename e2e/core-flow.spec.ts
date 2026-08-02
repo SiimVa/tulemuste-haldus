@@ -62,6 +62,15 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(competitionId).not.toBe("")
     await page.waitForURL(`/dashboard/competitions/${competitionId}`)
 
+    await page.goto(
+      `/dashboard/competitions/${competitionId}/registration-settings`
+    )
+    await page
+      .getByLabel("Registreerimine kinnitamine")
+      .selectOption("MANUAL")
+    await page.getByRole("button", { name: "Salvesta seaded" }).click()
+    await expect(page.getByText("Salvestatud", { exact: true })).toBeVisible()
+
     await page.goto(`/dashboard/competitions/${competitionId}/teams`)
     await page.getByRole("button", { name: "+ Lisa võistkond" }).click()
     await page.getByPlaceholder("Uulukad").fill("Testvõistkond")
@@ -366,6 +375,106 @@ test.describe.serial("võistluse põhivoog", () => {
     await adminContext.close()
   })
 
+  test("käsitsi kinnitatav registreering ootab korraldaja otsust", async ({
+    browser,
+  }) => {
+    const adminContext = await browser.newContext()
+    const adminPage = await adminContext.newPage()
+    await login(adminPage, admin.email, admin.password)
+
+    const competitionResponse = await adminPage.request.post(
+      "/api/competitions",
+      { data: { name: "Käsitsi kinnitamise test" } }
+    )
+    expect(competitionResponse.status(), await competitionResponse.text()).toBe(
+      200
+    )
+    const manualCompetitionId = (await competitionResponse.json()).id
+    const defaultsResponse = await adminPage.request.get(
+      `/api/competitions/${manualCompetitionId}/registration-settings`
+    )
+    expect(defaultsResponse.status()).toBe(200)
+    const defaults = await defaultsResponse.json()
+    const settingsResponse = await adminPage.request.patch(
+      `/api/competitions/${manualCompetitionId}/registration-settings`,
+      {
+        data: {
+          isPublic: true,
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "OPEN",
+          registrationCapacity: null,
+          registrationClassBalanceMode: "OFF",
+          registrationApprovalMode: "MANUAL",
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "AUTO",
+          mandateApprovalMode: "MANUAL",
+          classes: defaults.registrationClasses,
+          formFields: defaults.registrationFormFields,
+          allocationRules: defaults.registrationAllocationRules,
+        },
+      }
+    )
+    expect(settingsResponse.status(), await settingsResponse.text()).toBe(200)
+
+    const representativeContext = await browser.newContext()
+    const page = await representativeContext.newPage()
+    await login(page, representative.email, representative.password)
+    const applicationResponse = await page.request.post(
+      `/api/public/competitions/${manualCompetitionId}/registrations`,
+      {
+        data: {
+          teamName: "Käsitsi kinnitatav võistkond",
+          classId: null,
+          answers: {},
+        },
+      }
+    )
+    expect(applicationResponse.status(), await applicationResponse.text()).toBe(
+      200
+    )
+    const application = await applicationResponse.json()
+    expect(application.status).toBe("PENDING_REVIEW")
+
+    const confirmResponse = await adminPage.request.patch(
+      `/api/competitions/${manualCompetitionId}/registration-applications/${application.id}`,
+      { data: { action: "CONFIRM", note: "" } }
+    )
+    expect(confirmResponse.status(), await confirmResponse.text()).toBe(200)
+    expect((await confirmResponse.json()).status).toBe("CONFIRMED")
+
+    const changesResponse = await adminPage.request.patch(
+      `/api/competitions/${manualCompetitionId}/registration-applications/${application.id}`,
+      {
+        data: {
+          action: "REQUEST_CHANGES",
+          note: "Täpsusta võistkonna nime",
+        },
+      }
+    )
+    expect(changesResponse.status(), await changesResponse.text()).toBe(200)
+    const changes = await changesResponse.json()
+    expect(changes.status).toBe("CHANGES_REQUESTED")
+    expect(changes.allocationReason).toBe("Täpsusta võistkonna nime")
+
+    const resubmitResponse = await page.request.patch(
+      `/api/registration-applications/${application.id}`,
+      {
+        data: {
+          teamName: "Täpsustatud võistkonna nimi",
+          classId: null,
+          answers: {},
+        },
+      }
+    )
+    expect(resubmitResponse.status(), await resubmitResponse.text()).toBe(200)
+    expect((await resubmitResponse.json()).status).toBe("PENDING_REVIEW")
+
+    await representativeContext.close()
+    await adminContext.close()
+  })
+
   test("avalik registreerimine kinnitab koha või lisab ootenimekirja", async ({
     browser,
   }) => {
@@ -470,9 +579,11 @@ test.describe.serial("võistluse põhivoog", () => {
           registrationOverride: "OPEN",
           registrationCapacity: 2,
           registrationClassBalanceMode: "OFF",
+          registrationApprovalMode: "AUTOMATIC",
           mandateOpensAt: null,
           mandateClosesAt: null,
           mandateOverride: "AUTO",
+          mandateApprovalMode: "AUTOMATIC",
           representativeRequired: true,
           captainRequired: true,
           teamMemberRoles: [
@@ -772,7 +883,32 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.getByLabel("Liige 1 roll").selectOption("Meedik")
     await page.getByRole("button", { name: "Esita mandaat" }).click()
     await expect(
-      page.getByText("Mandaat esitatud korraldajale")
+      page.getByText("Mandaat kinnitati automaatselt")
+    ).toBeVisible()
+    const automaticMandateResponse = await page.request.get(
+      `/api/representative/teams/${assignment.team.id}`
+    )
+    expect(automaticMandateResponse.status()).toBe(200)
+    expect((await automaticMandateResponse.json()).mandateStatus).toBe(
+      "APPROVED"
+    )
+
+    await adminPage.goto(
+      `/dashboard/competitions/${competitionId}/registrations`
+    )
+    const automaticTeamCard = adminPage
+      .locator("article")
+      .filter({ hasText: "Avalik testvõistkond 3" })
+      .last()
+    adminPage.once("dialog", (dialog) =>
+      dialog.accept("Täpsusta mandaadi andmeid")
+    )
+    await automaticTeamCard
+      .getByRole("button", { name: "Saada parandamisele" })
+      .last()
+      .click()
+    await expect(
+      automaticTeamCard.getByText("Vajab parandamist", { exact: true })
     ).toBeVisible()
     await expect(page.getByText("Kontoga seotud liikmed")).toHaveCount(0)
 
