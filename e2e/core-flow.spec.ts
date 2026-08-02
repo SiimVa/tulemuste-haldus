@@ -526,6 +526,12 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       adminPage.locator('input[value="Iga maakonna üks kiireim"]')
     ).toBeVisible()
+    await adminPage.getByRole("button", { name: "+ Lisa roll" }).click()
+    const newRoleInput = adminPage.getByLabel("Liikmeroll 3")
+    await newRoleInput.press("A")
+    await expect(newRoleInput).toBeFocused()
+    await newRoleInput.pressSequentially("utojuht")
+    await expect(newRoleInput).toHaveValue("Autojuht")
 
     const representativeContext = await browser.newContext()
     const page = await representativeContext.newPage()
@@ -613,10 +619,36 @@ test.describe.serial("võistluse põhivoog", () => {
       .locator("article")
       .filter({ hasText: "Avalik testvõistkond 2" })
     await organizerSecondApplication
+      .getByRole("button", { name: "Muuda osalejaid" })
+      .click()
+    await organizerSecondApplication
+      .getByRole("button", { name: "+ Lisa liige" })
+      .click()
+    await organizerSecondApplication
+      .getByLabel("Liige 1 nimi")
+      .fill("Korraldaja lisatud liige")
+    await organizerSecondApplication
+      .getByLabel("Liige 1 e-post")
+      .fill("korraldaja.lisatud@example.com")
+    await organizerSecondApplication
+      .getByRole("button", { name: "Salvesta osalejad" })
+      .click()
+    await expect(
+      adminPage.getByText("Osalejate andmed salvestatud")
+    ).toBeVisible()
+    await expect(
+      organizerSecondApplication.getByText(/Korraldaja lisatud liige/)
+    ).toBeVisible()
+    await organizerSecondApplication
       .getByText(/Muudatuste ajalugu/)
       .click()
     await expect(
       organizerSecondApplication.getByText("Muudetud väljad: Maakond")
+    ).toBeVisible()
+    await expect(
+      organizerSecondApplication.getByText(
+        "Korraldaja muutis osalejaid: Võistkonna liikmed"
+      )
     ).toBeVisible()
 
     const applicationsResponse = await adminPage.request.get(

@@ -2,6 +2,14 @@
 
 import Link from "next/link"
 import { use, useCallback, useEffect, useState } from "react"
+import { DynamicFormFields } from "@/components/registration/DynamicFormFields"
+import {
+  isFormFieldVisible,
+  validateFormAnswers,
+  type FormAnswer,
+  type FormAnswers,
+  type FormFieldDefinition,
+} from "@/lib/registrationForm"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -43,6 +51,7 @@ type RegistrationApplication = {
   class: { id: string; name: string } | null
   submittedBy: { id: string; name: string; email: string }
   team: { id: string; code: string } | null
+  answers: FormAnswers
   details: { fieldId: string; label: string; value: string }[]
   events: {
     id: string
@@ -107,11 +116,20 @@ export default function RegistrationsPage({
   const { id: competitionId } = use(params)
   const [teams, setTeams] = useState<RegistrationTeam[]>([])
   const [applications, setApplications] = useState<RegistrationApplication[]>([])
+  const [memberFormFields, setMemberFormFields] = useState<
+    FormFieldDefinition[]
+  >([])
   const [overview, setOverview] = useState<RegistrationOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [message, setMessage] = useState("")
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [finalizing, setFinalizing] = useState(false)
+  const [editingApplicationId, setEditingApplicationId] = useState<
+    string | null
+  >(null)
+  const [editingAnswers, setEditingAnswers] = useState<FormAnswers>({})
+  const [editingErrors, setEditingErrors] = useState<Record<string, string>>({})
 
   const loadTeams = useCallback(async () => {
     const response = await fetch(
@@ -125,9 +143,76 @@ export default function RegistrationsPage({
     }
     setTeams(data.legacyTeams ?? [])
     setApplications(data.applications ?? [])
+    setMemberFormFields(data.memberFormFields ?? [])
     setOverview(data.competition ?? null)
     setLoading(false)
   }, [competitionId])
+
+  function startEditingMembers(application: RegistrationApplication) {
+    setEditingApplicationId(application.id)
+    setEditingAnswers(application.answers ?? {})
+    setEditingErrors({})
+    setError("")
+    setMessage("")
+  }
+
+  function updateEditingAnswer(key: string, value: FormAnswer) {
+    setEditingAnswers((current) => ({ ...current, [key]: value }))
+    setEditingErrors((current) => {
+      if (!current[key]) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }
+
+  async function saveApplicationMembers(applicationId: string) {
+    const validated = validateFormAnswers(
+      memberFormFields,
+      editingAnswers,
+      "REGISTRATION"
+    )
+    setEditingErrors(validated.errors)
+    if (Object.keys(validated.errors).length > 0) {
+      setError("Kontrolli osalejate kohustuslikke ja vigaseid välju")
+      return
+    }
+
+    setReviewing(`application-members-${applicationId}`)
+    setError("")
+    setMessage("")
+    const response = await fetch(
+      `/api/competitions/${competitionId}/registration-applications/${applicationId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_MEMBERS",
+          answers: validated.answers,
+        }),
+      }
+    )
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(data.error ?? "Osalejate salvestamine ebaõnnestus")
+    } else {
+      setEditingApplicationId(null)
+      setEditingAnswers({})
+      setMessage("Osalejate andmed salvestatud")
+      await loadTeams()
+    }
+    setReviewing(null)
+  }
+
+  function canEditApplicationMembers(application: RegistrationApplication) {
+    return (
+      !overview?.registrationFinalizedAt &&
+      !["WITHDRAWN", "REJECTED"].includes(application.status) &&
+      memberFormFields.some((field) =>
+        isFormFieldVisible(field, application.answers)
+      )
+    )
+  }
 
   useEffect(() => {
     void loadTeams()
@@ -235,6 +320,11 @@ export default function RegistrationsPage({
       {error && (
         <p className="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 text-sm">
           {error}
+        </p>
+      )}
+      {message && (
+        <p className="mb-4 px-4 py-3 rounded-lg bg-green-50 text-green-700 text-sm">
+          {message}
         </p>
       )}
 
@@ -346,6 +436,52 @@ export default function RegistrationsPage({
                       </div>
                     ))}
                   </dl>
+                )}
+                {editingApplicationId === application.id ? (
+                  <div className="mt-4 border-t pt-4 space-y-4">
+                    <h4 className="text-sm font-semibold text-gray-800">
+                      Muuda osalejaid
+                    </h4>
+                    <DynamicFormFields
+                      fields={memberFormFields}
+                      phase="REGISTRATION"
+                      values={editingAnswers}
+                      onChange={updateEditingAnswer}
+                      errors={editingErrors}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveApplicationMembers(application.id)}
+                        disabled={Boolean(reviewing)}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs disabled:opacity-50"
+                      >
+                        Salvesta osalejad
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingApplicationId(null)
+                          setEditingAnswers({})
+                          setEditingErrors({})
+                        }}
+                        disabled={Boolean(reviewing)}
+                        className="px-3 py-2 border rounded-lg text-xs disabled:opacity-50"
+                      >
+                        Tühista
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  canEditApplicationMembers(application) && (
+                    <button
+                      type="button"
+                      onClick={() => startEditingMembers(application)}
+                      className="mt-4 text-xs text-blue-600 hover:underline"
+                    >
+                      Muuda osalejaid
+                    </button>
+                  )
                 )}
                 {application.events.length > 0 && (
                   <details className="mt-4 border-t pt-3">

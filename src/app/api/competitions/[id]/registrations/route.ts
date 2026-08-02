@@ -44,6 +44,33 @@ export async function GET(
         mandateOpensAt: true,
         mandateClosesAt: true,
         mandateFinalizedAt: true,
+        registrationFormFields: {
+          where: {
+            isActive: true,
+            showInRegistration: true,
+            type: "MEMBER_LIST",
+          },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            key: true,
+            label: true,
+            helpText: true,
+            type: true,
+            semanticKey: true,
+            options: true,
+            memberFields: true,
+            showInRegistration: true,
+            requiredInRegistration: true,
+            showInMandate: true,
+            requiredInMandate: true,
+            editableInMandate: true,
+            conditionFieldKey: true,
+            conditionOperator: true,
+            conditionValue: true,
+            order: true,
+          },
+        },
       },
     }),
     prisma.team.findMany({
@@ -148,28 +175,37 @@ export async function GET(
     return NextResponse.json({ error: "Võistlust ei leitud" }, { status: 404 })
   }
 
+  const { registrationFormFields, ...competitionData } = competition
+
   return NextResponse.json({
     competition: {
-      ...competition,
+      ...competitionData,
       registrationStatus: getCompetitionRegistrationStatus(competition),
       mandateStatus: getCompetitionMandateStatus(competition),
     },
-    applications: applications.map(({ fieldValues, ...application }) => ({
-      ...application,
-      details: fieldValues
-        .sort((a, b) => a.field.order - b.field.order)
-        .map(({ field, value }) => {
+    memberFormFields: registrationFormFields.map(toFormFieldDefinition),
+    applications: applications.map(({ fieldValues, ...application }) => {
+      const sortedValues = fieldValues.sort(
+        (a, b) => a.field.order - b.field.order
+      )
+      return {
+        ...application,
+        answers: Object.fromEntries(
+          sortedValues.flatMap(({ field, value }) => {
+            const answer = parseFormAnswer(value)
+            return answer === undefined ? [] : [[field.key, answer]]
+          })
+        ),
+        details: sortedValues.map(({ field, value }) => {
           const definition = toFormFieldDefinition(field)
           return {
             fieldId: field.id,
             label: field.label,
-            value: formatFormAnswer(
-              definition,
-              parseFormAnswer(value)
-            ),
+            value: formatFormAnswer(definition, parseFormAnswer(value)),
           }
         }),
-    })),
+      }
+    }),
     legacyTeams: teams.map(({ formValues, ...team }) => ({
       ...team,
       details: formValues
