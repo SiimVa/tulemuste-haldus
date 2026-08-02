@@ -76,6 +76,24 @@ test.describe.serial("võistluse põhivoog", () => {
     teamId = competition.teams.find((team: { name: string }) => team.name === "Testvõistkond")?.id ?? ""
     expect(teamId).not.toBe("")
 
+    await page.getByRole("button", { name: "Muuda" }).click()
+    await page.getByRole("button", { name: "+ Lisa liige" }).click()
+    await page.getByPlaceholder("Liikme nimi").fill("Hiljem lisatud liige")
+    await page.getByRole("button", { name: "Salvesta", exact: true }).click()
+    await expect(page.getByText("1 liiget", { exact: true })).toBeVisible()
+
+    const updatedCompetitionResponse = await page.request.get(
+      `/api/competitions/${competitionId}`
+    )
+    const updatedCompetition = await updatedCompetitionResponse.json()
+    expect(
+      updatedCompetition.teams.find(
+        (team: { id: string }) => team.id === teamId
+      )?.members
+    ).toEqual([
+      expect.objectContaining({ name: "Hiljem lisatud liige" }),
+    ])
+
     const elementResponse = await page.request.post(
       `/api/competitions/${competitionId}/elements`,
       {
@@ -196,7 +214,7 @@ test.describe.serial("võistluse põhivoog", () => {
           name: "Teine testvõistkond",
           code: "VK 2",
           class: "P",
-          members: [],
+          members: [{ name: "Käsitsi lisatud liige" }],
         },
       }
     )
@@ -478,6 +496,11 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.getByLabel("Maakond").selectOption("Harjumaa")
     await page.getByLabel("Võistkonna liik").selectOption("Noored Kotkad")
     await page.getByLabel("Rühma nimi").fill("Harju rühm")
+    await page.getByRole("button", { name: "+ Lisa liige" }).click()
+    await page.getByLabel("Liige 1 nimi").fill("Registreerimisel lisatud liige")
+    await page
+      .getByLabel("Liige 1 e-post")
+      .fill("registreerimise.liige@example.com")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
     await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
     await expect(page.getByText("Registreeritud", { exact: true })).toBeVisible()

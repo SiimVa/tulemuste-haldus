@@ -136,7 +136,6 @@ export async function POST(
             },
             members: {
               create: resolvedMembers.map((member) => ({
-                competitionId,
                 name: member.name,
                 role: member.role,
                 email: member.email,

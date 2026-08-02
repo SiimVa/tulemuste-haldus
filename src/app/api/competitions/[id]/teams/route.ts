@@ -23,7 +23,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       members: members
         ? {
             create: members.map((m: { name: string; role?: string }) => ({
-              competitionId,
               name: m.name,
               role: m.role ?? "COMPETITOR",
             })),
