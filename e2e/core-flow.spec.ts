@@ -51,6 +51,8 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.goto("/dashboard/competitions/new")
     await page.getByPlaceholder("nt. Roheline matk 2026").fill("E2E proovivõistlus")
     await page.getByPlaceholder("nt. Kõrvemaa matkarajad").fill("Kõrvemaa")
+    await page.locator('input[type="date"]').nth(0).fill("2020-01-01")
+    await page.locator('input[type="date"]').nth(1).fill("2020-01-02")
     const createCompetitionResponse = page.waitForResponse(
       (response) =>
         response.url().endsWith("/api/competitions") &&
@@ -584,6 +586,7 @@ test.describe.serial("võistluse põhivoog", () => {
           mandateClosesAt: null,
           mandateOverride: "AUTO",
           mandateApprovalMode: "AUTOMATIC",
+          personalDataRetentionDays: 1,
           representativeRequired: true,
           captainRequired: true,
           teamMemberRoles: [
@@ -1033,6 +1036,64 @@ test.describe.serial("võistluse põhivoog", () => {
     const pageResponse = await page.goto(`/dashboard/competitions/${competitionId}`)
     expect(pageResponse?.status()).toBe(404)
 
+    await context.close()
+  })
+
+  test("säilitustähtaja saabumisel eemaldatakse kontakt- ja sünniandmed", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext()
+    const page = await context.newPage()
+    await login(page, admin.email, admin.password)
+
+    await page.goto(
+      `/dashboard/competitions/${competitionId}/registration-settings`
+    )
+    await expect(
+      page.getByRole("heading", { name: "Isikuandmete säilitamine" })
+    ).toBeVisible()
+    page.once("dialog", (dialog) => dialog.accept())
+    await page
+      .getByRole("button", { name: "Kustuta aegunud isikuandmed" })
+      .click()
+    await expect(page.getByText(/Isikuandmed kustutati/)).toBeVisible()
+
+    const registrationsResponse = await page.request.get(
+      `/api/competitions/${competitionId}/registrations`
+    )
+    expect(
+      registrationsResponse.status(),
+      await registrationsResponse.text()
+    ).toBe(200)
+    const registrations = await registrationsResponse.json()
+    for (const application of registrations.applications) {
+      expect(application.answers.contact_email).toBeUndefined()
+      for (const member of application.answers.members ?? []) {
+        expect(member.email).toBeUndefined()
+        expect(member.phone).toBeUndefined()
+        expect(member.birthDate).toBeUndefined()
+        expect(member.name).toBeTruthy()
+      }
+    }
+    for (const team of registrations.legacyTeams) {
+      const members = team.details.find(
+        (detail: { label: string }) => detail.label === "Võistkonna liikmed"
+      )
+      if (members) {
+        expect(members.value).not.toContain("@")
+        expect(members.value).not.toMatch(/\d{4}-\d{2}-\d{2}/)
+      }
+    }
+
+    const competitionResponse = await page.request.get(
+      `/api/competitions/${competitionId}`
+    )
+    const competition = await competitionResponse.json()
+    for (const team of competition.teams) {
+      for (const member of team.members) {
+        expect(member.email).toBeNull()
+      }
+    }
     await context.close()
   })
 })

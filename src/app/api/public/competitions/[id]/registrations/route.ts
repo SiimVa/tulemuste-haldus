@@ -66,6 +66,7 @@ async function createApplication(
               conditionFieldKey: true,
               conditionOperator: true,
               conditionValue: true,
+              purgeAfterCompetition: true,
               order: true,
             },
           },

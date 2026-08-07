@@ -5,6 +5,7 @@ import {
   type FormFieldType,
   type FormSemanticKey,
   MEMBER_FIELD_TYPES,
+  requiresPersonalDataPurge,
 } from "@/lib/registrationForm"
 
 const TYPE_LABEL: Record<FormFieldType, string> = {
@@ -48,6 +49,7 @@ function newField(order: number): FormFieldDefinition {
     conditionFieldKey: null,
     conditionOperator: null,
     conditionValue: null,
+    purgeAfterCompetition: false,
     order,
   }
 }
@@ -171,6 +173,12 @@ export function FormBuilder({
                     value={field.type}
                     onChange={(event) => {
                       const type = event.target.value as FormFieldType
+                      const memberFields =
+                        type === "MEMBER_LIST"
+                          ? Array.from(
+                              new Set(["name" as const, ...field.memberFields])
+                            )
+                          : ["name" as const]
                       update(index, {
                         type,
                         semanticKey:
@@ -180,12 +188,12 @@ export function FormBuilder({
                           field.options.length === 0
                             ? ["Valik 1"]
                             : field.options,
-                        memberFields:
+                        memberFields,
+                        purgeAfterCompetition:
                           type === "MEMBER_LIST"
-                            ? Array.from(
-                                new Set(["name" as const, ...field.memberFields])
-                              )
-                            : ["name"],
+                            ? requiresPersonalDataPurge({ type, memberFields })
+                            : field.purgeAfterCompetition ||
+                              requiresPersonalDataPurge({ type, memberFields }),
                       })
                     }}
                     className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
@@ -300,15 +308,22 @@ export function FormBuilder({
                           type="checkbox"
                           checked={field.memberFields.includes(memberField)}
                           disabled={memberField === "name"}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const memberFields = event.target.checked
+                              ? [...field.memberFields, memberField]
+                              : field.memberFields.filter(
+                                  (item) => item !== memberField
+                                )
                             update(index, {
-                              memberFields: event.target.checked
-                                ? [...field.memberFields, memberField]
-                                : field.memberFields.filter(
-                                    (item) => item !== memberField
-                                  ),
+                              memberFields,
+                              purgeAfterCompetition:
+                                field.purgeAfterCompetition ||
+                                requiresPersonalDataPurge({
+                                  type: field.type,
+                                  memberFields,
+                                }),
                             })
-                          }
+                          }}
                         />
                         {MEMBER_FIELD_LABEL[memberField]}
                       </label>
@@ -316,6 +331,40 @@ export function FormBuilder({
                   </div>
                 </div>
               )}
+
+              <label className="flex items-start gap-3 border-t pt-4">
+                <input
+                  type="checkbox"
+                  checked={
+                    field.type === "MEMBER_LIST"
+                      ? requiresPersonalDataPurge(field)
+                      : field.purgeAfterCompetition ||
+                        requiresPersonalDataPurge(field)
+                  }
+                  disabled={
+                    field.type === "MEMBER_LIST" ||
+                    requiresPersonalDataPurge(field)
+                  }
+                  onChange={(event) =>
+                    update(index, {
+                      purgeAfterCompetition: event.target.checked,
+                    })
+                  }
+                  className="mt-0.5 accent-blue-600"
+                />
+                <span>
+                  <span className="block text-sm text-gray-700">
+                    Kustuta isikuandmed säilitustähtaja järel
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    {field.type === "MEMBER_LIST"
+                      ? "Liikmete e-post, telefon ja sünniaeg eemaldatakse; nimi ja roll säilivad tulemuste ajaloos."
+                      : requiresPersonalDataPurge(field)
+                        ? "Selle väljatüübi väärtused eemaldatakse alati automaatselt."
+                        : "Märgi see valik, kui vabatekst või kuupäev sisaldab isikuandmeid."}
+                  </span>
+                </span>
+              </label>
 
               <div className="grid md:grid-cols-2 gap-4 border-t pt-4">
                 <PhaseOptions

@@ -166,6 +166,11 @@ model Competition {
   mandateFinalizedAt           DateTime?
   mandateApprovalMode          String    @default("MANUAL")
 
+  // Registreerimise ja mandaadi kontakt- ning sünniandmete säilitamine.
+  // Tähtaeg algab võistluse endDate väärtusest ja võib olla kuni 90 päeva.
+  personalDataRetentionDays Int       @default(90)
+  personalDataPurgedAt      DateTime?
+
   // Võistkonna koosseisu nõuded mandaadis. teamMemberRoles on JSON massiiv:
   // [{"name":"Meedik","required":true}]
   representativeRequired Boolean @default(false)
@@ -255,6 +260,7 @@ model CompetitionFormField {
   conditionFieldKey      String?
   conditionOperator      String?
   conditionValue         String?
+  purgeAfterCompetition  Boolean     @default(false)
   order                  Int         @default(0)
   isActive               Boolean     @default(true)
   createdAt              DateTime    @default(now())

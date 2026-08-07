@@ -18,6 +18,7 @@ type CompetitionClass = { id?: string; name: string; order: number }
 
 type Settings = {
   name: string
+  endDate: string | null
   isPublic: boolean
   registrationOpensAt: string
   registrationClosesAt: string
@@ -33,6 +34,10 @@ type Settings = {
   mandateFinalizedAt: string | null
   mandateApprovalMode: ApprovalMode
   mandateStatus: PhaseStatus
+  personalDataRetentionDays: number
+  personalDataPurgedAt: string | null
+  personalDataPurgeDueAt: string | null
+  personalDataPurgeDue: boolean
   representativeRequired: boolean
   captainRequired: boolean
   teamMemberRoles: TeamMemberRoleDefinition[]
@@ -189,6 +194,7 @@ export default function RegistrationSettingsPage({
   const [form, setForm] = useState<Settings | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [purging, setPurging] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -213,6 +219,11 @@ export default function RegistrationSettingsPage({
           captainRequired: Boolean(data.captainRequired),
           teamMemberRoles: data.teamMemberRoles ?? [],
           mandateApprovalMode: data.mandateApprovalMode ?? "MANUAL",
+          personalDataRetentionDays:
+            data.personalDataRetentionDays ?? 90,
+          personalDataPurgedAt: data.personalDataPurgedAt ?? null,
+          personalDataPurgeDueAt: data.personalDataPurgeDueAt ?? null,
+          personalDataPurgeDue: Boolean(data.personalDataPurgeDue),
         })
       })
       .catch((reason) =>
@@ -325,6 +336,7 @@ export default function RegistrationSettingsPage({
           mandateClosesAt: toIso(form.mandateClosesAt),
           mandateOverride: form.mandateOverride,
           mandateApprovalMode: form.mandateApprovalMode,
+          personalDataRetentionDays: form.personalDataRetentionDays,
           representativeRequired: form.representativeRequired,
           captainRequired: form.captainRequired,
           teamMemberRoles: form.teamMemberRoles,
@@ -355,11 +367,42 @@ export default function RegistrationSettingsPage({
         captainRequired: Boolean(data.captainRequired),
         teamMemberRoles: data.teamMemberRoles ?? [],
         mandateApprovalMode: data.mandateApprovalMode ?? "MANUAL",
+        personalDataRetentionDays: data.personalDataRetentionDays ?? 90,
+        personalDataPurgedAt: data.personalDataPurgedAt ?? null,
+        personalDataPurgeDueAt: data.personalDataPurgeDueAt ?? null,
+        personalDataPurgeDue: Boolean(data.personalDataPurgeDue),
       })
       setSaved(true)
       window.setTimeout(() => setSaved(false), 2500)
     }
     setSaving(false)
+  }
+
+  async function purgePersonalData() {
+    if (!form || purging) return
+    const confirmed = window.confirm(
+      "Kontakt- ja sünniandmed eemaldatakse jäädavalt. Seda toimingut ei saa tagasi võtta. Kas jätkad?"
+    )
+    if (!confirmed) return
+    setPurging(true)
+    setError("")
+    const response = await fetch(
+      `/api/competitions/${competitionId}/personal-data/purge`,
+      { method: "POST" }
+    )
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(data.error ?? "Isikuandmete kustutamine ebaõnnestus")
+    } else {
+      setForm({
+        ...form,
+        personalDataPurgedAt: data.purgedAt,
+        personalDataPurgeDue: false,
+      })
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2500)
+    }
+    setPurging(false)
   }
 
   if (!form && !error) {
@@ -484,6 +527,75 @@ export default function RegistrationSettingsPage({
               setForm({ ...form, registrationFormFields })
             }
           />
+
+          <section className="bg-white border rounded-xl p-5 space-y-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">
+                Isikuandmete säilitamine
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Kontaktandmed ja sünniajad kustutatakse pärast võistluse
+                lõppu. Võistkonna nimi, liikmete nimed, rollid ja tulemused
+                säilivad võistluse ajaloos.
+              </p>
+            </div>
+            <label className="text-xs text-gray-600 block">
+              Säilitustähtaeg pärast võistluse lõppu (päeva)
+              <input
+                type="number"
+                min={1}
+                max={90}
+                step={1}
+                value={form.personalDataRetentionDays}
+                disabled={Boolean(form.personalDataPurgedAt)}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    personalDataRetentionDays: Number(event.target.value),
+                  })
+                }
+                className="mt-1 w-full sm:w-56 px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
+              />
+              <span className="block text-xs text-gray-400 mt-1">
+                Maksimaalne tähtaeg on 90 päeva. Tähtaega arvestatakse
+                võistluse lõppkuupäevast.
+              </span>
+            </label>
+
+            {!form.endDate && (
+              <p className="text-xs rounded-lg bg-amber-50 text-amber-800 px-3 py-2">
+                Automaatseks kustutamiseks määra esmalt võistluse seadetes
+                lõppkuupäev.
+              </p>
+            )}
+            {form.personalDataPurgedAt ? (
+              <p className="text-xs rounded-lg bg-green-50 text-green-700 px-3 py-2">
+                Isikuandmed kustutati {new Date(
+                  form.personalDataPurgedAt
+                ).toLocaleString("et-EE")}.
+              </p>
+            ) : form.personalDataPurgeDueAt ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-3">
+                <p className="text-xs text-gray-600">
+                  Kustutamise tähtaeg: {new Date(
+                    form.personalDataPurgeDueAt
+                  ).toLocaleString("et-EE")}
+                </p>
+                {form.personalDataPurgeDue && (
+                  <button
+                    type="button"
+                    onClick={purgePersonalData}
+                    disabled={purging}
+                    className="px-3 py-2 text-xs font-medium text-red-700 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {purging
+                      ? "Kustutan..."
+                      : "Kustuta aegunud isikuandmed"}
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </section>
 
           <section className="bg-white border rounded-xl p-5 space-y-4">
             <div>

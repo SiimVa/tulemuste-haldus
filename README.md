@@ -56,3 +56,7 @@ failis [docs/accounts-and-roles.md](docs/accounts-and-roles.md).
 
 Esindaja registreerimise ja mandaadi töövoog on kirjeldatud failis
 [docs/registration-and-mandate.md](docs/registration-and-mandate.md).
+
+Kontakt- ja sünniandmete säilitustähtaja ning automaatse kustutamise seadistus
+on kirjeldatud failis
+[docs/personal-data-retention.md](docs/personal-data-retention.md).

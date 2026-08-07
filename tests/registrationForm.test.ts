@@ -25,6 +25,7 @@ function field(
     conditionFieldKey: null,
     conditionOperator: null,
     conditionValue: null,
+    purgeAfterCompetition: false,
     order: 0,
     ...patch,
   }
