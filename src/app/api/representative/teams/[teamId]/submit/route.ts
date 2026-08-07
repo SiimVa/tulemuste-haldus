@@ -76,6 +76,7 @@ export async function POST(
               conditionFieldKey: true,
               conditionOperator: true,
               conditionValue: true,
+              purgeAfterCompetition: true,
               order: true,
             },
           },

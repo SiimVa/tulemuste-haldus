@@ -68,6 +68,7 @@ export type FormFieldDefinition = {
   conditionFieldKey: string | null
   conditionOperator: FormConditionOperator | null
   conditionValue: string | null
+  purgeAfterCompetition: boolean
   order: number
 }
 
@@ -125,21 +126,40 @@ export function toFormFieldDefinition(
     (item): item is MemberFieldType =>
       MEMBER_FIELD_TYPES.includes(item as MemberFieldType)
   )
-  return {
+  const normalizedMemberFields: MemberFieldType[] =
+    memberFields.length > 0
+      ? Array.from(new Set(["name" as const, ...memberFields]))
+      : ["name"]
+  const definition = {
     ...field,
     type: isFormFieldType(field.type) ? field.type : "TEXT",
     semanticKey: isFormSemanticKey(field.semanticKey)
       ? field.semanticKey
       : null,
     options: parseStringArray(field.options),
-    memberFields:
-      memberFields.length > 0
-        ? Array.from(new Set(["name" as const, ...memberFields]))
-        : ["name"],
+    memberFields: normalizedMemberFields,
     conditionOperator: isFormConditionOperator(field.conditionOperator)
       ? field.conditionOperator
       : null,
   }
+  return {
+    ...definition,
+    purgeAfterCompetition:
+      Boolean(field.purgeAfterCompetition) ||
+      requiresPersonalDataPurge(definition),
+  }
+}
+
+export function requiresPersonalDataPurge(
+  field: Pick<FormFieldDefinition, "type" | "memberFields">
+): boolean {
+  if (field.type === "EMAIL" || field.type === "PHONE") return true
+  return (
+    field.type === "MEMBER_LIST" &&
+    field.memberFields.some((item) =>
+      ["email", "phone", "birthDate"].includes(item)
+    )
+  )
 }
 
 export function serializeFormAnswer(value: FormAnswer): string {

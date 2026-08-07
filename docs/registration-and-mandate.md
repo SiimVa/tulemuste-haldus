@@ -42,7 +42,10 @@ Esindaja määratakse jätkuvalt võistluse **Seaded** lehel.
 
 ## Isikuandmed
 
-Esimene versioon kogub mandaadis ainult liikme nime ja rolli. Isikukoodi,
-sünniaega, terviseandmeid ega muid tundlikumaid välju ei lisata enne, kui
-nende töötlemise eesmärk, säilitustähtaeg ja ligipääsureeglid on eraldi kokku
-lepitud.
+Vorm võib koguda liikmete e-posti, telefoni ja sünniaega. Korraldaja määrab
+võistluse seadetes nende säilitustähtaja vahemikus 1–90 päeva pärast võistluse
+lõppu. Tähtaja saabumisel eemaldatakse kontakt- ja sünniandmed, kuid tulemuste
+ajaloo jaoks säilivad võistkonna nimi, liikmete nimed ja rollid.
+
+Automaatse kustutamise käivitamine on kirjeldatud failis
+[personal-data-retention.md](personal-data-retention.md).

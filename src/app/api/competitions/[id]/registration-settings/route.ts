@@ -21,6 +21,10 @@ import {
   parseTeamMemberRoles,
 } from "@/lib/teamComposition"
 import {
+  getPersonalDataPurgeDueAt,
+  isPersonalDataRetentionDays,
+} from "@/lib/personalDataRetention"
+import {
   type FormFieldDefinition,
   FORM_FIELD_TYPES,
   FORM_SEMANTIC_KEYS,
@@ -28,6 +32,7 @@ import {
   isFormFieldType,
   isFormSemanticKey,
   MEMBER_FIELD_TYPES,
+  requiresPersonalDataPurge,
   toFormFieldDefinition,
 } from "@/lib/registrationForm"
 
@@ -48,6 +53,7 @@ const formFieldSelect = {
   conditionFieldKey: true,
   conditionOperator: true,
   conditionValue: true,
+  purgeAfterCompetition: true,
   order: true,
 }
 
@@ -181,12 +187,23 @@ function responseData<
     mandateOpensAt: Date | null
     mandateClosesAt: Date | null
     mandateFinalizedAt: Date | null
+    endDate: Date | null
+    personalDataRetentionDays: number
+    personalDataPurgedAt: Date | null
   },
 >(competition: T) {
+  const personalDataPurgeDueAt = getPersonalDataPurgeDueAt(
+    competition.endDate,
+    competition.personalDataRetentionDays
+  )
   return {
     ...competition,
     registrationStatus: getCompetitionRegistrationStatus(competition),
     mandateStatus: getCompetitionMandateStatus(competition),
+    personalDataPurgeDueAt,
+    personalDataPurgeDue: Boolean(
+      personalDataPurgeDueAt && personalDataPurgeDueAt.getTime() <= Date.now()
+    ),
   }
 }
 
@@ -321,6 +338,17 @@ function parseFormFields(value: unknown): FormFieldDefinition[] {
         conditionFieldKey && typeof raw.conditionValue === "string"
           ? raw.conditionValue
           : null,
+      purgeAfterCompetition:
+        raw.type === "MEMBER_LIST"
+          ? requiresPersonalDataPurge({
+              type: raw.type,
+              memberFields: normalizedMemberFields,
+            })
+          : Boolean(raw.purgeAfterCompetition) ||
+            requiresPersonalDataPurge({
+              type: raw.type,
+              memberFields: normalizedMemberFields,
+            }),
       order,
     }
   })
@@ -376,6 +404,7 @@ export async function GET(
     select: {
       id: true,
       name: true,
+      endDate: true,
       isPublic: true,
       registrationOpensAt: true,
       registrationClosesAt: true,
@@ -389,6 +418,8 @@ export async function GET(
       mandateOverride: true,
       mandateFinalizedAt: true,
       mandateApprovalMode: true,
+      personalDataRetentionDays: true,
+      personalDataPurgedAt: true,
       representativeRequired: true,
       captainRequired: true,
       teamMemberRoles: true,
@@ -550,6 +581,19 @@ export async function PATCH(
     }
     const formFields = parseFormFields(body.formFields)
     const allocationRules = parseAllocationRules(body.allocationRules)
+    const personalDataRetentionDays =
+      body.personalDataRetentionDays === undefined
+        ? null
+        : Number(body.personalDataRetentionDays)
+    if (
+      personalDataRetentionDays !== null &&
+      !isPersonalDataRetentionDays(personalDataRetentionDays)
+    ) {
+      return NextResponse.json(
+        { error: "Isikuandmete säilitustähtaeg peab olema 1–90 päeva" },
+        { status: 400 }
+      )
+    }
     const teamMemberRoles =
       body.teamMemberRoles === undefined
         ? null
@@ -639,6 +683,7 @@ export async function PATCH(
           conditionFieldKey: field.conditionFieldKey,
           conditionOperator: field.conditionOperator,
           conditionValue: field.conditionValue,
+          purgeAfterCompetition: field.purgeAfterCompetition,
           order: field.order,
           isActive: true,
         }
@@ -756,6 +801,8 @@ export async function PATCH(
           mandateOverride: body.mandateOverride,
           mandateApprovalMode:
             body.mandateApprovalMode ?? current.mandateApprovalMode,
+          personalDataRetentionDays:
+            personalDataRetentionDays ?? current.personalDataRetentionDays,
           representativeRequired:
             body.representativeRequired === undefined
               ? current.representativeRequired
