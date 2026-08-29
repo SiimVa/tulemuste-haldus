@@ -38,6 +38,8 @@ model User {
   registrationEvents       RegistrationApplicationEvent[] @relation("RegistrationEventActor")
   competitionPhaseEvents   CompetitionPhaseEvent[]
   teamMemberships          TeamMember[]
+  sentRoleInvitations      CompetitionRoleInvitation[] @relation("CompetitionRoleInvitationInvitedBy")
+  acceptedRoleInvitations  CompetitionRoleInvitation[] @relation("CompetitionRoleInvitationAcceptedBy")
 }
 
 model Account {
@@ -189,6 +191,7 @@ model Competition {
   phaseEvents                 CompetitionPhaseEvent[]
   teamMembers                 TeamMember[]
   judgeAssignments            JudgeElementAssignment[]
+  roleInvitations             CompetitionRoleInvitation[]
 }
 
 // Korraldaja määratud klassid. Null klassi tähendab klassideta võistlust,
@@ -615,6 +618,32 @@ model CompetitionMemberRole {
 
   @@id([memberId, role])
   @@index([role])
+}
+
+// Võistlusepõhine rollikutse kontota kasutajale. Toores kutsetoken kuvatakse
+// ainult loomisel; andmebaasi salvestatakse selle SHA-256 räsi.
+model CompetitionRoleInvitation {
+  id             String      @id @default(cuid())
+  competitionId  String
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  email          String
+  tokenHash      String      @unique
+  roles          String
+  elementIds     String      @default("[]")
+  teamIds        String      @default("[]")
+  invitedById    String
+  invitedBy      User        @relation("CompetitionRoleInvitationInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  acceptedById   String?
+  acceptedBy     User?       @relation("CompetitionRoleInvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  revokedAt      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([competitionId, email])
+  @@index([email, expiresAt])
+  @@index([competitionId, acceptedAt, revokedAt])
 }
 
 // Kasutajakontoga kohtunikule määratud hindamiselement. Komposiitvõtmed
