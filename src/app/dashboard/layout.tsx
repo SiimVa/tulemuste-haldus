@@ -9,9 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const roleLabel =
     session.user.role === "ADMIN"
       ? "Admin"
-      : session.user.role === "ORGANIZER"
-        ? "Korraldaja"
-        : "Kasutaja"
+      : "Kasutaja"
 
   return (
     <div className="min-h-screen bg-gray-50">

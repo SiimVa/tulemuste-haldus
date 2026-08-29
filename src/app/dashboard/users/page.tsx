@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 type User = { id: string; email: string; name: string; role: string; createdAt: string }
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Admin",
-  ORGANIZER: "Korraldaja",
+  ORGANIZER: "Kasutaja",
   USER: "Kasutaja",
 }
 
@@ -79,6 +80,15 @@ export default function UsersPage() {
   return (
     <div>
       <h1 className="text-xl font-bold text-gray-900 mb-6">Kasutajahaldus</h1>
+
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-6 text-sm text-blue-900">
+        Siin hallatakse kasutajakontosid. Korraldaja, kohtuniku ja esindaja
+        õigused määratakse vastava võistluse <strong>Juurdepääsu</strong>{" "}
+        lehel. Võistlusepõhine korraldaja ei saa uusi võistlusi luua. {" "}
+        <Link href="/dashboard" className="font-medium underline">
+          Vali võistlus
+        </Link>
+      </div>
 
       {/* Uue korraldaja vorm */}
       <form onSubmit={createUser} className="bg-white border rounded-xl p-5 mb-6 space-y-4">
