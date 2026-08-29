@@ -68,6 +68,8 @@ export async function POST(
               semanticKey: true,
               options: true,
               memberFields: true,
+              memberMinCount: true,
+              memberMaxCount: true,
               showInRegistration: true,
               requiredInRegistration: true,
               showInMandate: true,

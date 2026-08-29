@@ -188,6 +188,7 @@ model Competition {
   registrationAllocationRules RegistrationAllocationRule[]
   phaseEvents                 CompetitionPhaseEvent[]
   teamMembers                 TeamMember[]
+  judgeAssignments            JudgeElementAssignment[]
 }
 
 // Korraldaja määratud klassid. Null klassi tähendab klassideta võistlust,
@@ -252,6 +253,8 @@ model CompetitionFormField {
   semanticKey            String?
   options                String      @default("[]")
   memberFields           String      @default("[\"name\"]")
+  memberMinCount         Int         @default(1)
+  memberMaxCount         Int?
   showInRegistration     Boolean     @default(true)
   requiredInRegistration Boolean     @default(false)
   showInMandate          Boolean     @default(true)
@@ -356,16 +359,18 @@ model ScoringElement {
   directPointsEntry      Boolean     @default(false)
   revealPointsToAthletes Boolean     @default(false) // kas selle elemendi punktid on võistlejatele nähtavad
 
-  fields       FieldDefinition[]
-  exceptions   ElementException[]
-  calcMethod   CalcMethod?
-  results      Result[]
-  accessTokens AccessToken[]
-  scores       ComputedScore[]
-  miscEntries  MiscEntry[]
-  sections     ElementSection[]
+  fields           FieldDefinition[]
+  exceptions       ElementException[]
+  calcMethod       CalcMethod?
+  results          Result[]
+  accessTokens     AccessToken[]
+  scores           ComputedScore[]
+  miscEntries      MiscEntry[]
+  sections         ElementSection[]
+  judgeAssignments JudgeElementAssignment[]
 
   @@unique([competitionId, code])
+  @@unique([id, competitionId])
 }
 
 // ─── Elemendi sisendväljad ──────────────────────────────────────────────────
@@ -588,14 +593,15 @@ model SectionCalcMethod {
 // ─── Kaas-korraldajad ─────────────────────────────────────────────────────────
 
 model CompetitionMember {
-  id               String                  @id @default(cuid())
+  id               String                   @id @default(cuid())
   competitionId    String
-  competition      Competition             @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  competition      Competition              @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   userId           String
-  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  addedAt          DateTime                @default(now())
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt          DateTime                 @default(now())
   roles            CompetitionMemberRole[]
   representedTeams TeamRepresentative[]
+  judgedElements   JudgeElementAssignment[]
 
   @@unique([competitionId, userId])
   @@unique([id, competitionId])
@@ -609,6 +615,23 @@ model CompetitionMemberRole {
 
   @@id([memberId, role])
   @@index([role])
+}
+
+// Kasutajakontoga kohtunikule määratud hindamiselement. Komposiitvõtmed
+// tagavad, et kohtunik ja element kuuluvad samale võistlusele.
+model JudgeElementAssignment {
+  id            String            @id @default(cuid())
+  competitionId String
+  competition   Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  memberId      String
+  member        CompetitionMember @relation(fields: [memberId, competitionId], references: [id, competitionId], onDelete: Cascade)
+  elementId     String
+  element       ScoringElement    @relation(fields: [elementId, competitionId], references: [id, competitionId], onDelete: Cascade)
+  addedAt       DateTime          @default(now())
+
+  @@unique([memberId, elementId])
+  @@index([competitionId, memberId])
+  @@index([elementId])
 }
 
 // Ühel võistkonnal on kuni üks esindaja; üks esindaja võib hallata mitut võistkonda.

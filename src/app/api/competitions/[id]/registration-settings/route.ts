@@ -31,7 +31,9 @@ import {
   isFormConditionOperator,
   isFormFieldType,
   isFormSemanticKey,
+  isRepresentativeFormField,
   MEMBER_FIELD_TYPES,
+  representativeFormFields,
   requiresPersonalDataPurge,
   toFormFieldDefinition,
 } from "@/lib/registrationForm"
@@ -45,6 +47,8 @@ const formFieldSelect = {
   semanticKey: true,
   options: true,
   memberFields: true,
+  memberMinCount: true,
+  memberMaxCount: true,
   showInRegistration: true,
   requiredInRegistration: true,
   showInMandate: true,
@@ -285,6 +289,30 @@ function parseFormFields(value: unknown): FormFieldDefinition[] {
       raw.type === "MEMBER_LIST"
         ? Array.from(new Set(["name" as const, ...memberFields]))
         : ["name" as const]
+    const memberMinCount =
+      raw.type === "MEMBER_LIST" && raw.memberMinCount !== undefined
+        ? Number(raw.memberMinCount)
+        : 1
+    const memberMaxCount =
+      raw.type === "MEMBER_LIST" &&
+      raw.memberMaxCount !== undefined &&
+      raw.memberMaxCount !== null &&
+      raw.memberMaxCount !== ""
+        ? Number(raw.memberMaxCount)
+        : null
+    if (
+      !Number.isInteger(memberMinCount) ||
+      memberMinCount < 1 ||
+      memberMinCount > 500 ||
+      (memberMaxCount !== null &&
+        (!Number.isInteger(memberMaxCount) ||
+          memberMaxCount < memberMinCount ||
+          memberMaxCount > 500))
+    ) {
+      throw new Error(
+        `Välja „${label}” liikmete arv peab olema vahemikus 1–500`
+      )
+    }
 
     const showInRegistration = Boolean(raw.showInRegistration)
     const showInMandate = Boolean(raw.showInMandate)
@@ -325,6 +353,8 @@ function parseFormFields(value: unknown): FormFieldDefinition[] {
       semanticKey,
       options,
       memberFields: normalizedMemberFields,
+      memberMinCount,
+      memberMaxCount,
       showInRegistration,
       requiredInRegistration:
         showInRegistration && Boolean(raw.requiredInRegistration),
@@ -579,7 +609,17 @@ export async function PATCH(
         { status: 400 }
       )
     }
-    const formFields = parseFormFields(body.formFields)
+    const submittedFormFields = Array.isArray(body.formFields)
+      ? body.formFields.filter(
+          (field: unknown) =>
+            !field ||
+            typeof field !== "object" ||
+            !isRepresentativeFormField(
+              (field as Record<string, unknown>).key
+            )
+        )
+      : body.formFields
+    const customFormFields = parseFormFields(submittedFormFields)
     const allocationRules = parseAllocationRules(body.allocationRules)
     const personalDataRetentionDays =
       body.personalDataRetentionDays === undefined
@@ -608,6 +648,19 @@ export async function PATCH(
         },
       })
       if (!current) throw new Error("Võistlust ei leitud")
+      const representativeRequired =
+        body.representativeRequired === undefined
+          ? current.representativeRequired
+          : Boolean(body.representativeRequired)
+      const formFields = representativeRequired
+        ? [
+            ...representativeFormFields(),
+            ...customFormFields.map((field, index) => ({
+              ...field,
+              order: index + 3,
+            })),
+          ]
+        : customFormFields.map((field, order) => ({ ...field, order }))
 
       const currentById = new Map(
         current.registrationClasses.map((item) => [item.id, item])
@@ -675,6 +728,8 @@ export async function PATCH(
           semanticKey: field.semanticKey,
           options: JSON.stringify(field.options),
           memberFields: JSON.stringify(field.memberFields),
+          memberMinCount: field.memberMinCount,
+          memberMaxCount: field.memberMaxCount,
           showInRegistration: field.showInRegistration,
           requiredInRegistration: field.requiredInRegistration,
           showInMandate: field.showInMandate,
@@ -804,9 +859,7 @@ export async function PATCH(
           personalDataRetentionDays:
             personalDataRetentionDays ?? current.personalDataRetentionDays,
           representativeRequired:
-            body.representativeRequired === undefined
-              ? current.representativeRequired
-              : Boolean(body.representativeRequired),
+            representativeRequired,
           captainRequired:
             body.captainRequired === undefined
               ? current.captainRequired

@@ -12,7 +12,7 @@ type Team = { id: string; name: string; code: string; class?: string | null }
 type ExistingResult = { elementId: string; teamId: string; values: string; exceptionLabel?: string | null; updatedAt: Date }
 
 interface Props {
-  accessToken: string
+  accessToken?: string
   elements: Element[]
   teams: Team[]
   existingResults: ExistingResult[]
@@ -148,9 +148,14 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
 
     setSaving(true)
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    if (accessToken) headers["x-access-token"] = accessToken
+
     const res = await fetch(`/api/elements/${selectedElementId}/results`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-access-token": accessToken },
+      headers,
       body: JSON.stringify({
         teamId: selectedTeamId,
         values: exceptionLabel ? {} : formValues,

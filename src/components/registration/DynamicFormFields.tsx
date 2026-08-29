@@ -8,6 +8,7 @@ import {
   type FormPhase,
   isFormFieldVisible,
   type MemberAnswer,
+  REPRESENTATIVE_FORM_FIELD_KEYS,
 } from "@/lib/registrationForm"
 import type { TeamCompositionSettings } from "@/lib/teamComposition"
 
@@ -53,7 +54,10 @@ export function DynamicFormFields({
             ? field.requiredInRegistration
             : field.requiredInMandate
         const fieldDisabled =
-          disabled || (phase === "MANDATE" && !field.editableInMandate)
+          disabled ||
+          (phase === "MANDATE" && !field.editableInMandate) ||
+          field.key === REPRESENTATIVE_FORM_FIELD_KEYS.name ||
+          field.key === REPRESENTATIVE_FORM_FIELD_KEYS.email
         const value = valueFor(field, values)
         const inputId = `dynamic-field-${field.key}`
 
@@ -259,8 +263,20 @@ function MemberListInput({
     )
   }
 
+  const countLabel =
+    field.memberMaxCount === field.memberMinCount
+      ? `Nõutud ${field.memberMinCount} liiget`
+      : field.memberMaxCount === null
+        ? `Vähemalt ${field.memberMinCount} liiget`
+        : `${field.memberMinCount}–${field.memberMaxCount} liiget`
+  const maximumReached =
+    field.memberMaxCount !== null && value.length >= field.memberMaxCount
+
   return (
     <div className="space-y-3">
+      <p className="text-xs text-gray-500">
+        {countLabel}. Lisatud {value.length}.
+      </p>
       {value.map((member, index) => (
         <div key={index} className="border rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between gap-3">
@@ -377,7 +393,7 @@ function MemberListInput({
             )}
         </div>
       ))}
-      {!disabled && (
+      {!disabled && !maximumReached && (
         <button
           type="button"
           onClick={() => onChange([...value, { name: "" }])}
@@ -385,6 +401,11 @@ function MemberListInput({
         >
           + Lisa liige
         </button>
+      )}
+      {!disabled && maximumReached && (
+        <p className="text-xs text-gray-500">
+          Maksimaalne liikmete arv on täis.
+        </p>
       )}
     </div>
   )

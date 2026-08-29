@@ -4,6 +4,7 @@ import {
   type FormFieldDefinition,
   type FormFieldType,
   type FormSemanticKey,
+  isRepresentativeFormField,
   MEMBER_FIELD_TYPES,
   requiresPersonalDataPurge,
 } from "@/lib/registrationForm"
@@ -41,6 +42,8 @@ function newField(order: number): FormFieldDefinition {
     semanticKey: null,
     options: [],
     memberFields: ["name"],
+    memberMinCount: 1,
+    memberMaxCount: null,
     showInRegistration: true,
     requiredInRegistration: false,
     showInMandate: true,
@@ -80,6 +83,7 @@ export function FormBuilder({
   function move(index: number, direction: -1 | 1) {
     const target = index + direction
     if (target < 0 || target >= fields.length) return
+    if (isRepresentativeFormField(fields[target].key)) return
     const next = [...fields]
     ;[next[index], next[target]] = [next[target], next[index]]
     onChange(next.map((field, order) => ({ ...field, order })))
@@ -115,8 +119,11 @@ export function FormBuilder({
 
       <div className="space-y-4">
         {fields.map((field, index) => {
+          const isSystemField = isRepresentativeFormField(field.key)
           const previousFields = fields.slice(0, index).filter(
-            (candidate) => candidate.type !== "MEMBER_LIST"
+            (candidate) =>
+              candidate.type !== "MEMBER_LIST" &&
+              !isRepresentativeFormField(candidate.key)
           )
           const conditionField = previousFields.find(
             ({ key }) => key === field.conditionFieldKey
@@ -127,33 +134,45 @@ export function FormBuilder({
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
                   Väli {index + 1}
                 </p>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => move(index, -1)}
-                    disabled={index === 0}
-                    className="px-2 py-1 text-xs border rounded disabled:opacity-40"
-                    aria-label="Liiguta üles"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => move(index, 1)}
-                    disabled={index === fields.length - 1}
-                    className="px-2 py-1 text-xs border rounded disabled:opacity-40"
-                    aria-label="Liiguta alla"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(index)}
-                    className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded"
-                  >
-                    Eemalda
-                  </button>
-                </div>
+                {isSystemField ? (
+                  <span className="text-xs font-medium text-blue-700 bg-blue-50 rounded-full px-2.5 py-1">
+                    Automaatne esindajaväli
+                  </span>
+                ) : (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => move(index, -1)}
+                      disabled={
+                        index === 0 ||
+                        isRepresentativeFormField(fields[index - 1]?.key)
+                      }
+                      className="px-2 py-1 text-xs border rounded disabled:opacity-40"
+                      aria-label="Liiguta üles"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => move(index, 1)}
+                      disabled={
+                        index === fields.length - 1 ||
+                        isRepresentativeFormField(fields[index + 1]?.key)
+                      }
+                      className="px-2 py-1 text-xs border rounded disabled:opacity-40"
+                      aria-label="Liiguta alla"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded"
+                    >
+                      Eemalda
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
@@ -161,6 +180,7 @@ export function FormBuilder({
                   Välja nimetus *
                   <input
                     value={field.label}
+                    disabled={isSystemField}
                     onChange={(event) =>
                       update(index, { label: event.target.value })
                     }
@@ -171,6 +191,7 @@ export function FormBuilder({
                   Välja tüüp
                   <select
                     value={field.type}
+                    disabled={isSystemField}
                     onChange={(event) => {
                       const type = event.target.value as FormFieldType
                       const memberFields =
@@ -211,6 +232,7 @@ export function FormBuilder({
                 Abitekst
                 <input
                   value={field.helpText ?? ""}
+                  disabled={isSystemField}
                   onChange={(event) =>
                     update(index, {
                       helpText: event.target.value || null,
@@ -294,7 +316,7 @@ export function FormBuilder({
               )}
 
               {field.type === "MEMBER_LIST" && (
-                <div>
+                <div className="space-y-4">
                   <p className="text-xs text-gray-600 mb-2">
                     Iga liikme kohta küsitavad andmed
                   </p>
@@ -329,44 +351,93 @@ export function FormBuilder({
                       </label>
                     ))}
                   </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="text-xs text-gray-600">
+                      Minimaalne liikmete arv
+                      <input
+                        type="number"
+                        min={1}
+                        max={500}
+                        value={field.memberMinCount}
+                        onChange={(event) => {
+                          const memberMinCount = Number(event.target.value)
+                          update(index, {
+                            memberMinCount,
+                            memberMaxCount:
+                              field.memberMaxCount !== null &&
+                              field.memberMaxCount < memberMinCount
+                                ? memberMinCount
+                                : field.memberMaxCount,
+                          })
+                        }}
+                        className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-gray-600">
+                      Maksimaalne liikmete arv
+                      <input
+                        type="number"
+                        min={field.memberMinCount}
+                        max={500}
+                        value={field.memberMaxCount ?? ""}
+                        onChange={(event) =>
+                          update(index, {
+                            memberMaxCount: event.target.value
+                              ? Number(event.target.value)
+                              : null,
+                          })
+                        }
+                        placeholder="Piirang puudub"
+                        className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                      />
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Täpse koosseisu jaoks sisesta mõlemasse välja sama arv.
+                    Vabatahtliku välja võib jätta tühjaks; liikmete lisamisel
+                    rakendub määratud vahemik.
+                  </p>
                 </div>
               )}
 
-              <label className="flex items-start gap-3 border-t pt-4">
-                <input
-                  type="checkbox"
-                  checked={
-                    field.type === "MEMBER_LIST"
-                      ? requiresPersonalDataPurge(field)
-                      : field.purgeAfterCompetition ||
-                        requiresPersonalDataPurge(field)
-                  }
-                  disabled={
-                    field.type === "MEMBER_LIST" ||
-                    requiresPersonalDataPurge(field)
-                  }
-                  onChange={(event) =>
-                    update(index, {
-                      purgeAfterCompetition: event.target.checked,
-                    })
-                  }
-                  className="mt-0.5 accent-blue-600"
-                />
-                <span>
-                  <span className="block text-sm text-gray-700">
-                    Kustuta isikuandmed säilitustähtaja järel
+              {!isSystemField && (
+                <label className="flex items-start gap-3 border-t pt-4">
+                  <input
+                    type="checkbox"
+                    checked={
+                      field.type === "MEMBER_LIST"
+                        ? requiresPersonalDataPurge(field)
+                        : field.purgeAfterCompetition ||
+                          requiresPersonalDataPurge(field)
+                    }
+                    disabled={
+                      field.type === "MEMBER_LIST" ||
+                      requiresPersonalDataPurge(field)
+                    }
+                    onChange={(event) =>
+                      update(index, {
+                        purgeAfterCompetition: event.target.checked,
+                      })
+                    }
+                    className="mt-0.5 accent-blue-600"
+                  />
+                  <span>
+                    <span className="block text-sm text-gray-700">
+                      Kustuta isikuandmed säilitustähtaja järel
+                    </span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      {field.type === "MEMBER_LIST"
+                        ? "Liikmete e-post, telefon ja sünniaeg eemaldatakse; nimi ja roll säilivad tulemuste ajaloos."
+                        : requiresPersonalDataPurge(field)
+                          ? "Selle väljatüübi väärtused eemaldatakse alati automaatselt."
+                          : "Märgi see valik, kui vabatekst või kuupäev sisaldab isikuandmeid."}
+                    </span>
                   </span>
-                  <span className="block text-xs text-gray-500 mt-0.5">
-                    {field.type === "MEMBER_LIST"
-                      ? "Liikmete e-post, telefon ja sünniaeg eemaldatakse; nimi ja roll säilivad tulemuste ajaloos."
-                      : requiresPersonalDataPurge(field)
-                        ? "Selle väljatüübi väärtused eemaldatakse alati automaatselt."
-                        : "Märgi see valik, kui vabatekst või kuupäev sisaldab isikuandmeid."}
-                  </span>
-                </span>
-              </label>
+                </label>
+              )}
 
-              <div className="grid md:grid-cols-2 gap-4 border-t pt-4">
+              {!isSystemField && (
+                <div className="grid md:grid-cols-2 gap-4 border-t pt-4">
                 <PhaseOptions
                   title="Registreerimisel"
                   shown={field.showInRegistration}
@@ -401,9 +472,11 @@ export function FormBuilder({
                     update(index, { editableInMandate: value })
                   }
                 />
-              </div>
+                </div>
+              )}
 
-              <div className="border-t pt-4">
+              {!isSystemField && (
+                <div className="border-t pt-4">
                 <label className="text-xs text-gray-600 block">
                   Tingimuslik kuvamine
                   <select
@@ -495,7 +568,8 @@ export function FormBuilder({
                     )}
                   </div>
                 )}
-              </div>
+                </div>
+              )}
             </article>
           )
         })}

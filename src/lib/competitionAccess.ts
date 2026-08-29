@@ -5,6 +5,7 @@ import {
   canManageCompetitionMembers as canManageMembersWithContext,
   canManageTeamRegistration as canManageTeamWithContext,
   canEnterCompetitionResults as canEnterResultsWithContext,
+  canEnterElementResults as canEnterElementResultsWithContext,
   canViewCompetition as canViewCompetitionWithContext,
   type CompetitionAccessContext,
   type CompetitionRoleName,
@@ -48,6 +49,7 @@ async function getCompetitionAccess(
         select: {
           roles: { select: { role: true } },
           representedTeams: { select: { teamId: true } },
+          judgedElements: { select: { elementId: true } },
         },
       },
     },
@@ -62,6 +64,8 @@ async function getCompetitionAccess(
       membership?.roles.map(({ role }) => role as CompetitionRoleName) ?? [],
     representedTeamIds:
       membership?.representedTeams.map(({ teamId }) => teamId) ?? [],
+    judgedElementIds:
+      membership?.judgedElements.map(({ elementId }) => elementId) ?? [],
   }
 }
 
@@ -119,9 +123,10 @@ export async function canEnterElementResults(
     where: { id: elementId },
     select: { competitionId: true },
   })
+  if (!element) return false
+  const access = await getCompetitionAccess(element.competitionId, actor)
   return Boolean(
-    element &&
-      await canEnterCompetitionResults(element.competitionId, actor)
+    access && canEnterElementResultsWithContext(access, elementId)
   )
 }
 

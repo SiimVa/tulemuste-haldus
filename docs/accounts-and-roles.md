@@ -22,6 +22,24 @@ Toetatud võistluse rollid:
 
 Ühel liikmel võib olla samal võistlusel mitu rolli.
 
+## Kasutajakontoga kohtunik
+
+Võistluse **Juurdepääsu haldus** lehel saab korraldaja määrata olemasoleva
+kasutajakonto kohtunikuks ja valida talle ühe või mitu hindamiselementi.
+
+- kohtunik näeb pärast sisselogimist töölaual jaotist **Minu hindamispunktid**;
+- kontopõhine kohtunikuvaade avaneb aadressil
+  `/dashboard/judge/[competitionId]`;
+- kohtunik saab vaadata ja sisestada tulemusi ainult talle määratud
+  elementides;
+- elemendi õigust kontrollitakse serveris iga tulemuse lugemise ja
+  salvestamise ajal;
+- kohtuniku määramise muutmisel jäävad sama kasutaja teised võistluse rollid
+  alles.
+
+Tokeniga kohtuniku- ja võistlejalingid jäävad kasutatavaks varuvariandina,
+näiteks juhul, kui inimesel ei ole veel kasutajakontot.
+
 ## Võistkonna esindaja
 
 `TeamRepresentative` seob võistluse liikme konkreetse võistkonnaga.

@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma"
 import { parseValidation, validateClockValue, validateFieldValue } from "@/lib/fieldValidation"
 import { recomputeElementScores } from "@/lib/recompute"
 import {
-  canEnterCompetitionResults,
   canEnterElementResults,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
@@ -41,10 +40,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let enteredByUserId: string | null = null
   let enteredByTokenId: string | null = null
 
-  if (session?.user?.id) {
-    if (!await canEnterCompetitionResults(targetElement.competitionId, { id: session.user.id, role: session.user.role })) {
-      return NextResponse.json({ error: "Keelatud" }, { status: 403 })
-    }
+  const sessionMayEnter = session?.user?.id
+    ? await canEnterElementResults(elementId, {
+        id: session.user.id,
+        role: session.user.role,
+      })
+    : false
+
+  if (session?.user?.id && sessionMayEnter) {
     enteredByUserId = session.user.id
   } else if (authHeader) {
     const token = await prisma.accessToken.findUnique({
@@ -62,6 +65,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     enteredByTokenId = token.id
     await prisma.accessToken.update({ where: { id: token.id }, data: { lastUsedAt: new Date() } })
+  } else if (session?.user?.id) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   } else {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

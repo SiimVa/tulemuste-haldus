@@ -3,6 +3,7 @@ import test from "node:test"
 import {
   canCreateCompetition,
   canEnterCompetitionResults,
+  canEnterElementResults,
   canManageCompetition,
   canManageCompetitionMembers,
   canManageTeamRegistration,
@@ -18,6 +19,7 @@ function access(
     isOwner: false,
     roles: [],
     representedTeamIds: [],
+    judgedElementIds: [],
     ...overrides,
   }
 }
@@ -49,11 +51,24 @@ test("korraldaja haldab võistlust, kuid ei jaga omaniku õigusi", () => {
 })
 
 test("kohtunik saab sisestada tulemusi ilma võistlust haldamata", () => {
-  const judge = access({ roles: ["JUDGE"] })
+  const judge = access({
+    roles: ["JUDGE"],
+    judgedElementIds: ["element-a"],
+  })
 
   assert.equal(canViewCompetition(judge), true)
   assert.equal(canManageCompetition(judge), false)
   assert.equal(canEnterCompetitionResults(judge), true)
+  assert.equal(canEnterElementResults(judge, "element-a"), true)
+  assert.equal(canEnterElementResults(judge, "element-b"), false)
+})
+
+test("kohtuniku roll ilma elemendimääramiseta ei anna sisestusõigust", () => {
+  const judge = access({ roles: ["JUDGE"], judgedElementIds: [] })
+
+  assert.equal(canViewCompetition(judge), true)
+  assert.equal(canEnterCompetitionResults(judge), false)
+  assert.equal(canEnterElementResults(judge, "element-a"), false)
 })
 
 test("esindaja haldab ainult talle määratud võistkondi", () => {

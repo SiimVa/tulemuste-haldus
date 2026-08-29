@@ -22,6 +22,7 @@ export default async function DashboardPage() {
     publicCompetitionCandidates,
     registrationApplications,
     teamMemberships,
+    judgeMemberships,
   ] = await Promise.all([
     prisma.competition.findMany({
       where,
@@ -106,6 +107,31 @@ export default async function DashboardPage() {
         { competition: { date: "desc" } },
         { team: { code: "asc" } },
       ],
+    }),
+    prisma.competitionMember.findMany({
+      where: {
+        userId: currentUser.id,
+        roles: { some: { role: "JUDGE" } },
+        judgedElements: { some: {} },
+      },
+      select: {
+        id: true,
+        competition: {
+          select: {
+            id: true,
+            name: true,
+            date: true,
+            status: true,
+          },
+        },
+        judgedElements: {
+          select: {
+            element: { select: { id: true, code: true, name: true, order: true } },
+          },
+          orderBy: { element: { order: "asc" } },
+        },
+      },
+      orderBy: { competition: { date: "desc" } },
     }),
   ])
   const openCompetitions = publicCompetitionCandidates.filter(
@@ -289,11 +315,66 @@ export default async function DashboardPage() {
         </section>
       )}
 
+      {judgeMemberships.length > 0 && (
+        <section className="mb-10">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              Minu hindamispunktid
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Sisesta tulemusi kohtunikuna oma kasutajakontoga.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {judgeMemberships.map(({ id, competition, judgedElements }) => (
+              <Link
+                key={id}
+                href={`/dashboard/judge/${competition.id}`}
+                className="bg-white border border-orange-200 rounded-xl p-5 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-semibold text-gray-900">
+                    {competition.name}
+                  </h3>
+                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full shrink-0">
+                    Kohtunik
+                  </span>
+                </div>
+                {competition.date && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    📅 {competition.date.toLocaleDateString("et-EE")}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {judgedElements.slice(0, 3).map(({ element }) => (
+                    <span
+                      key={element.id}
+                      className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full"
+                    >
+                      {element.code} · {element.name}
+                    </span>
+                  ))}
+                  {judgedElements.length > 3 && (
+                    <span className="text-xs text-gray-400 px-1 py-1">
+                      +{judgedElements.length - 3}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-medium text-blue-600 mt-4">
+                  Ava kohtunikuvaade →
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {competitions.length === 0 &&
       representativeAssignments.length === 0 &&
       openCompetitions.length === 0 &&
       registrationApplications.length === 0 &&
-      teamMemberships.length === 0 ? (
+      teamMemberships.length === 0 &&
+      judgeMemberships.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">🏁</p>
           <p className="font-medium">Ühtegi võistlust veel pole</p>

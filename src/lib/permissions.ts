@@ -14,6 +14,7 @@ export type CompetitionAccessContext = {
   isOwner: boolean
   roles: readonly CompetitionRoleName[]
   representedTeamIds?: readonly string[]
+  judgedElementIds?: readonly string[]
 }
 
 function hasRole(
@@ -52,7 +53,22 @@ export function canManageCompetitionMembers(access: CompetitionAccessContext) {
 }
 
 export function canEnterCompetitionResults(access: CompetitionAccessContext) {
-  return canManageCompetition(access) || hasRole(access, ["JUDGE"])
+  return (
+    canManageCompetition(access) ||
+    (hasRole(access, ["JUDGE"]) &&
+      Boolean(access.judgedElementIds?.length))
+  )
+}
+
+export function canEnterElementResults(
+  access: CompetitionAccessContext,
+  elementId: string
+) {
+  return (
+    canManageCompetition(access) ||
+    (hasRole(access, ["JUDGE"]) &&
+      Boolean(access.judgedElementIds?.includes(elementId)))
+  )
 }
 
 export function canManageTeamRegistration(

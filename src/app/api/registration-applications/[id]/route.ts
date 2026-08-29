@@ -24,6 +24,7 @@ import {
   serializeFormAnswer,
   toFormFieldDefinition,
   validateFormAnswers,
+  withRepresentativeIdentity,
 } from "@/lib/registrationForm"
 
 class RegistrationUpdateValidationError extends Error {}
@@ -39,7 +40,8 @@ async function updateApplication(
   userId: string,
   teamName: string,
   requestedClassId: string | null,
-  rawAnswers: unknown
+  rawAnswers: unknown,
+  representativeIdentity: { name: string; email: string }
 ) {
   return prisma.$transaction(
     async (tx) => {
@@ -73,6 +75,8 @@ async function updateApplication(
                   semanticKey: true,
                   options: true,
                   memberFields: true,
+                  memberMinCount: true,
+                  memberMaxCount: true,
                   showInRegistration: true,
                   requiredInRegistration: true,
                   showInMandate: true,
@@ -115,7 +119,7 @@ async function updateApplication(
         )
       const validated = validateFormAnswers(
         formFields,
-        rawAnswers,
+        withRepresentativeIdentity(rawAnswers, representativeIdentity),
         "REGISTRATION"
       )
       const firstError = Object.entries(validated.errors)[0]
@@ -362,7 +366,11 @@ export async function PATCH(
         session.user.id,
         teamName,
         classId,
-        body.answers
+        body.answers,
+        {
+          name: session.user.name ?? "",
+          email: session.user.email ?? "",
+        }
       )
       return NextResponse.json(application)
     } catch (error) {

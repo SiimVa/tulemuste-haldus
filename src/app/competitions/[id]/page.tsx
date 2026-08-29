@@ -57,6 +57,8 @@ export default async function PublicCompetitionPage({
           semanticKey: true,
           options: true,
           memberFields: true,
+          memberMinCount: true,
+          memberMaxCount: true,
           showInRegistration: true,
           requiredInRegistration: true,
           showInMandate: true,
@@ -182,6 +184,10 @@ export default async function PublicCompetitionPage({
           formFields={competition.registrationFormFields.map(
             toFormFieldDefinition
           )}
+          representativeDefaults={{
+            name: session?.user?.name ?? "",
+            email: session?.user?.email ?? "",
+          }}
           applications={competition.registrationApplications.map(
             ({ fieldValues, ...application }) => ({
               ...application,
