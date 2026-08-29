@@ -3,7 +3,9 @@ import test from "node:test"
 import {
   type FormFieldDefinition,
   isFormFieldVisible,
+  representativeFormFields,
   validateFormAnswers,
+  withRepresentativeIdentity,
 } from "../src/lib/registrationForm"
 
 function field(
@@ -17,6 +19,8 @@ function field(
     semanticKey: "COUNTY",
     options: ["Harjumaa", "Raplamaa"],
     memberFields: ["name"],
+    memberMinCount: 1,
+    memberMaxCount: null,
     showInRegistration: true,
     requiredInRegistration: true,
     showInMandate: true,
@@ -153,4 +157,122 @@ test("liikmete loend nõuab iga täidetud rea puhul nime", () => {
       birthDate: "2010-05-02",
     },
   ])
+})
+
+test("liikmete loend kontrollib korraldaja määratud liikmete arvu", () => {
+  const members = field({
+    key: "members",
+    label: "Võistkonna liikmed",
+    type: "MEMBER_LIST",
+    semanticKey: null,
+    options: [],
+    memberFields: ["name"],
+    memberMinCount: 3,
+    memberMaxCount: 4,
+    requiredInRegistration: true,
+  })
+
+  assert.equal(
+    validateFormAnswers(
+      [members],
+      { members: [{ name: "Üks" }, { name: "Kaks" }] },
+      "REGISTRATION"
+    ).errors.members,
+    "Lisa vähemalt 3 liiget"
+  )
+  assert.equal(
+    validateFormAnswers(
+      [members],
+      {
+        members: [
+          { name: "Üks" },
+          { name: "Kaks" },
+          { name: "Kolm" },
+          { name: "Neli" },
+          { name: "Viis" },
+        ],
+      },
+      "REGISTRATION"
+    ).errors.members,
+    "Võistkonnas võib olla kuni 4 liiget"
+  )
+  assert.deepEqual(
+    validateFormAnswers(
+      [members],
+      {
+        members: [
+          { name: "Üks" },
+          { name: "Kaks" },
+          { name: "Kolm" },
+        ],
+      },
+      "REGISTRATION"
+    ).errors,
+    {}
+  )
+})
+
+test("vabatahtlik liikmete loend võib jääda tühjaks, aga täidetuna järgib miinimumi", () => {
+  const members = field({
+    key: "members",
+    label: "Võistkonna liikmed",
+    type: "MEMBER_LIST",
+    semanticKey: null,
+    options: [],
+    memberFields: ["name"],
+    memberMinCount: 2,
+    requiredInRegistration: false,
+  })
+
+  assert.deepEqual(
+    validateFormAnswers([members], { members: [] }, "REGISTRATION").errors,
+    {}
+  )
+  assert.equal(
+    validateFormAnswers(
+      [members],
+      { members: [{ name: "Ainuke" }] },
+      "REGISTRATION"
+    ).errors.members,
+    "Lisa vähemalt 2 liiget"
+  )
+})
+
+test("kohustusliku esindaja süsteemiväljad on registreerimisel nõutud", () => {
+  const fields = representativeFormFields()
+  const invalid = validateFormAnswers(fields, {}, "REGISTRATION")
+  assert.deepEqual(Object.keys(invalid.errors), [
+    "system_representative_name",
+    "system_representative_email",
+    "system_representative_phone",
+  ])
+
+  const valid = validateFormAnswers(
+    fields,
+    {
+      system_representative_name: "Mari Mets",
+      system_representative_email: "mari@example.com",
+      system_representative_phone: "+372 5555 5555",
+    },
+    "REGISTRATION"
+  )
+  assert.deepEqual(valid.errors, {})
+})
+
+test("esindaja nimi ja e-post võetakse usaldusväärselt kasutajakontolt", () => {
+  assert.deepEqual(
+    withRepresentativeIdentity(
+      {
+        system_representative_name: "Vale nimi",
+        system_representative_email: "vale@example.com",
+        system_representative_phone: "+372 5555 5555",
+      },
+      { name: "Mari Mets", email: "mari@example.com" }
+    ),
+    {
+      system_representative_name: "Mari Mets",
+      system_representative_email: "mari@example.com",
+      system_representative_phone: "+372 5555 5555",
+    }
+  )
 })

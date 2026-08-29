@@ -60,6 +60,8 @@ export type FormFieldDefinition = {
   semanticKey: FormSemanticKey | null
   options: string[]
   memberFields: MemberFieldType[]
+  memberMinCount: number
+  memberMaxCount: number | null
   showInRegistration: boolean
   requiredInRegistration: boolean
   showInMandate: boolean
@@ -81,6 +83,77 @@ type StoredFormField = Omit<
   options: string
   memberFields: string
   conditionOperator: string | null
+}
+
+export const REPRESENTATIVE_FORM_FIELD_KEYS = {
+  name: "system_representative_name",
+  email: "system_representative_email",
+  phone: "system_representative_phone",
+} as const
+
+const REPRESENTATIVE_FORM_FIELD_KEY_SET = new Set<string>(
+  Object.values(REPRESENTATIVE_FORM_FIELD_KEYS)
+)
+
+export function isRepresentativeFormField(key: unknown): boolean {
+  return typeof key === "string" && REPRESENTATIVE_FORM_FIELD_KEY_SET.has(key)
+}
+
+export function withRepresentativeIdentity(
+  rawAnswers: unknown,
+  identity: { name: string; email: string }
+): Record<string, unknown> {
+  const answers =
+    rawAnswers && typeof rawAnswers === "object" && !Array.isArray(rawAnswers)
+      ? { ...(rawAnswers as Record<string, unknown>) }
+      : {}
+  answers[REPRESENTATIVE_FORM_FIELD_KEYS.name] = identity.name
+  answers[REPRESENTATIVE_FORM_FIELD_KEYS.email] = identity.email
+  return answers
+}
+
+export function representativeFormFields(
+  startOrder = 0
+): FormFieldDefinition[] {
+  return [
+    {
+      key: REPRESENTATIVE_FORM_FIELD_KEYS.name,
+      label: "Esindaja nimi",
+      helpText: "Esindaja, kelle kasutajakonto seotakse võistkonnaga.",
+      type: "TEXT",
+      purgeAfterCompetition: false,
+    },
+    {
+      key: REPRESENTATIVE_FORM_FIELD_KEYS.email,
+      label: "Esindaja e-post",
+      helpText: "Eeltäidetakse sisselogitud kasutaja e-posti aadressiga.",
+      type: "EMAIL",
+      purgeAfterCompetition: true,
+    },
+    {
+      key: REPRESENTATIVE_FORM_FIELD_KEYS.phone,
+      label: "Esindaja telefon",
+      helpText: "Telefon, millelt korraldaja saab esindajaga ühendust.",
+      type: "PHONE",
+      purgeAfterCompetition: true,
+    },
+  ].map((field, index) => ({
+    ...field,
+    semanticKey: null,
+    options: [],
+    memberFields: ["name"],
+    memberMinCount: 1,
+    memberMaxCount: null,
+    showInRegistration: true,
+    requiredInRegistration: true,
+    showInMandate: true,
+    requiredInMandate: true,
+    editableInMandate: true,
+    conditionFieldKey: null,
+    conditionOperator: null,
+    conditionValue: null,
+    order: startOrder + index,
+  })) as FormFieldDefinition[]
 }
 
 export function isFormFieldType(value: unknown): value is FormFieldType {
@@ -130,6 +203,19 @@ export function toFormFieldDefinition(
     memberFields.length > 0
       ? Array.from(new Set(["name" as const, ...memberFields]))
       : ["name"]
+  const memberMinCount =
+    Number.isInteger(field.memberMinCount) &&
+    field.memberMinCount >= 1 &&
+    field.memberMinCount <= 500
+      ? field.memberMinCount
+      : 1
+  const memberMaxCount =
+    field.memberMaxCount !== null &&
+    Number.isInteger(field.memberMaxCount) &&
+    field.memberMaxCount >= memberMinCount &&
+    field.memberMaxCount <= 500
+      ? field.memberMaxCount
+      : null
   const definition = {
     ...field,
     type: isFormFieldType(field.type) ? field.type : "TEXT",
@@ -138,6 +224,8 @@ export function toFormFieldDefinition(
       : null,
     options: parseStringArray(field.options),
     memberFields: normalizedMemberFields,
+    memberMinCount,
+    memberMaxCount,
     conditionOperator: isFormConditionOperator(field.conditionOperator)
       ? field.conditionOperator
       : null,
@@ -382,6 +470,22 @@ export function validateFormAnswers(
       phase === "REGISTRATION"
         ? field.requiredInRegistration
         : field.requiredInMandate
+    if (field.type === "MEMBER_LIST" && Array.isArray(value)) {
+      if ((required || value.length > 0) && value.length < field.memberMinCount) {
+        errors[field.key] =
+          field.memberMinCount === field.memberMaxCount
+            ? `Võistkonnas peab olema ${field.memberMinCount} liiget`
+            : `Lisa vähemalt ${field.memberMinCount} liiget`
+        continue
+      }
+      if (
+        field.memberMaxCount !== null &&
+        value.length > field.memberMaxCount
+      ) {
+        errors[field.key] = `Võistkonnas võib olla kuni ${field.memberMaxCount} liiget`
+        continue
+      }
+    }
     if (
       required &&
       (isEmptyAnswer(value) ||

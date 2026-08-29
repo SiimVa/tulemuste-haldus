@@ -625,7 +625,9 @@ export default function RegistrationSettingsPage({
                   Esindaja on kohustuslik
                 </span>
                 <span className="block text-xs text-gray-500 mt-0.5">
-                  Esindaja võib olla ka ühe esindatava võistkonna liige.
+                  Esindaja nimi, e-post ja telefon lisatakse vormi
+                  automaatselt. Esindaja võib olla ka ühe esindatava
+                  võistkonna liige.
                 </span>
               </span>
             </label>

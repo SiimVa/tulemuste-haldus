@@ -20,6 +20,19 @@ Mõlemal etapil on olekud:
 Mandaat avaneb alles pärast registreerimise kinnitamist. Mandaadi esitamiseks
 peab võistkonnal olema vähemalt üks `COMPETITOR` rolliga liige.
 
+## Vorm ja koosseis
+
+Korraldaja määrab vormiehitajas, milliseid välju näidatakse registreerimisel
+ja mandaadis ning kas need on kohustuslikud. „Võistkonna liikmete loend” väljal
+saab määrata liikmete minimaalse ja maksimaalse arvu. Sama arv mõlemas väljas
+tähendab täpset koosseisu. Vabatahtliku liikmete välja võib jätta tühjaks, kuid
+liikmete lisamisel peab nende arv jääma määratud vahemikku.
+
+Kui võistluse koosseisunõuetes on esindaja kohustuslik, lisab süsteem vormi
+automaatselt esindaja nime, e-posti ja telefoni. Nimi ja e-post eeltäidetakse
+sisselogitud kasutaja konto andmetega. Süsteemseid esindajavälju ei saa
+vormiehitajas eemaldada.
+
 ## Esindaja vaade
 
 Esindaja näeb dashboard'il jaotist **Minu esindatavad võistkonnad**. Sealt
@@ -38,7 +51,9 @@ Võistluse lehel on jaotis **Registreerimine**, kus omanik, korraldaja või
 süsteemiadministraator näeb kõigi võistkondade olekuid, esindajat ja mandaadi
 koosseisu. Esitatud etapi saab kinnitada või märkusega parandamisele saata.
 
-Esindaja määratakse jätkuvalt võistluse **Seaded** lehel.
+Avaliku registreerimise kinnitamisel seotakse registreeringu esitanud kasutaja
+võistkonna esindajaks. Korraldaja saab esindajat hiljem võistluse **Seaded**
+lehel muuta.
 
 ## Isikuandmed
 

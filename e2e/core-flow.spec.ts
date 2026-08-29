@@ -18,6 +18,12 @@ const representative = {
   password: "esindaja-turvaline-123",
 }
 
+const accountJudge = {
+  email: "kohtunik.e2e@example.com",
+  name: "E2E Kontokohtunik",
+  password: "kohtunik-turvaline-123",
+}
+
 const setupSecret = "e2e-setup-secret-used-only-by-playwright-tests"
 
 async function login(page: Page, email: string, password: string) {
@@ -33,6 +39,7 @@ test.describe.serial("võistluse põhivoog", () => {
   let teamId = ""
   let secondTeamId = ""
   let elementId = ""
+  let restrictedElementId = ""
   let judgeToken = ""
   let athleteToken = ""
 
@@ -145,6 +152,40 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(elementResponse.status(), await elementResponse.text()).toBe(200)
     elementId = (await elementResponse.json()).id
 
+    const restrictedElementResponse = await page.request.post(
+      `/api/competitions/${competitionId}/elements`,
+      {
+        data: {
+          name: "Kontrollpunkt 2",
+          code: "KP2",
+          type: "CHECKPOINT",
+          maxValue: 30,
+          config: {},
+          fields: [
+            {
+              name: "punktid",
+              label: "Punktid",
+              type: "NUMBER",
+              isResultField: true,
+              rankingPriority: 1,
+              order: 0,
+              validation: { required: true },
+            },
+          ],
+          exceptions: [],
+          calcMethod: {
+            type: "ABSOLUTE_POINTS",
+            params: { higherIsBetter: false },
+          },
+        },
+      }
+    )
+    expect(
+      restrictedElementResponse.status(),
+      await restrictedElementResponse.text()
+    ).toBe(200)
+    restrictedElementId = (await restrictedElementResponse.json()).id
+
     const visibilityResponse = await page.request.patch(
       `/api/competitions/${competitionId}/athlete-visibility`,
       {
@@ -188,6 +229,33 @@ test.describe.serial("võistluse põhivoog", () => {
       await representativeResponse.text()
     ).toBe(200)
 
+    const accountJudgeResponse = await page.request.post("/api/users", {
+      data: accountJudge,
+    })
+    expect(
+      accountJudgeResponse.status(),
+      await accountJudgeResponse.text()
+    ).toBe(200)
+
+    await page.goto(`/dashboard/competitions/${competitionId}/access`)
+    await page.getByPlaceholder("kohtunik@email.ee").fill(accountJudge.email)
+    await page.getByLabel("KP1 · Kontrollpunkt 1").check()
+    const assignmentResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(
+          `/api/competitions/${competitionId}/judges`
+        ) && response.request().method() === "POST"
+    )
+    await page.getByRole("button", { name: "Salvesta kohtunik" }).click()
+    const savedAssignmentResponse = await assignmentResponse
+    expect(
+      savedAssignmentResponse.status(),
+      await savedAssignmentResponse.text()
+    ).toBe(200)
+    await expect(
+      page.getByText(accountJudge.name, { exact: true })
+    ).toBeVisible()
+
   })
 
   test("kohtunik sisestab tulemuse ja pingerida arvutatakse", async ({ page }) => {
@@ -211,6 +279,50 @@ test.describe.serial("võistluse põhivoog", () => {
     )
     expect(teamResult.total).toBe(83)
     expect(teamResult.rank).toBe(1)
+  })
+
+  test("kontoga kohtunik näeb ja sisestab ainult määratud elementi", async ({
+    page,
+  }) => {
+    await login(page, accountJudge.email, accountJudge.password)
+
+    await expect(
+      page.getByRole("heading", { name: "Minu hindamispunktid" })
+    ).toBeVisible()
+    await expect(page.getByText("KP1 · Kontrollpunkt 1")).toBeVisible()
+    await page.getByText("Ava kohtunikuvaade →").click()
+    await page.waitForURL(`/dashboard/judge/${competitionId}`)
+
+    await expect(
+      page.getByRole("heading", { name: "E2E proovivõistlus" })
+    ).toBeVisible()
+    await expect(page.getByText("[KP1] Kontrollpunkt 1")).toBeVisible()
+    await expect(page.getByText("Kontrollpunkt 2")).toHaveCount(0)
+
+    await page.getByRole("button", { name: /VK 1.*Testvõistkond/ }).click()
+    const timeInput = page.locator('form input[inputmode="numeric"]')
+    await timeInput.fill("123")
+    await page.getByRole("button", { name: "✓ Salvesta tulemus" }).click()
+    await expect(
+      page.getByText(/Viimati salvestatud: Testvõistkond/)
+    ).toBeVisible()
+
+    const deniedResponse = await page.request.post(
+      `/api/elements/${restrictedElementId}/results`,
+      {
+        data: {
+          teamId,
+          values: { punktid: 5 },
+          exceptionLabel: null,
+        },
+      }
+    )
+    expect(deniedResponse.status()).toBe(403)
+
+    const managementResponse = await page.request.get(
+      `/api/competitions/${competitionId}`
+    )
+    expect(managementResponse.status()).toBe(403)
   })
 
   test("võistleja näeb sisestatud tulemust ja avaldatud punkte", async ({ page }) => {
@@ -561,6 +673,8 @@ test.describe.serial("võistluse põhivoog", () => {
         semanticKey: null,
         options: [],
         memberFields: ["name", "email", "phone", "birthDate"],
+        memberMinCount: 1,
+        memberMaxCount: 4,
         showInRegistration: true,
         requiredInRegistration: false,
         showInMandate: true,
@@ -633,6 +747,15 @@ test.describe.serial("võistluse põhivoog", () => {
       adminPage.locator('input[value="Maakond"]')
     ).toBeVisible()
     await expect(
+      adminPage.getByText("Automaatne esindajaväli")
+    ).toHaveCount(3)
+    await expect(adminPage.getByLabel("Minimaalne liikmete arv")).toHaveValue(
+      "1"
+    )
+    await expect(adminPage.getByLabel("Maksimaalne liikmete arv")).toHaveValue(
+      "4"
+    )
+    await expect(
       adminPage.getByRole("heading", {
         name: "Kohtade automaatne jaotamine",
       })
@@ -652,6 +775,13 @@ test.describe.serial("võistluse põhivoog", () => {
     await login(page, representative.email, representative.password)
     await page.goto(`/competitions/${competitionId}`)
 
+    await expect(page.getByLabel("Esindaja nimi")).toHaveValue(
+      representative.name
+    )
+    await expect(page.getByLabel("Esindaja e-post")).toHaveValue(
+      representative.email
+    )
+    await page.getByLabel("Esindaja telefon").fill("+372 5555 0001")
     await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 1")
     await expect(page.getByLabel("Klass")).toHaveCount(0)
     await page.getByLabel("Maakond").selectOption("Harjumaa")
@@ -670,12 +800,14 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.getByLabel("Maakond").selectOption("Harjumaa")
     await page.getByLabel("Võistkonna liik").selectOption("Noored Kotkad")
     await page.getByLabel("Rühma nimi").fill("Harju teine rühm")
+    await page.getByLabel("Esindaja telefon").fill("+372 5555 0002")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
     await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
 
     await page.getByLabel("Võistkonna nimi").fill("Avalik testvõistkond 3")
     await page.getByLabel("Maakond").selectOption("Raplamaa")
     await page.getByLabel("Võistkonna liik").selectOption("Kodutütred")
+    await page.getByLabel("Esindaja telefon").fill("+372 5555 0003")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
     await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
     const secondApplication = page

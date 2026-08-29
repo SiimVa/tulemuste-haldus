@@ -8,6 +8,7 @@ import {
   type FormAnswer,
   type FormAnswers,
   type FormFieldDefinition,
+  REPRESENTATIVE_FORM_FIELD_KEYS,
   validateFormAnswers,
 } from "@/lib/registrationForm"
 
@@ -43,6 +44,17 @@ const STATUS_COLOR: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
 }
 
+function representativeDefaultAnswers(defaults: {
+  name: string
+  email: string
+}): FormAnswers {
+  return {
+    [REPRESENTATIVE_FORM_FIELD_KEYS.name]: defaults.name,
+    [REPRESENTATIVE_FORM_FIELD_KEYS.email]: defaults.email,
+    [REPRESENTATIVE_FORM_FIELD_KEYS.phone]: "",
+  }
+}
+
 export function RegistrationPanel({
   competitionId,
   registrationOpen,
@@ -50,6 +62,7 @@ export function RegistrationPanel({
   classes,
   formFields,
   applications,
+  representativeDefaults,
 }: {
   competitionId: string
   registrationOpen: boolean
@@ -57,13 +70,16 @@ export function RegistrationPanel({
   classes: CompetitionClass[]
   formFields: FormFieldDefinition[]
   applications: Application[]
+  representativeDefaults: { name: string; email: string }
 }) {
   const router = useRouter()
   const [teamName, setTeamName] = useState("")
   const [classId, setClassId] = useState(
     classes.length === 1 ? classes[0].id : ""
   )
-  const [answers, setAnswers] = useState<FormAnswers>({})
+  const [answers, setAnswers] = useState<FormAnswers>(() =>
+    representativeDefaultAnswers(representativeDefaults)
+  )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -74,7 +90,7 @@ export function RegistrationPanel({
   function resetForm() {
     setTeamName("")
     setClassId(classes.length === 1 ? classes[0].id : "")
-    setAnswers({})
+    setAnswers(representativeDefaultAnswers(representativeDefaults))
     setFormErrors({})
     setEditingId(null)
   }
@@ -85,7 +101,10 @@ export function RegistrationPanel({
     setClassId(
       application.class?.id ?? (classes.length === 1 ? classes[0].id : "")
     )
-    setAnswers(application.formValues)
+    setAnswers({
+      ...representativeDefaultAnswers(representativeDefaults),
+      ...application.formValues,
+    })
     setFormErrors({})
     setError("")
     setMessage("")
