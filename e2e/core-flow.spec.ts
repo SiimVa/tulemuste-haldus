@@ -24,6 +24,12 @@ const accountJudge = {
   password: "kohtunik-turvaline-123",
 }
 
+const competitionOrganizer = {
+  email: "korraldaja.e2e@example.com",
+  name: "E2E Võistluse korraldaja",
+  password: "korraldaja-turvaline-123",
+}
+
 const setupSecret = "e2e-setup-secret-used-only-by-playwright-tests"
 
 async function login(page: Page, email: string, password: string) {
@@ -237,16 +243,25 @@ test.describe.serial("võistluse põhivoog", () => {
       await accountJudgeResponse.text()
     ).toBe(200)
 
+    const organizerResponse = await page.request.post("/api/users", {
+      data: competitionOrganizer,
+    })
+    expect(
+      organizerResponse.status(),
+      await organizerResponse.text()
+    ).toBe(200)
+
     await page.goto(`/dashboard/competitions/${competitionId}/access`)
-    await page.getByPlaceholder("kohtunik@email.ee").fill(accountJudge.email)
+    await page.getByPlaceholder("kasutaja@email.ee").fill(accountJudge.email)
+    await page.getByRole("checkbox", { name: /Kohtunik/ }).check()
     await page.getByLabel("KP1 · Kontrollpunkt 1").check()
     const assignmentResponse = page.waitForResponse(
       (response) =>
         response.url().endsWith(
-          `/api/competitions/${competitionId}/judges`
-        ) && response.request().method() === "POST"
+          `/api/competitions/${competitionId}/roles`
+        ) && response.request().method() === "PUT"
     )
-    await page.getByRole("button", { name: "Salvesta kohtunik" }).click()
+    await page.getByRole("button", { name: "Salvesta õigused" }).click()
     const savedAssignmentResponse = await assignmentResponse
     expect(
       savedAssignmentResponse.status(),
@@ -256,6 +271,58 @@ test.describe.serial("võistluse põhivoog", () => {
       page.getByText(accountJudge.name, { exact: true })
     ).toBeVisible()
 
+    await page
+      .getByPlaceholder("kasutaja@email.ee")
+      .fill(competitionOrganizer.email)
+    await page.getByRole("checkbox", { name: /Korraldaja/ }).check()
+    const organizerAssignmentResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(
+          `/api/competitions/${competitionId}/roles`
+        ) && response.request().method() === "PUT"
+    )
+    await page.getByRole("button", { name: "Salvesta õigused" }).click()
+    const savedOrganizerResponse = await organizerAssignmentResponse
+    expect(
+      savedOrganizerResponse.status(),
+      await savedOrganizerResponse.text()
+    ).toBe(200)
+    await expect(
+      page.getByText(competitionOrganizer.name, { exact: true })
+    ).toBeVisible()
+
+  })
+
+  test("võistluse korraldaja saab olemasolevat võistlust hallata, kuid uut luua ei saa", async ({ page }) => {
+    await login(page, competitionOrganizer.email, competitionOrganizer.password)
+
+    await expect(
+      page.getByText("E2E proovivõistlus", { exact: true })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("link", { name: "+ Uus võistlus" })
+    ).toHaveCount(0)
+
+    const managementResponse = await page.request.get(
+      `/api/competitions/${competitionId}`
+    )
+    expect(managementResponse.status()).toBe(200)
+    const escalationResponse = await page.request.put(
+      `/api/competitions/${competitionId}/roles`,
+      {
+        data: {
+          email: accountJudge.email,
+          roles: ["ORGANIZER", "JUDGE"],
+          elementIds: [elementId],
+          teamIds: [],
+        },
+      }
+    )
+    expect(escalationResponse.status()).toBe(403)
+    const createResponse = await page.request.post("/api/competitions", {
+      data: { name: "Keelatud uus võistlus" },
+    })
+    expect(createResponse.status()).toBe(403)
   })
 
   test("kohtunik sisestab tulemuse ja pingerida arvutatakse", async ({ page }) => {

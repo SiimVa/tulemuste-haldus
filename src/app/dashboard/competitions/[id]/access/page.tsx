@@ -2,19 +2,11 @@
 
 import { use, useState, useEffect } from "react"
 import Link from "next/link"
+import { CompetitionRoleManager } from "@/components/CompetitionRoleManager"
 
 type Token = { id: string; token: string; type: string; name: string; elementId?: string | null; teamId?: string | null; element?: { name: string } | null; team?: { name: string } | null; lastUsedAt?: string | null }
 type Element = { id: string; name: string; code: string }
 type Team = { id: string; name: string; code: string }
-type JudgeAssignment = {
-  id: string
-  userId: string
-  user: { id: string; name: string; email: string }
-  judgedElements: {
-    element: { id: string; name: string; code: string; order: number }
-  }[]
-}
-
 export default function AccessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = use(params)
   const [tokens, setTokens] = useState<Token[]>([])
@@ -26,11 +18,6 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkMsg, setBulkMsg] = useState("")
   const [copied, setCopied] = useState<string | null>(null)
-  const [judges, setJudges] = useState<JudgeAssignment[]>([])
-  const [judgeEmail, setJudgeEmail] = useState("")
-  const [judgeElementIds, setJudgeElementIds] = useState<string[]>([])
-  const [savingJudge, setSavingJudge] = useState(false)
-  const [judgeError, setJudgeError] = useState("")
 
   useEffect(() => {
     fetch(`/api/competitions/${competitionId}`)
@@ -44,72 +31,7 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
       .then(r => r.ok ? r.json() : [])
       .then(setTokens)
       .catch(() => {})
-    fetch(`/api/competitions/${competitionId}/judges`)
-      .then(r => r.ok ? r.json() : [])
-      .then(setJudges)
-      .catch(() => {})
   }, [competitionId])
-
-  function toggleJudgeElement(elementId: string) {
-    setJudgeElementIds((current) =>
-      current.includes(elementId)
-        ? current.filter((id) => id !== elementId)
-        : [...current, elementId]
-    )
-  }
-
-  async function saveJudge(event: React.FormEvent) {
-    event.preventDefault()
-    setSavingJudge(true)
-    setJudgeError("")
-
-    const response = await fetch(`/api/competitions/${competitionId}/judges`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: judgeEmail, elementIds: judgeElementIds }),
-    })
-    const data = await response.json().catch(() => ({}))
-    setSavingJudge(false)
-
-    if (!response.ok) {
-      setJudgeError(data.error ?? "Kohtuniku määramine ebaõnnestus")
-      return
-    }
-
-    setJudges((current) => [
-      ...current.filter((judge) => judge.userId !== data.userId),
-      data,
-    ])
-    setJudgeEmail("")
-    setJudgeElementIds([])
-  }
-
-  function editJudge(judge: JudgeAssignment) {
-    setJudgeEmail(judge.user.email)
-    setJudgeElementIds(
-      judge.judgedElements.map(({ element }) => element.id)
-    )
-    setJudgeError("")
-  }
-
-  async function removeJudge(judge: JudgeAssignment) {
-    if (!confirm(`Eemalda ${judge.user.name} kohtuniku rollist?`)) return
-
-    const response = await fetch(`/api/competitions/${competitionId}/judges`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: judge.userId }),
-    })
-    if (response.ok) {
-      setJudges((current) =>
-        current.filter((item) => item.userId !== judge.userId)
-      )
-      if (judgeEmail.trim().toLowerCase() === judge.user.email.toLowerCase()) {
-        setJudgeEmail("")
-        setJudgeElementIds([])
-      }
-    }
-  }
 
   async function createToken(e: React.FormEvent) {
     e.preventDefault()
@@ -182,130 +104,11 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
         "Loo kõik lingid" loob automaatselt kohtuniku lingid igale elemendile ja võistleja lingid igale võistkonnale (kui need juba pole olemas).
       </p>
 
-      <section className="bg-white border border-orange-200 rounded-xl p-5 mb-6 space-y-4">
-        <div>
-          <h2 className="font-semibold text-gray-900">
-            Kasutajakontoga kohtunikud
-          </h2>
-          <p className="text-xs text-gray-500 mt-1">
-            Kohtunik logib sisse Google&apos;iga või oma kontoga ja näeb ainult
-            talle määratud elemente. Kasutajakonto peab enne olemas olema.
-          </p>
-        </div>
-
-        {judges.length > 0 && (
-          <div className="divide-y border rounded-lg">
-            {judges.map((judge) => (
-              <div
-                key={judge.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {judge.user.name}
-                  </p>
-                  <p className="text-xs text-gray-400">{judge.user.email}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {judge.judgedElements
-                      .map(({ element }) => `${element.code} · ${element.name}`)
-                      .join(", ")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => editJudge(judge)}
-                    className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1"
-                  >
-                    Muuda
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeJudge(judge)}
-                    className="text-xs text-red-500 hover:text-red-600 px-2 py-1"
-                  >
-                    Eemalda
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <form onSubmit={saveJudge} className="space-y-3">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">
-              Kohtuniku e-post
-            </label>
-            <input
-              type="email"
-              required
-              value={judgeEmail}
-              onChange={(event) => setJudgeEmail(event.target.value)}
-              placeholder="kohtunik@email.ee"
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <label className="text-xs text-gray-500">
-                Lubatud elemendid
-              </label>
-              {elements.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setJudgeElementIds(
-                      judgeElementIds.length === elements.length
-                        ? []
-                        : elements.map(({ id }) => id)
-                    )
-                  }
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  {judgeElementIds.length === elements.length
-                    ? "Tühista kõik"
-                    : "Vali kõik"}
-                </button>
-              )}
-            </div>
-            <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
-              {elements.length === 0 ? (
-                <p className="text-sm text-gray-400 px-3 py-4">
-                  Võistlusel pole veel elemente.
-                </p>
-              ) : (
-                elements.map((element) => (
-                  <label
-                    key={element.id}
-                    className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={judgeElementIds.includes(element.id)}
-                      onChange={() => toggleJudgeElement(element.id)}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="font-medium text-gray-700">
-                      {element.code} · {element.name}
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={savingJudge || judgeElementIds.length === 0}
-            className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50"
-          >
-            {savingJudge ? "Salvestan..." : "Salvesta kohtunik"}
-          </button>
-          {judgeError && <p className="text-sm text-red-600">{judgeError}</p>}
-        </form>
-      </section>
+      <CompetitionRoleManager
+        competitionId={competitionId}
+        elements={elements}
+        teams={teams}
+      />
 
       {/* Uue tokeni vorm */}
       <form onSubmit={createToken} className="bg-white border rounded-xl p-5 mb-6 space-y-4">

@@ -22,9 +22,27 @@ Toetatud võistluse rollid:
 
 Ühel liikmel võib olla samal võistlusel mitu rolli.
 
+## Rollide haldamine
+
+Võistluse **Juurdepääsu** lehel saab olemasoleva kasutajakonto e-posti järgi
+määrata ja muuta aktiivseid võistlusepõhiseid rolle ühes kohas.
+
+- võistluse omanik ja süsteemiadministraator saavad anda või eemaldada
+  `ORGANIZER` rolli;
+- kaas-korraldaja saab hallata `JUDGE` ja `REPRESENTATIVE` rolle, kuid ei saa
+  ennast ega teist kasutajat korraldajaks tõsta;
+- `JUDGE` rolliga tuleb valida vähemalt üks hindamiselement;
+- `REPRESENTATIVE` rolliga tuleb valida vähemalt üks võistkond;
+- `COMPETITOR` roll tekib võistkonna liikme kasutajakontoga sidumisel
+  automaatselt ja käsitsi rollihaldus seda ei eemalda;
+- võistluse omaniku `OWNER` rolli ei saa rollihaldusest muuta.
+
+Kasutajale võistluse korraldaja rolli andmine ei muuda tema süsteemiülest
+rolli ega anna talle õigust uusi võistlusi luua.
+
 ## Kasutajakontoga kohtunik
 
-Võistluse **Juurdepääsu haldus** lehel saab korraldaja määrata olemasoleva
+Võistluse **Juurdepääsu** lehel saab korraldaja määrata olemasoleva
 kasutajakonto kohtunikuks ja valida talle ühe või mitu hindamiselementi.
 
 - kohtunik näeb pärast sisselogimist töölaual jaotist **Minu hindamispunktid**;
@@ -52,7 +70,7 @@ näiteks juhul, kui inimesel ei ole veel kasutajakontot.
 - registreerimise ja mandaadi API peab kasutama
   `canManageTeamRegistration()` kontrolli.
 
-Korraldaja saab esindajaid määrata võistluse seadete lehel. Praeguse esindaja
+Korraldaja saab esindajaid määrata võistluse **Juurdepääsu** lehel. Praeguse esindaja
 asendamisel säilivad tema teised rollid ja teiste võistkondade seosed.
 
 ## Google’i sisselogimise aktiveerimine
