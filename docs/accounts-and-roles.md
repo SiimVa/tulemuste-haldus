@@ -40,10 +40,31 @@ määrata ja muuta aktiivseid võistlusepõhiseid rolle ühes kohas.
 Kasutajale võistluse korraldaja rolli andmine ei muuda tema süsteemiülest
 rolli ega anna talle õigust uusi võistlusi luua.
 
+## Kontota kasutaja kutsumine
+
+Kui sisestatud e-posti aadressiga kasutajakontot veel ei ole, saab korraldaja
+**Juurdepääsu** lehel luua turvalise kutselingi. Rakendus e-kirju ise ei saada:
+korraldaja kopeerib kuvatud lingi ja edastab selle kutsutule ise.
+
+- kutse kehtib seitse päeva ja selle saab enne vastuvõtmist tühistada või uue
+  lingiga asendada;
+- kutse saab vastu võtta ainult sama e-posti aadressiga sisse loginud kasutaja;
+- konto võib kutse avamise järel luua Google'i sisselogimisega;
+- kutse lisab määratud rollid ja ligipääsud ega eemalda kasutaja varasemaid
+  võistluse rolle;
+- kaas-korraldaja saab kutsuda kohtunikke ja esindajaid, kuid korraldaja rolli
+  saab kutses anda ainult võistluse omanik või süsteemiadministraator;
+- vastuvõtmisel kontrollitakse uuesti, et kutse saatjal on endiselt vastavate
+  õiguste andmise õigus.
+
+Kutselinki ennast andmebaasis ei hoita. Salvestatakse ainult tokeni SHA-256
+räsi, mistõttu tuleb loodud link kohe kopeerida.
+
 ## Kasutajakontoga kohtunik
 
 Võistluse **Juurdepääsu** lehel saab korraldaja määrata olemasoleva
-kasutajakonto kohtunikuks ja valida talle ühe või mitu hindamiselementi.
+kasutajakonto kohtunikuks või luua kontota kasutajale kutselingi ning valida
+talle ühe või mitu hindamiselementi.
 
 - kohtunik näeb pärast sisselogimist töölaual jaotist **Minu hindamispunktid**;
 - kontopõhine kohtunikuvaade avaneb aadressil

@@ -22,6 +22,16 @@ type RoleData = {
   owner: CompetitionMember
   members: CompetitionMember[]
 }
+type RoleInvitation = {
+  id: string
+  email: string
+  roles: ManagedRole[]
+  elementIds: string[]
+  teamIds: string[]
+  state: "PENDING" | "EXPIRED"
+  expiresAt: string
+  invitedBy: { name: string }
+}
 
 const ROLE_LABELS: Record<CompetitionRole, string> = {
   OWNER: "Peakorraldaja",
@@ -68,6 +78,7 @@ export function CompetitionRoleManager({
   teams: TeamOption[]
 }) {
   const [data, setData] = useState<RoleData | null>(null)
+  const [invitations, setInvitations] = useState<RoleInvitation[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState("")
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
@@ -76,11 +87,14 @@ export function CompetitionRoleManager({
   const [teamIds, setTeamIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [invitationLink, setInvitationLink] = useState("")
+  const [copiedInvitationLink, setCopiedInvitationLink] = useState(false)
 
   const loadRoles = useCallback(async () => {
-    const response = await fetch(
-      `/api/competitions/${competitionId}/roles`
-    )
+    const [response, invitationsResponse] = await Promise.all([
+      fetch(`/api/competitions/${competitionId}/roles`),
+      fetch(`/api/competitions/${competitionId}/role-invitations`),
+    ])
     const responseData = await response.json().catch(() => null)
     if (!response.ok) {
       setError(responseData?.error ?? "Rollide laadimine ebaõnnestus")
@@ -88,6 +102,11 @@ export function CompetitionRoleManager({
       return
     }
     setData(responseData)
+    if (invitationsResponse.ok) {
+      setInvitations(
+        await invitationsResponse.json().catch(() => [])
+      )
+    }
     setLoading(false)
   }, [competitionId])
 
@@ -118,6 +137,17 @@ export function CompetitionRoleManager({
     )
     setTeamIds(member.representedTeams.map(({ team }) => team.id))
     setError("")
+    setInvitationLink("")
+  }
+
+  function editInvitation(invitation: RoleInvitation) {
+    setEmail(invitation.email)
+    setEditingUserId(null)
+    setRoles(invitation.roles)
+    setElementIds(invitation.elementIds)
+    setTeamIds(invitation.teamIds)
+    setError("")
+    setInvitationLink("")
   }
 
   function toggleRole(role: ManagedRole) {
@@ -142,6 +172,7 @@ export function CompetitionRoleManager({
   async function updateRoles(requestedRoles: ManagedRole[]) {
     setSaving(true)
     setError("")
+    setInvitationLink("")
     const response = await fetch(
       `/api/competitions/${competitionId}/roles`,
       {
@@ -156,14 +187,75 @@ export function CompetitionRoleManager({
       }
     )
     const responseData = await response.json().catch(() => ({}))
-    setSaving(false)
     if (!response.ok) {
+      if (
+        responseData.code === "USER_NOT_FOUND" &&
+        requestedRoles.length > 0 &&
+        !editingUserId
+      ) {
+        const invitationResponse = await fetch(
+          `/api/competitions/${competitionId}/role-invitations`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email,
+              roles: requestedRoles,
+              elementIds,
+              teamIds,
+            }),
+          }
+        )
+        const invitationData = await invitationResponse
+          .json()
+          .catch(() => ({}))
+        setSaving(false)
+        if (!invitationResponse.ok) {
+          setError(
+            invitationData.error ?? "Kutse loomine ebaõnnestus"
+          )
+          return false
+        }
+        const link = `${window.location.origin}${invitationData.invitationUrl}`
+        await loadRoles()
+        resetForm()
+        setInvitationLink(link)
+        return true
+      }
+      setSaving(false)
       setError(responseData.error ?? "Rollide salvestamine ebaõnnestus")
       return false
     }
+    setSaving(false)
     await loadRoles()
     resetForm()
     return true
+  }
+
+  async function copyInvitationLink() {
+    await navigator.clipboard.writeText(invitationLink)
+    setCopiedInvitationLink(true)
+    setTimeout(() => setCopiedInvitationLink(false), 2000)
+  }
+
+  async function revokeInvitation(invitation: RoleInvitation) {
+    if (!confirm(`Tühista kutse aadressile ${invitation.email}?`)) return
+    const response = await fetch(
+      `/api/competitions/${competitionId}/role-invitations`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId: invitation.id }),
+      }
+    )
+    const responseData = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(responseData.error ?? "Kutse tühistamine ebaõnnestus")
+      return
+    }
+    setInvitations((current) =>
+      current.filter(({ id }) => id !== invitation.id)
+    )
   }
 
   async function saveRoles(event: React.FormEvent) {
@@ -223,8 +315,8 @@ export function CompetitionRoleManager({
           Kasutajate võistlusepõhised rollid
         </h2>
         <p className="text-xs text-gray-500 mt-1">
-          Määra olemasolevale kasutajakontole korraldaja, kohtuniku või
-          esindaja õigused. Ühel kasutajal võib olla mitu rolli.
+          Määra korraldaja, kohtuniku või esindaja õigused. Kui selle
+          e-postiga kontot veel pole, luuakse jagatav kutselink.
         </p>
       </div>
 
@@ -308,6 +400,99 @@ export function CompetitionRoleManager({
         </div>
       )}
 
+      {invitations.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">
+            Vastuvõtmist ootavad kutsed
+          </h3>
+          <div className="divide-y border rounded-lg">
+            {invitations.map((invitation) => {
+              const organizerInvitation =
+                invitation.roles.includes("ORGANIZER")
+              const mayManageInvitation =
+                data?.canManageOrganizers || !organizerInvitation
+              return (
+                <div
+                  key={invitation.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900">
+                        {invitation.email}
+                      </p>
+                      <span
+                        className={`text-xs rounded-full px-2 py-0.5 ${
+                          invitation.state === "EXPIRED"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {invitation.state === "EXPIRED"
+                          ? "Aegunud"
+                          : "Ootab vastuvõtmist"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {invitation.roles
+                        .map((role) => ROLE_LABELS[role])
+                        .join(", ")}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Kehtib kuni {new Date(invitation.expiresAt).toLocaleString("et-EE")}
+                    </p>
+                  </div>
+                  {mayManageInvitation && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => editInvitation(invitation)}
+                        className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1"
+                      >
+                        Loo uus link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => revokeInvitation(invitation)}
+                        className="text-xs text-red-500 hover:text-red-600 px-2 py-1"
+                      >
+                        Tühista
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {invitationLink && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p className="text-sm font-medium text-green-800">
+            Kutse on loodud – kopeeri link kohe
+          </p>
+          <p className="text-xs text-green-700 mt-1">
+            Turvalisuse tõttu ei saa sama linki pärast lehe uuesti laadimist
+            enam kuvada. Vajaduse korral loo uus link.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 mt-3">
+            <input
+              readOnly
+              value={invitationLink}
+              className="flex-1 min-w-0 px-3 py-2 border border-green-200 bg-white rounded-lg text-xs"
+            />
+            <button
+              type="button"
+              onClick={copyInvitationLink}
+              className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800"
+            >
+              {copiedInvitationLink ? "Kopeeritud" : "Kopeeri link"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={saveRoles} className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-gray-800">
@@ -338,7 +523,8 @@ export function CompetitionRoleManager({
             className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-gray-50"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Kasutajakonto peab enne olemas olema.
+            Konto olemasolul rakenduvad õigused kohe. Uuele kasutajale saad
+            kutselingi, mis kehtib seitse päeva.
           </p>
         </div>
 

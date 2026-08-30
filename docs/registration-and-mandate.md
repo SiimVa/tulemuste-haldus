@@ -52,8 +52,9 @@ süsteemiadministraator näeb kõigi võistkondade olekuid, esindajat ja mandaad
 koosseisu. Esitatud etapi saab kinnitada või märkusega parandamisele saata.
 
 Avaliku registreerimise kinnitamisel seotakse registreeringu esitanud kasutaja
-võistkonna esindajaks. Korraldaja saab esindajat hiljem võistluse **Seaded**
-lehel muuta.
+võistkonna esindajaks. Korraldaja saab esindajat hiljem võistluse
+**Juurdepääsu** lehel muuta. Kui esindajal veel kontot ei ole, saab talle samalt
+lehelt luua rollikutse ja edastada kuvatud lingi käsitsi.
 
 ## Isikuandmed
 

@@ -30,6 +30,12 @@ const competitionOrganizer = {
   password: "korraldaja-turvaline-123",
 }
 
+const invitedJudge = {
+  email: "kutsutud.kohtunik.e2e@example.com",
+  name: "E2E Kutsutud kohtunik",
+  password: "kutsutud-turvaline-123",
+}
+
 const setupSecret = "e2e-setup-secret-used-only-by-playwright-tests"
 
 async function login(page: Page, email: string, password: string) {
@@ -48,6 +54,7 @@ test.describe.serial("võistluse põhivoog", () => {
   let restrictedElementId = ""
   let judgeToken = ""
   let athleteToken = ""
+  let judgeInvitationUrl = ""
 
   test.beforeAll(async ({ request }) => {
     const response = await request.post("/api/setup", {
@@ -291,6 +298,35 @@ test.describe.serial("võistluse põhivoog", () => {
       page.getByText(competitionOrganizer.name, { exact: true })
     ).toBeVisible()
 
+    await page.getByPlaceholder("kasutaja@email.ee").fill(invitedJudge.email)
+    await page.getByRole("checkbox", { name: /Kohtunik/ }).check()
+    await page.getByLabel("KP1 · Kontrollpunkt 1").check()
+    const invitationResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(
+          `/api/competitions/${competitionId}/role-invitations`
+        ) && response.request().method() === "POST"
+    )
+    await page.getByRole("button", { name: "Salvesta õigused" }).click()
+    const invitationResponse = await invitationResponsePromise
+    const invitationData = await invitationResponse.json()
+    expect(
+      invitationResponse.status(),
+      JSON.stringify(invitationData)
+    ).toBe(201)
+    judgeInvitationUrl = invitationData.invitationUrl
+    expect(judgeInvitationUrl).toMatch(/^\/invitations\//)
+    await expect(
+      page.getByText("Kutse on loodud – kopeeri link kohe")
+    ).toBeVisible()
+
+    const invitedJudgeResponse = await page.request.post("/api/users", {
+      data: invitedJudge,
+    })
+    expect(
+      invitedJudgeResponse.status(),
+      await invitedJudgeResponse.text()
+    ).toBe(200)
   })
 
   test("võistluse korraldaja saab olemasolevat võistlust hallata, kuid uut luua ei saa", async ({ page }) => {
@@ -319,10 +355,63 @@ test.describe.serial("võistluse põhivoog", () => {
       }
     )
     expect(escalationResponse.status()).toBe(403)
+    const invitationEscalationResponse = await page.request.post(
+      `/api/competitions/${competitionId}/role-invitations`,
+      {
+        data: {
+          email: "keelatud.kutse@example.com",
+          roles: ["ORGANIZER"],
+          elementIds: [],
+          teamIds: [],
+        },
+      }
+    )
+    expect(invitationEscalationResponse.status()).toBe(403)
+    const wrongAccountAcceptanceResponse = await page.request.post(
+      `${judgeInvitationUrl.replace(
+        "/invitations/",
+        "/api/invitations/"
+      )}/accept`
+    )
+    expect(wrongAccountAcceptanceResponse.status()).toBe(403)
     const createResponse = await page.request.post("/api/competitions", {
       data: { name: "Keelatud uus võistlus" },
     })
     expect(createResponse.status()).toBe(403)
+  })
+
+  test("kontota kasutaja võtab rollikutse pärast sisselogimist vastu", async ({ page }) => {
+    await page.goto(judgeInvitationUrl)
+    await expect(
+      page.getByRole("heading", { name: "E2E proovivõistlus" })
+    ).toBeVisible()
+    await expect(page.getByText("Kohtunik", { exact: true })).toBeVisible()
+    await page
+      .getByRole("link", { name: "Logi sisse ja võta kutse vastu" })
+      .click()
+    await page.getByPlaceholder("admin@example.com").fill(invitedJudge.email)
+    await page.locator('input[type="password"]').fill(invitedJudge.password)
+    await page.getByRole("button", { name: "Logi sisse" }).click()
+    await page.waitForURL(`**${judgeInvitationUrl}`)
+
+    const acceptResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/invitations/") &&
+        response.url().endsWith("/accept") &&
+        response.request().method() === "POST"
+    )
+    await page.getByRole("button", { name: "Võta kutse vastu" }).click()
+    const acceptResponse = await acceptResponsePromise
+    expect(acceptResponse.status(), await acceptResponse.text()).toBe(200)
+    await page.waitForURL("**/dashboard")
+    await expect(
+      page.getByRole("heading", { name: "Minu hindamispunktid" })
+    ).toBeVisible()
+
+    await page.goto(judgeInvitationUrl)
+    await expect(
+      page.getByRole("heading", { name: "Kutse on juba vastu võetud" })
+    ).toBeVisible()
   })
 
   test("kohtunik sisestab tulemuse ja pingerida arvutatakse", async ({ page }) => {
