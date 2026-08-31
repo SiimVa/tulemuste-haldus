@@ -5,6 +5,7 @@ import Link from "next/link"
 import { RecalculateButton } from "@/components/RecalculateButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { ElementList } from "@/components/competition/ElementList"
+import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
 
 const STATUS_LABEL: Record<string, string> = {
   SETUP: "Ettevalmistus",
@@ -125,10 +126,13 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
       <div className="bg-white border rounded-xl">
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="font-semibold text-gray-900">Hindamiselemendid</h2>
-          <Link href={`/dashboard/competitions/${id}/elements/new`}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            + Lisa element
-          </Link>
+          <div className="flex items-center gap-4">
+            <ScoringElementCopyDialog fixedTargetCompetitionId={id} />
+            <Link href={`/dashboard/competitions/${id}/elements/new`}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              + Lisa element
+            </Link>
+          </div>
         </div>
 
         <ElementList

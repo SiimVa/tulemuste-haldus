@@ -5,6 +5,7 @@ import { canCreateCompetition } from "@/lib/permissions"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { teamDisplayName } from "@/lib/teamDisplay"
 import Link from "next/link"
+import { CompetitionCopyButton } from "@/components/competition/CompetitionCopyButton"
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -387,31 +388,44 @@ export default async function DashboardPage() {
       ) : competitions.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {competitions.map((c) => (
-            <Link
+            <div
               key={c.id}
-              href={`/dashboard/competitions/${c.id}`}
-              className="bg-white border rounded-xl p-5 hover:shadow-md transition-shadow"
+              className="bg-white border rounded-xl hover:shadow-md transition-shadow overflow-hidden"
             >
-              <div className="flex items-start justify-between mb-3">
-                <h2 className="font-semibold text-gray-900 leading-tight">{c.name}</h2>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-2 shrink-0 ${statusColor[c.status] ?? statusColor.SETUP}`}>
-                  {statusLabel[c.status] ?? c.status}
-                </span>
-              </div>
-              {(c.date || c.endDate) && (
-                <p className="text-sm text-gray-500 mb-3">
-                  📅 {c.date ? c.date.toLocaleDateString("et-EE") : ""}
-                  {c.endDate && (!c.date || c.endDate.toDateString() !== c.date.toDateString()) && ` – ${c.endDate.toLocaleDateString("et-EE")}`}
-                </p>
+              <Link
+                href={`/dashboard/competitions/${c.id}`}
+                className="block p-5"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <h2 className="font-semibold text-gray-900 leading-tight">{c.name}</h2>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-2 shrink-0 ${statusColor[c.status] ?? statusColor.SETUP}`}>
+                    {statusLabel[c.status] ?? c.status}
+                  </span>
+                </div>
+                {(c.date || c.endDate) && (
+                  <p className="text-sm text-gray-500 mb-3">
+                    📅 {c.date ? c.date.toLocaleDateString("et-EE") : ""}
+                    {c.endDate && (!c.date || c.endDate.toDateString() !== c.date.toDateString()) && ` – ${c.endDate.toLocaleDateString("et-EE")}`}
+                  </p>
+                )}
+                <div className="flex gap-4 text-sm text-gray-400">
+                  <span>🏳 {c._count.elements} elementi</span>
+                  <span>👥 {c._count.teams} võistkonda</span>
+                </div>
+                {currentUser.role === "ADMIN" && (
+                  <p className="text-xs text-gray-400 mt-2">Korraldaja: {c.organizer.name}</p>
+                )}
+              </Link>
+              {mayCreateCompetition && (
+                <div className="border-t px-5 py-3 bg-gray-50/60">
+                  <CompetitionCopyButton
+                    competitionId={c.id}
+                    competitionName={c.name}
+                    elementCount={c._count.elements}
+                  />
+                </div>
               )}
-              <div className="flex gap-4 text-sm text-gray-400">
-                <span>🏳 {c._count.elements} elementi</span>
-                <span>👥 {c._count.teams} võistkonda</span>
-              </div>
-              {currentUser.role === "ADMIN" && (
-                <p className="text-xs text-gray-400 mt-2">Korraldaja: {c.organizer.name}</p>
-              )}
-            </Link>
+            </div>
           ))}
         </div>
       ) : null}

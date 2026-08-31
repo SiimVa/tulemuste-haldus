@@ -15,6 +15,7 @@
     "src/lib/fieldValidation.ts",
     "src/lib/competitionRoleManagement.ts",
     "src/lib/competitionRoleInvitations.ts",
+    "src/lib/competitionCopy.ts",
     "src/lib/permissions.ts",
     "src/lib/registrationAllocation.ts",
     "src/lib/registrationClasses.ts",
