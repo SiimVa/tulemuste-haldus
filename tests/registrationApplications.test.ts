@@ -4,6 +4,7 @@ import {
   canEditRegistration,
   canWithdrawRegistration,
   initialRegistrationStatus,
+  isPublicRegistrationApplicationStatus,
 } from "../src/lib/registrationApplications"
 
 test("piiranguta registreerimine kinnitatakse automaatselt", () => {
@@ -31,4 +32,14 @@ test("ainult aktiivset avaldust saab registreerimise ajal muuta", () => {
   assert.equal(canEditRegistration("CHANGES_REQUESTED"), true)
   assert.equal(canEditRegistration("REJECTED"), false)
   assert.equal(canEditRegistration("WITHDRAWN"), false)
+})
+
+test("avalikus nimekirjas on ainult aktiivselt esitatud registreeringud", () => {
+  assert.equal(isPublicRegistrationApplicationStatus("CONFIRMED"), true)
+  assert.equal(isPublicRegistrationApplicationStatus("WAITLISTED"), true)
+  assert.equal(isPublicRegistrationApplicationStatus("PENDING_REVIEW"), true)
+  assert.equal(isPublicRegistrationApplicationStatus("CHANGES_REQUESTED"), true)
+  assert.equal(isPublicRegistrationApplicationStatus("DRAFT"), false)
+  assert.equal(isPublicRegistrationApplicationStatus("REJECTED"), false)
+  assert.equal(isPublicRegistrationApplicationStatus("WITHDRAWN"), false)
 })

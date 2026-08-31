@@ -2,6 +2,7 @@ import Link from "next/link"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { PUBLIC_REGISTRATION_APPLICATION_STATUSES } from "@/lib/registrationApplications"
 
 const PHASE_LABEL = {
   NOT_OPEN: "Registreerimine pole veel avatud",
@@ -34,7 +35,17 @@ export default async function PublicCompetitionsPage() {
       registrationOpensAt: true,
       registrationClosesAt: true,
       registrationFinalizedAt: true,
-      _count: { select: { registrationApplications: true } },
+      _count: {
+        select: {
+          registrationApplications: {
+            where: {
+              status: {
+                in: [...PUBLIC_REGISTRATION_APPLICATION_STATUSES],
+              },
+            },
+          },
+        },
+      },
     },
     orderBy: [{ date: "asc" }, { createdAt: "desc" }],
   })
@@ -107,7 +118,8 @@ export default async function PublicCompetitionsPage() {
                 </p>
               )}
               <p className="text-xs text-gray-400 mt-4">
-                {competition._count.registrationApplications} avaldust
+                {competition._count.registrationApplications} registreerunud
+                võistkonda
               </p>
             </Link>
           ))}

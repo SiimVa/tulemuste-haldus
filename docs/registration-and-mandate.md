@@ -25,8 +25,9 @@ peab võistkonnal olema vähemalt üks `COMPETITOR` rolliga liige.
 Korraldaja määrab vormiehitajas, milliseid välju näidatakse registreerimisel
 ja mandaadis ning kas need on kohustuslikud. „Võistkonna liikmete loend” väljal
 saab määrata liikmete minimaalse ja maksimaalse arvu. Sama arv mõlemas väljas
-tähendab täpset koosseisu. Vabatahtliku liikmete välja võib jätta tühjaks, kuid
-liikmete lisamisel peab nende arv jääma määratud vahemikku.
+tähendab kohustuslikus etapis täpset koosseisu. Miinimum kehtib etapis, kus
+liikmete väli on kohustuslik. Vabatahtlikus etapis võib välja jätta tühjaks või
+lisada ka miinimumist vähem teadaolevaid liikmeid; maksimum kehtib alati.
 
 Kui võistluse koosseisunõuetes on esindaja kohustuslik, lisab süsteem vormi
 automaatselt esindaja nime, e-posti ja telefoni. Nimi ja e-post eeltäidetakse
@@ -44,6 +45,15 @@ Esindaja:
 - ei saa muuta teisi sama võistluse võistkondi;
 - ei saa muuta esitatud või kinnitatud etappi;
 - ei saa muuta registreerimist pärast võistluse aktiveerimist.
+
+## Avalik nimekiri
+
+Avaliku võistluse lehel näevad ka sisselogimata külastajad aktiivselt esitatud
+registreeringuid kolmes rühmas: võistlusele pääsenud, ootenimekirjas ja
+korraldaja otsust ootavad võistkonnad. Avalikus nimekirjas kuvatakse ainult
+võistkonna nimi, klass, staatus ja ootenimekirja koht. Liikmete, esindaja ning
+kontaktisikute andmeid ei avaldata. Mustandeid, tagasi lükatud registreeringuid
+ja loobunud võistkondi avalikus nimekirjas ei näidata.
 
 ## Korraldaja vaade
 

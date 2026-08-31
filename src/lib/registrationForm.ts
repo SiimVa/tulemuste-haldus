@@ -471,7 +471,7 @@ export function validateFormAnswers(
         ? field.requiredInRegistration
         : field.requiredInMandate
     if (field.type === "MEMBER_LIST" && Array.isArray(value)) {
-      if ((required || value.length > 0) && value.length < field.memberMinCount) {
+      if (required && value.length < field.memberMinCount) {
         errors[field.key] =
           field.memberMinCount === field.memberMaxCount
             ? `Võistkonnas peab olema ${field.memberMinCount} liiget`

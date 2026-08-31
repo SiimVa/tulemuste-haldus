@@ -394,8 +394,9 @@ export function FormBuilder({
                   </div>
                   <p className="text-xs text-gray-500">
                     Täpse koosseisu jaoks sisesta mõlemasse välja sama arv.
-                    Vabatahtliku välja võib jätta tühjaks; liikmete lisamisel
-                    rakendub määratud vahemik.
+                    Miinimum kehtib etapis, kus väli on kohustuslik.
+                    Vabatahtlikus etapis võib koosseisu jätta tühjaks või lisada
+                    ka vähem liikmeid; maksimum kehtib alati.
                   </p>
                 </div>
               )}

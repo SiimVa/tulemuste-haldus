@@ -1,9 +1,14 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { PublicRegistrationList } from "@/components/registration/PublicRegistrationList"
 import { RegistrationPanel } from "@/components/registration/RegistrationPanel"
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  PUBLIC_REGISTRATION_APPLICATION_STATUSES,
+  type PublicRegistrationApplicationStatus,
+} from "@/lib/registrationApplications"
 import {
   parseFormAnswer,
   toFormFieldDefinition,
@@ -73,7 +78,35 @@ export default async function PublicCompetitionPage({
       },
       registrationApplications: {
         where: {
-          submittedById: session?.user?.id ?? "__anonymous-user__",
+          status: {
+            in: [...PUBLIC_REGISTRATION_APPLICATION_STATUSES],
+          },
+        },
+        orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          teamName: true,
+          status: true,
+          waitlistPosition: true,
+          class: { select: { name: true } },
+        },
+      },
+      _count: {
+        select: {
+          registrationApplications: {
+            where: { status: "CONFIRMED" },
+          },
+        },
+      },
+    },
+  })
+  if (!competition) notFound()
+
+  const ownApplications = session?.user?.id
+    ? await prisma.registrationApplication.findMany({
+        where: {
+          competitionId: competition.id,
+          submittedById: session.user.id,
         },
         orderBy: { createdAt: "desc" },
         select: {
@@ -91,17 +124,8 @@ export default async function PublicCompetitionPage({
             },
           },
         },
-      },
-      _count: {
-        select: {
-          registrationApplications: {
-            where: { status: "CONFIRMED" },
-          },
-        },
-      },
-    },
-  })
-  if (!competition) notFound()
+      })
+    : []
 
   const registrationStatus = getCompetitionRegistrationStatus(competition)
 
@@ -176,30 +200,41 @@ export default async function PublicCompetitionPage({
           )}
         </div>
 
-        <RegistrationPanel
-          competitionId={competition.id}
-          registrationOpen={registrationStatus === "OPEN"}
-          loggedIn={Boolean(session?.user)}
-          classes={competition.registrationClasses}
-          formFields={competition.registrationFormFields.map(
-            toFormFieldDefinition
-          )}
-          representativeDefaults={{
-            name: session?.user?.name ?? "",
-            email: session?.user?.email ?? "",
-          }}
-          applications={competition.registrationApplications.map(
-            ({ fieldValues, ...application }) => ({
-              ...application,
-              formValues: Object.fromEntries(
-                fieldValues.flatMap(({ field, value }) => {
-                  const parsed = parseFormAnswer(value)
-                  return parsed === undefined ? [] : [[field.key, parsed]]
-                })
-              ),
-            })
-          )}
-        />
+        <div className="space-y-6">
+          <PublicRegistrationList
+            applications={competition.registrationApplications.map(
+              (application) => ({
+                ...application,
+                status:
+                  application.status as PublicRegistrationApplicationStatus,
+              })
+            )}
+          />
+          <RegistrationPanel
+            competitionId={competition.id}
+            registrationOpen={registrationStatus === "OPEN"}
+            loggedIn={Boolean(session?.user)}
+            classes={competition.registrationClasses}
+            formFields={competition.registrationFormFields.map(
+              toFormFieldDefinition
+            )}
+            representativeDefaults={{
+              name: session?.user?.name ?? "",
+              email: session?.user?.email ?? "",
+            }}
+            applications={ownApplications.map(
+              ({ fieldValues, ...application }) => ({
+                ...application,
+                formValues: Object.fromEntries(
+                  fieldValues.flatMap(({ field, value }) => {
+                    const parsed = parseFormAnswer(value)
+                    return parsed === undefined ? [] : [[field.key, parsed]]
+                  })
+                ),
+              })
+            )}
+          />
+        </div>
       </main>
     </div>
   )
