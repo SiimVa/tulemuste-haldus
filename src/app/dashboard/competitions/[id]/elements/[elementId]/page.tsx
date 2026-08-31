@@ -15,6 +15,7 @@ import { ElementSectionsManager } from "@/components/competition/ElementSections
 import { ResultsImportTrigger } from "@/components/competition/ResultsImportTrigger"
 import { RecalcButton } from "@/components/competition/RecalcButton"
 import { explainElementScores } from "@/lib/scoreExplainer"
+import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
 
 export const dynamic = "force-dynamic"
 
@@ -149,12 +150,15 @@ export default async function ElementPage({
               { label: "Tühi protokoll (PDF)", printHref: `/dashboard/competitions/${competitionId}/elements/${elementId}/protocol` },
             ],
           }]} />
-          <Link
-            href={`/dashboard/competitions/${competitionId}/elements/new?copyFrom=${elementId}`}
-            className="text-sm px-3 py-1.5 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Kopeeri
-          </Link>
+          <ScoringElementCopyDialog
+            fixedSource={{
+              id: element.id,
+              name: element.name,
+              code: element.code,
+              isCancelled: element.isCancelled,
+              competitionId,
+            }}
+          />
           <Link
             href={`/dashboard/competitions/${competitionId}/elements/${elementId}/edit`}
             className="text-sm px-3 py-1.5 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"

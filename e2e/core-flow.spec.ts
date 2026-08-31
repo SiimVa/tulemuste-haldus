@@ -52,6 +52,7 @@ test.describe.serial("võistluse põhivoog", () => {
   let secondTeamId = ""
   let elementId = ""
   let restrictedElementId = ""
+  let copiedCompetitionId = ""
   let judgeToken = ""
   let athleteToken = ""
   let judgeInvitationUrl = ""
@@ -329,6 +330,187 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBe(200)
   })
 
+  test("admin kopeerib võistluse ja elemendi üle võistluste", async ({ page }) => {
+    await login(page, admin.email, admin.password)
+
+    const combinedElementResponse = await page.request.post(
+      `/api/competitions/${competitionId}/elements`,
+      {
+        data: {
+          name: "Kombineeritud kontrollpunkt",
+          code: "KOMB",
+          type: "CHECKPOINT",
+          config: { copiedTest: true },
+          exceptions: [{ label: "Erand", penalty: 5, order: 0 }],
+          sections: [
+            {
+              name: "Hindamisosa",
+              maxValue: 10,
+              fields: [
+                {
+                  name: "punktid",
+                  label: "Punktid",
+                  type: "NUMBER",
+                  rankingPriority: 1,
+                  order: 0,
+                  meta: JSON.stringify({ higherIsBetter: true }),
+                },
+              ],
+              calcMethod: {
+                type: "ABSOLUTE_POINTS",
+                params: { higherIsBetter: true },
+              },
+            },
+          ],
+        },
+      }
+    )
+    expect(
+      combinedElementResponse.status(),
+      await combinedElementResponse.text()
+    ).toBe(200)
+    const combinedElementId = (await combinedElementResponse.json()).id
+    await page.reload()
+
+    await page.getByRole("button", { name: "Kopeeri võistlus" }).click()
+    const competitionCopyDialog = page.getByRole("dialog", {
+      name: "Kopeeri võistlus",
+    })
+    await expect(
+      competitionCopyDialog.getByLabel("Uue võistluse nimi")
+    ).toHaveValue("E2E proovivõistlus – koopia")
+    await competitionCopyDialog
+      .getByLabel("Uue võistluse nimi")
+      .fill("E2E kopeeritud võistlus")
+    const competitionCopyResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(
+          `/api/competitions/${competitionId}/copy`
+        ) && response.request().method() === "POST"
+    )
+    await competitionCopyDialog
+      .getByRole("button", { name: "Loo koopia" })
+      .click()
+    const competitionCopyResponse = await competitionCopyResponsePromise
+    const copiedCompetition = await competitionCopyResponse.json()
+    expect(
+      competitionCopyResponse.status(),
+      JSON.stringify(copiedCompetition)
+    ).toBe(201)
+    copiedCompetitionId = copiedCompetition.id
+    expect(copiedCompetitionId).toBeTruthy()
+    await page.waitForURL(`/dashboard/competitions/${copiedCompetitionId}`)
+
+    const copiedCompetitionResponse = await page.request.get(
+      `/api/competitions/${copiedCompetitionId}`
+    )
+    expect(
+      copiedCompetitionResponse.status(),
+      await copiedCompetitionResponse.text()
+    ).toBe(200)
+    const copiedCompetitionData = await copiedCompetitionResponse.json()
+    expect(copiedCompetitionData).toEqual(
+      expect.objectContaining({
+        name: "E2E kopeeritud võistlus",
+        date: null,
+        endDate: null,
+        status: "SETUP",
+        isPublic: false,
+        registrationApprovalMode: "MANUAL",
+      })
+    )
+    expect(copiedCompetitionData.teams).toHaveLength(0)
+    expect(copiedCompetitionData.elements).toHaveLength(3)
+    const copiedFirstElement = copiedCompetitionData.elements.find(
+      (element: { code: string }) => element.code === "KP1"
+    )
+    expect(copiedFirstElement.fields[0]).toEqual(
+      expect.objectContaining({
+        name: "aeg",
+        label: "Aeg",
+        validation: JSON.stringify({ required: true }),
+      })
+    )
+    expect(copiedFirstElement.exceptions[0]).toEqual(
+      expect.objectContaining({ label: "Ei läbinud", penalty: 40 })
+    )
+    expect(copiedFirstElement.calcMethod).toEqual(
+      expect.objectContaining({ type: "ABSOLUTE_TIME" })
+    )
+    const copiedCombinedElementSummary = copiedCompetitionData.elements.find(
+      (element: { code: string }) => element.code === "KOMB"
+    )
+    const copiedCombinedElementResponse = await page.request.get(
+      `/api/elements/${copiedCombinedElementSummary.id}`
+    )
+    expect(copiedCombinedElementResponse.status()).toBe(200)
+    const copiedCombinedElement = await copiedCombinedElementResponse.json()
+    expect(copiedCombinedElement.sections).toHaveLength(1)
+    expect(copiedCombinedElement.sections[0]).toEqual(
+      expect.objectContaining({ name: "Hindamisosa", maxValue: 10 })
+    )
+    expect(copiedCombinedElement.sections[0].fields[0]).toEqual(
+      expect.objectContaining({ name: "punktid", label: "Punktid" })
+    )
+    expect(copiedCombinedElement.sections[0].calcMethod).toEqual(
+      expect.objectContaining({ type: "ABSOLUTE_POINTS" })
+    )
+
+    const copiedSettingsResponse = await page.request.get(
+      `/api/competitions/${copiedCompetitionId}/registration-settings`
+    )
+    expect(copiedSettingsResponse.status()).toBe(200)
+    const copiedSettings = await copiedSettingsResponse.json()
+    expect(copiedSettings.registrationStatus).toBe("NOT_OPEN")
+    expect(copiedSettings.mandateStatus).toBe("NOT_OPEN")
+
+    await page.goto(
+      `/dashboard/competitions/${competitionId}/elements/${elementId}`
+    )
+    await page.getByRole("button", { name: "Kopeeri", exact: true }).click()
+    const elementCopyDialog = page.getByRole("dialog", {
+      name: "Kopeeri hindamiselement",
+    })
+    await elementCopyDialog
+      .getByLabel("Sihtvõistlus")
+      .selectOption(copiedCompetitionId)
+    const elementCopyResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/elements/${elementId}/copy`) &&
+        response.request().method() === "POST"
+    )
+    await elementCopyDialog
+      .getByRole("button", { name: "Kopeeri element" })
+      .click()
+    const elementCopyResponse = await elementCopyResponsePromise
+    const copiedElement = await elementCopyResponse.json()
+    expect(
+      elementCopyResponse.status(),
+      JSON.stringify(copiedElement)
+    ).toBe(201)
+    expect(copiedElement.code).toBe("KP1-2")
+    expect(copiedElement.name).toBe("Kontrollpunkt 1")
+    await page.waitForURL(
+      `/dashboard/competitions/${copiedCompetitionId}/elements/${copiedElement.id}`
+    )
+
+    const copiedWithExtraElementResponse = await page.request.get(
+      `/api/competitions/${copiedCompetitionId}`
+    )
+    const copiedWithExtraElement = await copiedWithExtraElementResponse.json()
+    expect(copiedWithExtraElement.elements).toHaveLength(4)
+    expect(
+      copiedWithExtraElement.elements.find(
+        (element: { id: string }) => element.id === copiedElement.id
+      )._count.results
+    ).toBe(0)
+
+    const deleteCombinedResponse = await page.request.delete(
+      `/api/elements/${combinedElementId}`
+    )
+    expect(deleteCombinedResponse.status()).toBe(200)
+  })
+
   test("võistluse korraldaja saab olemasolevat võistlust hallata, kuid uut luua ei saa", async ({ page }) => {
     await login(page, competitionOrganizer.email, competitionOrganizer.password)
 
@@ -378,6 +560,16 @@ test.describe.serial("võistluse põhivoog", () => {
       data: { name: "Keelatud uus võistlus" },
     })
     expect(createResponse.status()).toBe(403)
+    const copyCompetitionResponse = await page.request.post(
+      `/api/competitions/${competitionId}/copy`,
+      { data: { name: "Keelatud koopia" } }
+    )
+    expect(copyCompetitionResponse.status()).toBe(403)
+    const copyElementResponse = await page.request.post(
+      `/api/elements/${elementId}/copy`,
+      { data: { targetCompetitionId: copiedCompetitionId } }
+    )
+    expect(copyElementResponse.status()).toBe(403)
   })
 
   test("kontota kasutaja võtab rollikutse pärast sisselogimist vastu", async ({ page }) => {

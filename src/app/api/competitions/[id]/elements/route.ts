@@ -3,6 +3,38 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  const { id: competitionId } = await params
+  const allowed = await canAccessCompetition(competitionId, {
+    id: session.user.id,
+    role: session.user.role,
+  })
+  if (!allowed) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
+
+  const elements = await prisma.scoringElement.findMany({
+    where: { competitionId },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      type: true,
+      order: true,
+      isCancelled: true,
+    },
+    orderBy: { order: "asc" },
+  })
+  return NextResponse.json(elements)
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

@@ -60,3 +60,6 @@ Esindaja registreerimise ja mandaadi töövoog on kirjeldatud failis
 Kontakt- ja sünniandmete säilitustähtaja ning automaatse kustutamise seadistus
 on kirjeldatud failis
 [docs/personal-data-retention.md](docs/personal-data-retention.md).
+
+Võistluste ja hindamiselementide kopeerimise ulatus ning õigused on kirjeldatud
+failis [docs/competition-copying.md](docs/competition-copying.md).
