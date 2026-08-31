@@ -1158,7 +1158,12 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.getByLabel("Esindaja telefon").fill("+372 5555 0003")
     await page.getByRole("button", { name: "Registreeri võistkond" }).click()
     await expect(page.getByText("Võistkond on registreeritud.")).toBeVisible()
+    const ownRegistrations = page
+      .getByRole("heading", { name: "Minu registreerimised" })
+      .locator("..")
     const secondApplication = page
+      .getByRole("heading", { name: "Minu registreerimised" })
+      .locator("..")
       .getByText("Avalik testvõistkond 2", { exact: true })
       .locator("..")
       .locator("..")
@@ -1171,6 +1176,41 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       page.getByText("Garanteeritud koht: Iga maakonna üks kiireim")
     ).toHaveCount(2)
+
+    const publicContext = await browser.newContext()
+    const publicPage = await publicContext.newPage()
+    await publicPage.goto(`/competitions/${competitionId}`)
+    const publicList = publicPage
+      .getByRole("heading", { name: "Registreerunud võistkonnad" })
+      .locator("..")
+      .locator("..")
+      .locator("..")
+    await expect(
+      publicList.getByRole("heading", { name: "Võistlusele pääsenud" })
+    ).toBeVisible()
+    await expect(
+      publicList.getByRole("heading", { name: "Ootenimekirjas" })
+    ).toBeVisible()
+    await expect(
+      publicList.getByText("Avalik testvõistkond 1", { exact: true })
+    ).toBeVisible()
+    await expect(
+      publicList.getByText("Avalik testvõistkond 2", { exact: true })
+    ).toBeVisible()
+    await expect(
+      publicList.getByText("Avalik testvõistkond 3", { exact: true })
+    ).toBeVisible()
+    await expect(
+      publicList.getByText("Ootenimekirja koht 1", { exact: true })
+    ).toBeVisible()
+    await expect(publicPage.getByText(representative.email)).toHaveCount(0)
+    await expect(
+      publicPage.getByText("registreerimise.liige@example.com")
+    ).toHaveCount(0)
+    await expect(
+      publicPage.getByText("Registreerimisel lisatud liige")
+    ).toHaveCount(0)
+    await publicContext.close()
 
     await secondApplication.getByRole("button", { name: "Muuda" }).click()
     await expect(
@@ -1195,7 +1235,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       secondApplication.getByText(/Ootenimekirja koht:/)
     ).toHaveCount(0)
-    const thirdApplication = page
+    const thirdApplication = ownRegistrations
       .getByText("Avalik testvõistkond 3", { exact: true })
       .locator("..")
       .locator("..")
@@ -1267,7 +1307,7 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(unauthorizedEdit.status()).toBe(409)
 
     page.once("dialog", (dialog) => dialog.accept())
-    await page
+    await ownRegistrations
       .getByText("Avalik testvõistkond 1", { exact: true })
       .locator("..")
       .locator("..")

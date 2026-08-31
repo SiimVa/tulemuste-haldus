@@ -209,6 +209,7 @@ export function DynamicFormFields({
             {field.type === "MEMBER_LIST" && (
               <MemberListInput
                 field={field}
+                required={required}
                 value={
                   Array.isArray(value)
                     ? value.filter(
@@ -235,12 +236,14 @@ export function DynamicFormFields({
 
 function MemberListInput({
   field,
+  required,
   value,
   disabled,
   teamComposition,
   onChange,
 }: {
   field: FormFieldDefinition
+  required: boolean
   value: MemberAnswer[]
   disabled: boolean
   teamComposition?: TeamCompositionSettings
@@ -263,12 +266,15 @@ function MemberListInput({
     )
   }
 
-  const countLabel =
-    field.memberMaxCount === field.memberMinCount
+  const countLabel = required
+    ? field.memberMaxCount === field.memberMinCount
       ? `Nõutud ${field.memberMinCount} liiget`
       : field.memberMaxCount === null
         ? `Vähemalt ${field.memberMinCount} liiget`
         : `${field.memberMinCount}–${field.memberMaxCount} liiget`
+    : field.memberMaxCount === null
+      ? "Liikmete lisamine on vabatahtlik"
+      : `Liikmete lisamine on vabatahtlik, kuni ${field.memberMaxCount} liiget`
   const maximumReached =
     field.memberMaxCount !== null && value.length >= field.memberMaxCount
 

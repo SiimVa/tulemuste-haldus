@@ -212,7 +212,7 @@ test("liikmete loend kontrollib korraldaja määratud liikmete arvu", () => {
   )
 })
 
-test("vabatahtlik liikmete loend võib jääda tühjaks, aga täidetuna järgib miinimumi", () => {
+test("vabatahtlik liikmete loend võib olla tühi või alla mandaadi miinimumi", () => {
   const members = field({
     key: "members",
     label: "Võistkonna liikmed",
@@ -228,11 +228,20 @@ test("vabatahtlik liikmete loend võib jääda tühjaks, aga täidetuna järgib 
     validateFormAnswers([members], { members: [] }, "REGISTRATION").errors,
     {}
   )
-  assert.equal(
+  assert.deepEqual(
     validateFormAnswers(
       [members],
       { members: [{ name: "Ainuke" }] },
       "REGISTRATION"
+    ).errors,
+    {}
+  )
+
+  assert.equal(
+    validateFormAnswers(
+      [members],
+      { members: [{ name: "Ainuke" }] },
+      "MANDATE"
     ).errors.members,
     "Lisa vähemalt 2 liiget"
   )
