@@ -63,6 +63,8 @@ export function RegistrationPanel({
   formFields,
   applications,
   representativeDefaults,
+  registrationPath,
+  registrationLinkToken,
 }: {
   competitionId: string
   registrationOpen: boolean
@@ -71,6 +73,8 @@ export function RegistrationPanel({
   formFields: FormFieldDefinition[]
   applications: Application[]
   representativeDefaults: { name: string; email: string }
+  registrationPath?: string
+  registrationLinkToken?: string
 }) {
   const router = useRouter()
   const [teamName, setTeamName] = useState("")
@@ -145,6 +149,7 @@ export function RegistrationPanel({
           teamName,
           classId,
           answers: validated.answers,
+          registrationLinkToken,
         }),
       }
     )
@@ -296,7 +301,7 @@ export function RegistrationPanel({
             </p>
             <Link
               href={`/login?callbackUrl=${encodeURIComponent(
-                `/competitions/${competitionId}`
+                registrationPath ?? `/competitions/${competitionId}`
               )}`}
               className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >

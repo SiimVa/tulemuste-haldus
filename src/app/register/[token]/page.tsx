@@ -1,14 +1,14 @@
 import { PublicCompetitionRegistrationPage } from "@/components/registration/PublicCompetitionRegistrationPage"
 
-export default async function PublicCompetitionPage({
+export default async function LinkOnlyRegistrationPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ token: string }>
 }) {
-  const { id } = await params
+  const { token } = await params
   return (
     <PublicCompetitionRegistrationPage
-      access={{ type: "PUBLIC", competitionId: id }}
+      access={{ type: "LINK_ONLY", registrationLinkToken: token }}
     />
   )
 }

@@ -745,7 +745,10 @@ test.describe.serial("võistluse põhivoog", () => {
 
     await login(page, representative.email, representative.password)
     await expect(
-      page.getByRole("heading", { name: "Minu esindatavad võistkonnad" })
+      page.getByRole("heading", { name: "Minu registreerimised" })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("heading", { name: "Ootavad kinnitamist" })
     ).toBeVisible()
     await expect(
       page.getByRole("heading", { name: /VK 1 · Testvõistkond/ })
@@ -1323,11 +1326,80 @@ test.describe.serial("võistluse põhivoog", () => {
       thirdApplication.getByText(/Ootenimekirja koht:/)
     ).toHaveCount(0)
 
+    await adminPage.goto(
+      `/dashboard/competitions/${competitionId}/registration-settings`
+    )
+    await adminPage
+      .getByLabel("Registreerimise ligipääs")
+      .selectOption("LINK_ONLY")
+    await adminPage.getByRole("button", { name: "Salvesta seaded" }).click()
+    await expect(adminPage.getByText("Salvestatud", { exact: true })).toBeVisible()
+    const linkInput = adminPage.getByLabel("Registreerimislink")
+    const firstRegistrationLink = await linkInput.inputValue()
+    expect(firstRegistrationLink).toMatch(/\/register\/[A-Za-z0-9_-]{43}$/)
+
+    const linkContext = await browser.newContext()
+    const linkPage = await linkContext.newPage()
+    await linkPage.goto("/competitions")
+    await expect(
+      linkPage.getByText("E2E proovivõistlus", { exact: true })
+    ).toHaveCount(0)
+    const directResponse = await linkPage.goto(
+      `/competitions/${competitionId}`
+    )
+    expect(directResponse?.status()).toBe(404)
+    const invalidLinkResponse = await linkPage.goto("/register/vigane")
+    expect(invalidLinkResponse?.status()).toBe(404)
+    await linkPage.goto(firstRegistrationLink)
+    await expect(
+      linkPage.getByRole("heading", { name: "E2E proovivõistlus" })
+    ).toBeVisible()
+    await expect(
+      linkPage.getByRole("link", { name: "Logi sisse ja registreeri" })
+    ).toBeVisible()
+    await expect(
+      linkPage.getByText("Avalik testvõistkond 2", { exact: true })
+    ).toBeVisible()
+
+    adminPage.once("dialog", (dialog) => dialog.accept())
+    await adminPage.getByRole("button", { name: "Loo uus link" }).click()
+    await expect(linkInput).not.toHaveValue(firstRegistrationLink)
+    const secondRegistrationLink = await linkInput.inputValue()
+    expect(secondRegistrationLink).toMatch(/\/register\/[A-Za-z0-9_-]{43}$/)
+    expect(secondRegistrationLink).not.toBe(firstRegistrationLink)
+    const expiredLinkResponse = await linkPage.goto(firstRegistrationLink)
+    expect(expiredLinkResponse?.status()).toBe(404)
+    await linkPage.goto(secondRegistrationLink)
+    await expect(
+      linkPage.getByRole("heading", { name: "E2E proovivõistlus" })
+    ).toBeVisible()
+    await linkContext.close()
+
+    await page.goto(secondRegistrationLink)
+    await page.getByLabel("Esindaja telefon").fill("+372 5555 0099")
+    await page.getByLabel("Võistkonna nimi").fill("Lingiga testvõistkond")
+    await page.getByLabel("Maakond").selectOption("Harjumaa")
+    await page.getByLabel("Võistkonna liik").selectOption("Kodutütred")
+    await page.getByRole("button", { name: "Registreeri võistkond" }).click()
+    await expect(page.getByText("Võistkond lisati ootenimekirja.")).toBeVisible()
+    const linkedRegistration = page
+      .getByRole("heading", { name: "Minu registreerimised" })
+      .locator("..")
+      .getByText("Lingiga testvõistkond", { exact: true })
+      .locator("..")
+      .locator("..")
+    await expect(
+      linkedRegistration.getByText("Ootenimekirjas", { exact: true })
+    ).toBeVisible()
+    page.once("dialog", (dialog) => dialog.accept())
+    await linkedRegistration.getByRole("button", { name: "Loobu" }).click()
+    await expect(page.getByText("Registreerimisest on loobutud.")).toBeVisible()
+
     const closedResponse = await adminPage.request.patch(
       `/api/competitions/${competitionId}/registration-settings`,
       {
         data: {
-          isPublic: true,
+          registrationAccessMode: "LINK_ONLY",
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "CLOSED",
@@ -1355,7 +1427,7 @@ test.describe.serial("võistluse põhivoog", () => {
       `/api/competitions/${competitionId}/registration-settings`,
       {
         data: {
-          isPublic: true,
+          registrationAccessMode: "LINK_ONLY",
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "CLOSED",
@@ -1493,6 +1565,87 @@ test.describe.serial("võistluse põhivoog", () => {
       await linkedTeamResultResponse.text()
     ).toBe(200)
 
+    const currentCompetitionResponse = await adminPage.request.get(
+      `/api/competitions/${competitionId}`
+    )
+    expect(
+      currentCompetitionResponse.status(),
+      await currentCompetitionResponse.text()
+    ).toBe(200)
+    const currentCompetition = await currentCompetitionResponse.json()
+    const activateResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}`,
+      { data: { ...currentCompetition, status: "ACTIVE" } }
+    )
+    expect(activateResponse.status(), await activateResponse.text()).toBe(200)
+
+    const accessTokensResponse = await adminPage.request.get(
+      `/api/competitions/${competitionId}/tokens`
+    )
+    expect(
+      accessTokensResponse.status(),
+      await accessTokensResponse.text()
+    ).toBe(200)
+    const accessTokens = await accessTokensResponse.json()
+    expect(
+      accessTokens.some(
+        (token: { type: string; teamId: string | null }) =>
+          token.type === "ATHLETE" && token.teamId === assignment.team.id
+      )
+    ).toBe(true)
+
+    await page.goto("/dashboard")
+    await expect(
+      page.getByRole("heading", { name: "Aktiivsed võistlused" })
+    ).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Mandaadid" })).toHaveCount(
+      0
+    )
+    const representativeActiveTeam = page
+      .locator("article")
+      .filter({ hasText: "Avalik testvõistkond 3" })
+    await expect(representativeActiveTeam).toBeVisible()
+    await expect(
+      representativeActiveTeam.getByRole("button", {
+        name: "Kopeeri tulemuste link",
+      })
+    ).toBeVisible()
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.reload()
+    await expect(
+      page.getByRole("link", { name: "Avalikud", exact: true })
+    ).toBeVisible()
+    await expect(
+      page
+        .getByRole("button", { name: "Logi välja" })
+        .getByText("Välju", { exact: true })
+    ).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
+    ).toBe(true)
+
+    const resultLinkResponse = await page.request.post(
+      `/api/representative/teams/${assignment.team.id}/results-link`
+    )
+    expect(resultLinkResponse.status(), await resultLinkResponse.text()).toBe(
+      200
+    )
+    const resultLink = await resultLinkResponse.json()
+    expect(resultLink.token).toMatch(/^[A-Za-z0-9_-]+$/)
+
+    const sharedResultsContext = await browser.newContext()
+    const sharedResultsPage = await sharedResultsContext.newPage()
+    await sharedResultsPage.goto(`/athlete/${resultLink.token}`)
+    await expect(
+      sharedResultsPage.getByRole("heading", {
+        name: "Avalik testvõistkond 3",
+      })
+    ).toBeVisible()
+    await sharedResultsContext.close()
+
     await representativeContext.close()
     await adminContext.close()
   })
@@ -1504,14 +1657,14 @@ test.describe.serial("võistluse põhivoog", () => {
     await login(page, otherOrganizer.email, otherOrganizer.password)
 
     await expect(
-      page.getByRole("heading", { name: "Minu võistkonnad" })
+      page.getByRole("heading", { name: "Aktiivsed võistlused" })
     ).toBeVisible()
     const memberTeamCard = page
-      .locator(`a[href^="/dashboard/teams/"][href$="/results"]`)
+      .locator("article")
       .filter({ hasText: "Avalik testvõistkond 3" })
     await expect(memberTeamCard).toBeVisible()
     await expect(memberTeamCard).not.toContainText("REG-")
-    await memberTeamCard.click()
+    await memberTeamCard.getByRole("link", { name: "Vaata tulemusi" }).click()
     await expect(
       page.getByRole("heading", { name: "Võistkonna tulemused" })
     ).toBeVisible()

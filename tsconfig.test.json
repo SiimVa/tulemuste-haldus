@@ -17,6 +17,8 @@
     "src/lib/competitionRoleInvitations.ts",
     "src/lib/competitionCopy.ts",
     "src/lib/permissions.ts",
+    "src/lib/registrationAccess.ts",
+    "src/lib/registrationAccess.server.ts",
     "src/lib/registrationAllocation.ts",
     "src/lib/registrationClasses.ts",
     "src/lib/registrationForm.ts",

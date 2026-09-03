@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react"
 import { AllocationRuleBuilder } from "@/components/registration/AllocationRuleBuilder"
 import { FormBuilder } from "@/components/registration/FormBuilder"
 import type { ApprovalMode } from "@/lib/approvalModes"
+import type { RegistrationAccessMode } from "@/lib/registrationAccess"
 import type {
   AllocationRuleDefinition,
   ClassBalanceMode,
@@ -19,7 +20,9 @@ type CompetitionClass = { id?: string; name: string; order: number }
 type Settings = {
   name: string
   endDate: string | null
-  isPublic: boolean
+  registrationAccessMode: RegistrationAccessMode
+  hasRegistrationLink: boolean
+  registrationLinkToken: string | null
   registrationOpensAt: string
   registrationClosesAt: string
   registrationOverride: PhaseOverride
@@ -195,15 +198,24 @@ export default function RegistrationSettingsPage({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [purging, setPurging] = useState(false)
+  const [rotatingLink, setRotatingLink] = useState(false)
+  const [origin, setOrigin] = useState("")
+  const [linkCopied, setLinkCopied] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
+    setOrigin(window.location.origin)
     fetch(`/api/competitions/${competitionId}/registration-settings`)
       .then(async (response) => {
         const data = await response.json()
         if (!response.ok) throw new Error(data.error ?? "Laadimine ebaõnnestus")
         setForm({
           ...data,
+          registrationAccessMode:
+            data.registrationAccessMode ??
+            (data.isPublic ? "PUBLIC" : "PRIVATE"),
+          hasRegistrationLink: Boolean(data.hasRegistrationLink),
+          registrationLinkToken: data.registrationLinkToken ?? null,
           registrationOpensAt: toLocalInput(data.registrationOpensAt),
           registrationClosesAt: toLocalInput(data.registrationClosesAt),
           mandateOpensAt: toLocalInput(data.mandateOpensAt),
@@ -322,7 +334,7 @@ export default function RegistrationSettingsPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          isPublic: form.isPublic,
+          registrationAccessMode: form.registrationAccessMode,
           registrationOpensAt: toIso(form.registrationOpensAt),
           registrationClosesAt: toIso(form.registrationClosesAt),
           registrationOverride: form.registrationOverride,
@@ -352,6 +364,14 @@ export default function RegistrationSettingsPage({
     } else {
       setForm({
         ...data,
+        registrationAccessMode:
+          data.registrationAccessMode ??
+          (data.isPublic ? "PUBLIC" : "PRIVATE"),
+        hasRegistrationLink: Boolean(data.hasRegistrationLink),
+        registrationLinkToken:
+          data.registrationAccessMode === "LINK_ONLY"
+            ? data.registrationLinkToken ?? form.registrationLinkToken
+            : null,
         registrationOpensAt: toLocalInput(data.registrationOpensAt),
         registrationClosesAt: toLocalInput(data.registrationClosesAt),
         mandateOpensAt: toLocalInput(data.mandateOpensAt),
@@ -373,9 +393,50 @@ export default function RegistrationSettingsPage({
         personalDataPurgeDue: Boolean(data.personalDataPurgeDue),
       })
       setSaved(true)
+      setLinkCopied(false)
       window.setTimeout(() => setSaved(false), 2500)
     }
     setSaving(false)
+  }
+
+  async function rotateRegistrationLink() {
+    if (!form || rotatingLink) return
+    if (
+      form.hasRegistrationLink &&
+      !window.confirm(
+        "Uue lingi loomisel lõpetab senine registreerimislink kohe töötamise. Kas jätkad?"
+      )
+    ) {
+      return
+    }
+    setRotatingLink(true)
+    setError("")
+    setLinkCopied(false)
+    const response = await fetch(
+      `/api/competitions/${competitionId}/registration-link/rotate`,
+      { method: "POST" }
+    )
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(data.error ?? "Uue registreerimislingi loomine ebaõnnestus")
+    } else {
+      setForm({
+        ...form,
+        hasRegistrationLink: true,
+        registrationLinkToken: data.registrationLinkToken,
+      })
+    }
+    setRotatingLink(false)
+  }
+
+  async function copyRegistrationLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link)
+      setLinkCopied(true)
+      window.setTimeout(() => setLinkCopied(false), 2500)
+    } catch {
+      setError("Lingi kopeerimine ebaõnnestus. Kopeeri link tekstiväljalt.")
+    }
   }
 
   async function purgePersonalData() {
@@ -436,25 +497,104 @@ export default function RegistrationSettingsPage({
         <form onSubmit={save} className="space-y-6">
           <section className="bg-white border rounded-xl p-5 space-y-4">
             <div>
-              <h2 className="font-semibold text-gray-900">Avalik võistlus</h2>
+              <h2 className="font-semibold text-gray-900">
+                Registreerimislehe ligipääs
+              </h2>
               <p className="text-xs text-gray-500 mt-1">
-                Avalikku võistlust näevad kõik. Registreerimiseks peab kasutaja
-                sisse logima.
+                Registreerimiseks peab kasutaja alati sisse logima. Lingiga
+                võistlust avalikus nimekirjas ei kuvata.
               </p>
             </div>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.isPublic}
+            <label className="block text-xs text-gray-600">
+              Ligipääsu viis
+              <select
+                aria-label="Registreerimise ligipääs"
+                value={form.registrationAccessMode}
                 onChange={(event) =>
-                  setForm({ ...form, isPublic: event.target.checked })
+                  setForm({
+                    ...form,
+                    registrationAccessMode: event.target
+                      .value as RegistrationAccessMode,
+                    registrationLinkToken:
+                      event.target.value === "LINK_ONLY"
+                        ? form.registrationLinkToken
+                        : null,
+                  })
                 }
-                className="mt-1 accent-blue-600"
-              />
-              <span className="text-sm text-gray-700">
-                Kuva võistlus avalikus võistluste nimekirjas
-              </span>
+                className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+              >
+                <option value="PUBLIC">
+                  Avalik – nimekirjas ja registreeritav
+                </option>
+                <option value="LINK_ONLY">
+                  Ainult lingiga – nimekirjas peidetud
+                </option>
+                <option value="PRIVATE">
+                  Privaatne – väline registreerimine keelatud
+                </option>
+              </select>
             </label>
+
+            {form.registrationAccessMode === "LINK_ONLY" && (
+              <div className="rounded-lg border bg-gray-50 p-4 space-y-3">
+                {form.registrationLinkToken && origin ? (
+                  <>
+                    <label className="block text-xs text-gray-600">
+                      Registreerimislink
+                      <input
+                        aria-label="Registreerimislink"
+                        readOnly
+                        value={`${origin}/register/${form.registrationLinkToken}`}
+                        onFocus={(event) => event.currentTarget.select()}
+                        className="mt-1 w-full px-3 py-2 border rounded-lg bg-white text-sm"
+                      />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyRegistrationLink(
+                            `${origin}/register/${form.registrationLinkToken}`
+                          )
+                        }
+                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                      >
+                        {linkCopied ? "Kopeeritud" : "Kopeeri link"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={rotateRegistrationLink}
+                        disabled={rotatingLink}
+                        className="px-3 py-2 border rounded-lg text-sm hover:bg-white disabled:opacity-50"
+                      >
+                        {rotatingLink ? "Loon..." : "Loo uus link"}
+                      </button>
+                    </div>
+                  </>
+                ) : form.hasRegistrationLink ? (
+                  <>
+                    <p className="text-xs text-gray-600">
+                      Registreerimislink on aktiivne. Turvalisuse tõttu ei saa
+                      varem loodud tunnust uuesti kuvada. Uue kopeeritava lingi
+                      loomine muudab vana lingi kehtetuks.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={rotateRegistrationLink}
+                      disabled={rotatingLink}
+                      className="px-3 py-2 border rounded-lg text-sm hover:bg-white disabled:opacity-50"
+                    >
+                      {rotatingLink ? "Loon..." : "Loo uus link"}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-600">
+                    Salvesta seaded. Seejärel luuakse kopeeritav turvaline
+                    registreerimislink.
+                  </p>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="bg-white border rounded-xl p-5 space-y-4">

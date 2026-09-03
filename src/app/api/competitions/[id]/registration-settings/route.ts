@@ -17,6 +17,13 @@ import {
 } from "@/lib/registrationAllocation"
 import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
 import {
+  registrationAccessModeFromRequest,
+} from "@/lib/registrationAccess"
+import {
+  generateRegistrationLinkToken,
+  hashRegistrationLinkToken,
+} from "@/lib/registrationAccess.server"
+import {
   normalizeTeamMemberRoles,
   parseTeamMemberRoles,
 } from "@/lib/teamComposition"
@@ -436,6 +443,8 @@ export async function GET(
       name: true,
       endDate: true,
       isPublic: true,
+      registrationAccessMode: true,
+      registrationTokenHash: true,
       registrationOpensAt: true,
       registrationClosesAt: true,
       registrationOverride: true,
@@ -477,8 +486,11 @@ export async function GET(
     return NextResponse.json({ error: "Võistlust ei leitud" }, { status: 404 })
   }
 
+  const { registrationTokenHash, ...publicCompetition } = competition
   return NextResponse.json({
-    ...responseData(competition),
+    ...responseData(publicCompetition),
+    hasRegistrationLink: Boolean(registrationTokenHash),
+    registrationLinkToken: null,
     teamMemberRoles: parseTeamMemberRoles(competition.teamMemberRoles),
     registrationFormFields: competition.registrationFormFields.map(
       toFormFieldDefinition
@@ -512,6 +524,16 @@ export async function PATCH(
 
   try {
     const body = await req.json()
+    const registrationAccessMode = registrationAccessModeFromRequest(
+      body.registrationAccessMode,
+      body.isPublic
+    )
+    if (!registrationAccessMode) {
+      return NextResponse.json(
+        { error: "Vigane registreerimise ligipääsu valik" },
+        { status: 400 }
+      )
+    }
     if (
       !isPhaseOverride(body.registrationOverride) ||
       !isPhaseOverride(body.mandateOverride)
@@ -639,7 +661,7 @@ export async function PATCH(
         ? null
         : normalizeTeamMemberRoles(body.teamMemberRoles)
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const current = await tx.competition.findUnique({
         where: { id },
         include: {
@@ -840,10 +862,25 @@ export async function PATCH(
         })
       }
 
+      let registrationLinkToken: string | null = null
+      let registrationTokenHash = current.registrationTokenHash
+      if (
+        registrationAccessMode === "LINK_ONLY" &&
+        (current.registrationAccessMode !== "LINK_ONLY" ||
+          !registrationTokenHash)
+      ) {
+        registrationLinkToken = generateRegistrationLinkToken()
+        registrationTokenHash = hashRegistrationLinkToken(
+          registrationLinkToken
+        )
+      }
+
       const competition = await tx.competition.update({
         where: { id },
         data: {
-          isPublic: Boolean(body.isPublic),
+          isPublic: registrationAccessMode === "PUBLIC",
+          registrationAccessMode,
+          registrationTokenHash,
           registrationOpensAt,
           registrationClosesAt,
           registrationOverride: body.registrationOverride,
@@ -940,11 +977,15 @@ export async function PATCH(
         })
       }
 
-      return competition
+      return { competition, registrationLinkToken }
     })
 
+    const { competition: updated, registrationLinkToken } = result
+    const { registrationTokenHash, ...publicCompetition } = updated
     return NextResponse.json({
-      ...responseData(updated),
+      ...responseData(publicCompetition),
+      hasRegistrationLink: Boolean(registrationTokenHash),
+      registrationLinkToken,
       teamMemberRoles: parseTeamMemberRoles(updated.teamMemberRoles),
       registrationFormFields: updated.registrationFormFields.map(
         toFormFieldDefinition
