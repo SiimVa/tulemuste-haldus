@@ -16,11 +16,25 @@ export default async function MemberTeamResultsPage({
   if (!session?.user?.id) return null
 
   const { teamId } = await params
-  const membership = await prisma.teamMember.findFirst({
-    where: { teamId, userId: session.user.id },
-    select: { id: true },
+  const teamAccess = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: {
+      members: {
+        where: { userId: session.user.id },
+        select: { id: true },
+        take: 1,
+      },
+      representative: {
+        select: { member: { select: { userId: true } } },
+      },
+    },
   })
-  if (!membership) notFound()
+  const mayView = Boolean(
+    teamAccess &&
+      (teamAccess.members.length > 0 ||
+        teamAccess.representative?.member.userId === session.user.id)
+  )
+  if (!mayView) notFound()
 
   const data = await getTeamResultData(teamId)
   if (!data) notFound()

@@ -6,9 +6,11 @@ export function SignOutButton() {
   return (
     <button
       onClick={() => signOut({ callbackUrl: "/login" })}
-      className="text-sm text-gray-500 hover:text-red-600 transition-colors"
+      aria-label="Logi välja"
+      className="shrink-0 text-sm text-gray-500 transition-colors hover:text-red-600"
     >
-      Logi välja
+      <span className="sm:hidden">Välju</span>
+      <span className="hidden sm:inline">Logi välja</span>
     </button>
   )
 }

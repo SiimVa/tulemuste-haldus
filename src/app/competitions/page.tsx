@@ -23,6 +23,7 @@ export default async function PublicCompetitionsPage() {
   const competitions = await prisma.competition.findMany({
     where: {
       isPublic: true,
+      registrationAccessMode: "PUBLIC",
       status: { notIn: ["CANCELLED", "ARCHIVED", "FINISHED"] },
     },
     select: {

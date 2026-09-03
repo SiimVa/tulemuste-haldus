@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { parseTeamMemberRoles } from "@/lib/teamComposition"
+import { ensureCompetitionAccessTokens } from "@/lib/accessTokens.server"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -66,32 +67,62 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "Vigane võistluse staatus" }, { status: 400 })
     }
 
-    const updated = await prisma.competition.update({
-      where: { id },
-      data: {
-        name: body.name,
-        date: body.date ? new Date(body.date) : body.date === null ? null : undefined,
-        endDate: body.endDate ? new Date(body.endDate) : body.endDate === null ? null : undefined,
-        location: body.location ?? null,
-        status: body.status,
-        scoringMode: body.scoringMode,
-        defaultKPMaxValue: Number(body.defaultKPMaxValue),
-        defaultPKMaxValue: Number(body.defaultPKMaxValue),
-        defaultNotPassed: Number(body.defaultNotPassed),
-        defaultPassedNotDone: Number(body.defaultPassedNotDone),
-        defaultVastutegevusPenaltyPerLife: Number(body.defaultVastutegevusPenaltyPerLife),
-        defaultVarustusPenaltyPerItem: Number(body.defaultVarustusPenaltyPerItem),
-        defaultHilinemineMode: body.defaultHilinemineMode,
-        defaultHilinemineIntervalMinutes: body.defaultHilinemineIntervalMinutes != null
-          ? Math.round(Number(body.defaultHilinemineIntervalMinutes)) : undefined,
-        defaultHilineminePenaltyPerInterval: Number(body.defaultHilineminePenaltyPerInterval),
-        defaultHilinemineMaxPenalty: Number(body.defaultHilinemineMaxPenalty),
-        defaultCalcType: body.defaultCalcType,
-        defaultHigherIsBetter: body.defaultHigherIsBetter,
-        defaultRankingMinPoints: body.defaultRankingMinPoints != null ? Number(body.defaultRankingMinPoints) : undefined,
-        defaultFixedRankingPoints: Array.isArray(body.defaultFixedRankingPoints)
-          ? JSON.stringify(body.defaultFixedRankingPoints) : undefined,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const competition = await tx.competition.update({
+        where: { id },
+        data: {
+          name: body.name,
+          date: body.date
+            ? new Date(body.date)
+            : body.date === null
+              ? null
+              : undefined,
+          endDate: body.endDate
+            ? new Date(body.endDate)
+            : body.endDate === null
+              ? null
+              : undefined,
+          location: body.location ?? null,
+          status: body.status,
+          scoringMode: body.scoringMode,
+          defaultKPMaxValue: Number(body.defaultKPMaxValue),
+          defaultPKMaxValue: Number(body.defaultPKMaxValue),
+          defaultNotPassed: Number(body.defaultNotPassed),
+          defaultPassedNotDone: Number(body.defaultPassedNotDone),
+          defaultVastutegevusPenaltyPerLife: Number(
+            body.defaultVastutegevusPenaltyPerLife
+          ),
+          defaultVarustusPenaltyPerItem: Number(
+            body.defaultVarustusPenaltyPerItem
+          ),
+          defaultHilinemineMode: body.defaultHilinemineMode,
+          defaultHilinemineIntervalMinutes:
+            body.defaultHilinemineIntervalMinutes != null
+              ? Math.round(Number(body.defaultHilinemineIntervalMinutes))
+              : undefined,
+          defaultHilineminePenaltyPerInterval: Number(
+            body.defaultHilineminePenaltyPerInterval
+          ),
+          defaultHilinemineMaxPenalty: Number(
+            body.defaultHilinemineMaxPenalty
+          ),
+          defaultCalcType: body.defaultCalcType,
+          defaultHigherIsBetter: body.defaultHigherIsBetter,
+          defaultRankingMinPoints:
+            body.defaultRankingMinPoints != null
+              ? Number(body.defaultRankingMinPoints)
+              : undefined,
+          defaultFixedRankingPoints: Array.isArray(
+            body.defaultFixedRankingPoints
+          )
+            ? JSON.stringify(body.defaultFixedRankingPoints)
+            : undefined,
+        },
+      })
+      if (body.status === "ACTIVE") {
+        await ensureCompetitionAccessTokens(tx, id)
+      }
+      return competition
     })
     return NextResponse.json(updated)
   } catch (e) {

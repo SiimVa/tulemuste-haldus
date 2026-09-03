@@ -111,6 +111,10 @@ model Competition {
   location    String?
   status      String    @default("SETUP")
   isPublic    Boolean   @default(false)
+  // Registreerimislehe ligipääs: "PUBLIC" | "LINK_ONLY" | "PRIVATE".
+  // Lingitunnusest säilitatakse ainult SHA-256 räsi.
+  registrationAccessMode String  @default("PRIVATE")
+  registrationTokenHash  String? @unique
   organizerId String
   organizer   User      @relation(fields: [organizerId], references: [id])
   createdAt   DateTime  @default(now())

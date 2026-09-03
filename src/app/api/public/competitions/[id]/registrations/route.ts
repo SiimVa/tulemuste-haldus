@@ -8,6 +8,8 @@ import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
+import { isRegistrationLinkToken } from "@/lib/registrationAccess"
+import { hashRegistrationLinkToken } from "@/lib/registrationAccess.server"
 import {
   RegistrationClassError,
   resolveRegistrationClass,
@@ -27,7 +29,8 @@ async function createApplication(
   teamName: string,
   requestedClassId: string | null,
   rawAnswers: unknown,
-  representativeIdentity: { name: string; email: string }
+  representativeIdentity: { name: string; email: string },
+  registrationLinkToken: string | null
 ) {
   return prisma.$transaction(
     async (tx) => {
@@ -36,6 +39,8 @@ async function createApplication(
         select: {
           id: true,
           isPublic: true,
+          registrationAccessMode: true,
+          registrationTokenHash: true,
           status: true,
           registrationOverride: true,
           registrationOpensAt: true,
@@ -76,9 +81,18 @@ async function createApplication(
           },
         },
       })
+      const registrationPageAllowed = Boolean(
+        competition &&
+          ((competition.registrationAccessMode === "PUBLIC" &&
+            competition.isPublic) ||
+            (competition.registrationAccessMode === "LINK_ONLY" &&
+              registrationLinkToken &&
+              competition.registrationTokenHash ===
+                hashRegistrationLinkToken(registrationLinkToken)))
+      )
       if (
         !competition ||
-        !competition.isPublic ||
+        !registrationPageAllowed ||
         ["CANCELLED", "ARCHIVED", "FINISHED"].includes(competition.status)
       ) {
         throw new Error("Võistlus pole registreerimiseks saadaval")
@@ -179,6 +193,11 @@ export async function POST(
   const teamName = typeof body.teamName === "string" ? body.teamName.trim() : ""
   const classId =
     typeof body.classId === "string" && body.classId ? body.classId : null
+  const registrationLinkToken = isRegistrationLinkToken(
+    body.registrationLinkToken
+  )
+    ? body.registrationLinkToken
+    : null
   if (!teamName || teamName.length > 200) {
     return NextResponse.json(
       { error: "Võistkonna nimi on kohustuslik ja võib olla kuni 200 tähemärki" },
@@ -196,7 +215,8 @@ export async function POST(
         {
           name: session.user.name ?? "",
           email: session.user.email ?? "",
-        }
+        },
+        registrationLinkToken
       )
       return NextResponse.json(application)
     } catch (error) {

@@ -48,12 +48,45 @@ Esindaja:
 
 ## Avalik nimekiri
 
-Avaliku võistluse lehel näevad ka sisselogimata külastajad aktiivselt esitatud
-registreeringuid kolmes rühmas: võistlusele pääsenud, ootenimekirjas ja
-korraldaja otsust ootavad võistkonnad. Avalikus nimekirjas kuvatakse ainult
-võistkonna nimi, klass, staatus ja ootenimekirja koht. Liikmete, esindaja ning
-kontaktisikute andmeid ei avaldata. Mustandeid, tagasi lükatud registreeringuid
-ja loobunud võistkondi avalikus nimekirjas ei näidata.
+Võistluse registreerimise seadetes saab valida kolm ligipääsurežiimi:
+
+- **Avalik** – võistlus on avalikus võistluste nimekirjas ja selle
+  registreerimisleht avaneb kõigile;
+- **Ainult lingiga** – võistlust avalikus nimekirjas ei näidata, kuid eraldi
+  registreerimislink avab sama lehe;
+- **Privaatne** – väline registreerimisleht ei ole kättesaadav.
+
+Lingiga registreerimiseks loodud 256-bitist juhutunnust näidatakse korraldajale
+ainult selle loomisel. Andmebaasis säilitatakse tunnuse SHA-256 räsi. Kui link
+on kadunud või lekkinud, saab korraldaja luua uue lingi; vana link muutub kohe
+kehtetuks. Registreerimisavalduse esitamiseks peab kasutaja igas režiimis sisse
+logima.
+
+Ligipääsetaval registreerimislehel näevad ka sisselogimata külastajad aktiivselt
+esitatud registreeringuid kolmes rühmas: võistlusele pääsenud, ootenimekirjas ja
+korraldaja otsust ootavad võistkonnad. Registreerimislehe nimekirjas kuvatakse
+ainult võistkonna nimi, klass, staatus ja ootenimekirja koht. Liikmete, esindaja
+ning kontaktisikute andmeid ei avaldata. Mustandeid, tagasi lükatud
+registreeringuid ja loobunud võistkondi nimekirjas ei näidata.
+
+## Esindaja töölaud
+
+Esindaja töölaud kuvab ainult käimasoleva etapiga seotud tegevusi:
+
+- avalikud võistlused, mille registreerimine on avatud;
+- aktiivsed registreeringud eraldi kinnitatud, ootenimekirjas, tagasi saadetud
+  ja korraldaja otsust ootavate võistkondadena;
+- aktiivsed mandaadid eraldi täitmist vajavate, esitatud, tagasi saadetud ja
+  kinnitatud võistkondadena;
+- aktiivse võistluse kinnitatud võistkonnad koos tulemuste vaatamise ja
+  jagatava tulemuste lingi kopeerimise võimalusega.
+
+Registreering eemaldatakse töölaua registreerimisosast osalejate nimekirja
+kinnitamisel. Mandaat eemaldatakse võistluse aktiveerimisel ning võistkond
+liigub aktiivsete võistluste alla. Võistluse aktiveerimisel luuakse puuduvad
+256-bitised juurdepääsutunnused automaatselt nii hindamiselementidele kui ka
+kinnitatud võistkondadele. Varem aktiveeritud võistkonna puuduv tulemuste link
+luuakse esimesel kopeerimisel.
 
 ## Korraldaja vaade
 
