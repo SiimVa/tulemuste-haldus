@@ -5,6 +5,7 @@ import Link from "next/link"
 import { AutoRefresh } from "@/components/AutoRefresh"
 import { MiscScoreCell } from "@/components/competition/MiscScoreCell"
 import { LeaderboardHighlighter } from "@/components/public/LeaderboardHighlighter"
+import { isAutomaticRegistrationCode } from "@/lib/teamDisplay"
 
 export const dynamic = "force-dynamic"
 
@@ -123,7 +124,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                 <span className="text-lg font-bold text-gray-900 w-7 text-center shrink-0">{row.rank}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                    {!isAutomaticRegistrationCode(row.team.code) && (
+                      <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                    )}
                     <span className="font-medium text-gray-900 truncate">{row.team.name}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -164,7 +167,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <span className="text-xs text-amber-600 font-medium w-7 text-center shrink-0">AV</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                        {!isAutomaticRegistrationCode(row.team.code) && (
+                          <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                        )}
                         <span className="font-medium text-amber-700 truncate">{row.team.name}</span>
                       </div>
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-0.5 inline-block">{row.class}</span>
@@ -196,7 +201,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <span className="text-xs text-gray-400 font-medium w-7 text-center shrink-0">KAT</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                        {!isAutomaticRegistrationCode(row.team.code) && (
+                          <span className="font-mono text-xs text-gray-400">{row.team.code}</span>
+                        )}
                         <span className="font-medium text-gray-500 truncate">{row.team.name}</span>
                       </div>
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full mt-0.5 inline-block">{row.class}</span>
@@ -250,7 +257,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <td className="sticky left-0 z-10 bg-white w-12 px-2 py-3 font-bold text-gray-900 text-center">{row.rank}</td>
                     <td className="sticky left-12 z-10 bg-white w-12 px-2 py-3 text-gray-400 text-xs text-center">{row.classRank}</td>
                     <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-40">
-                      <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                      {!isAutomaticRegistrationCode(row.team.code) && (
+                        <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                      )}
                       <span className="font-medium text-gray-900">{row.team.name}</span>
                       {row.team.dqFromElementOrder != null && (
                         <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">DQ</span>
@@ -298,7 +307,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         <td className="sticky left-0 z-10 bg-amber-50 w-12 px-2 py-3 text-xs text-amber-600 font-medium text-center">AV</td>
                         <td className="sticky left-12 z-10 bg-amber-50 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
                         <td className="sticky left-24 z-10 bg-amber-50 border-r px-4 py-3 min-w-40">
-                          <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                          {!isAutomaticRegistrationCode(row.team.code) && (
+                            <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                          )}
                           <span className="font-medium text-amber-700">{row.team.name}</span>
                           {row.team.dqFromElementOrder != null && (
                             <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">DQ</span>
@@ -348,7 +359,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         <td className="sticky left-0 z-10 bg-gray-100 w-12 px-2 py-3 text-xs text-gray-400 font-medium text-center">KAT</td>
                         <td className="sticky left-12 z-10 bg-gray-100 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
                         <td className="sticky left-24 z-10 bg-gray-100 border-r px-4 py-3 min-w-40">
-                          <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                          {!isAutomaticRegistrationCode(row.team.code) && (
+                            <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
+                          )}
                           <span className="font-medium text-gray-500">{row.team.name}</span>
                           {row.team.dnfReason && (
                             <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-medium">{row.team.dnfReason}</span>

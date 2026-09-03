@@ -3,6 +3,7 @@
 import { useState, useEffect, Fragment } from "react"
 import Link from "next/link"
 import { SimulatorPanel, type SimEl, type Standing } from "@/components/public/SimulatorPanel"
+import { isAutomaticRegistrationCode, teamDisplayName } from "@/lib/teamDisplay"
 
 export type SimElementConfig = {
   id: string
@@ -290,7 +291,7 @@ export default function AnalysisView({
                   <optgroup label="Arvestussisesed">
                     {teams.filter(t => !t.isHorsDeCompetition).map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.code} – {t.name}{t.class ? ` (${t.class})` : ""}
+                        {teamDisplayName(t)}{t.class ? ` (${t.class})` : ""}
                         {t.overallRank != null ? ` · #${t.overallRank}/${t.totalInComp}` : ""}
                       </option>
                     ))}
@@ -299,7 +300,7 @@ export default function AnalysisView({
                 {teams.filter(t => t.isHorsDeCompetition).length > 0 && (
                   <optgroup label="Arvestusvälised">
                     {teams.filter(t => t.isHorsDeCompetition).map((t) => (
-                      <option key={t.id} value={t.id}>{t.code} – {t.name} [AV]</option>
+                      <option key={t.id} value={t.id}>{teamDisplayName(t)} [AV]</option>
                     ))}
                   </optgroup>
                 )}
@@ -313,7 +314,9 @@ export default function AnalysisView({
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-sm text-gray-400">{selectedTeam.code}</span>
+                        {!isAutomaticRegistrationCode(selectedTeam.code) && (
+                          <span className="font-mono text-sm text-gray-400">{selectedTeam.code}</span>
+                        )}
                         <h2 className="text-lg font-bold text-gray-900">{selectedTeam.name}</h2>
                         {selectedTeam.class && (
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selectedTeam.class}</span>
@@ -514,10 +517,10 @@ export default function AnalysisView({
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   {teams.filter(t => !t.isHorsDeCompetition).map((t) => (
-                    <option key={t.id} value={t.id}>{t.code} – {t.name}</option>
+                    <option key={t.id} value={t.id}>{teamDisplayName(t)}</option>
                   ))}
                   {teams.filter(t => t.isHorsDeCompetition).map((t) => (
-                    <option key={t.id} value={t.id}>{t.code} – {t.name} [AV]</option>
+                    <option key={t.id} value={t.id}>{teamDisplayName(t)} [AV]</option>
                   ))}
                 </select>
               </div>
@@ -631,7 +634,9 @@ export default function AnalysisView({
                                   : "–"}
                               </td>
                               <td className="px-4 py-3">
-                                <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
+                                {!isAutomaticRegistrationCode(team.code) && (
+                                  <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
+                                )}
                                 <span className={`font-medium ${isMe ? "text-blue-700" : isDnf ? "text-gray-500" : isHC ? "text-amber-700" : "text-gray-900"}`}>{team.name}</span>
                                 {isMe && <span className="ml-1.5 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">mina</span>}
                                 {isDnf && <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">katkestanud</span>}
@@ -714,7 +719,7 @@ export default function AnalysisView({
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 {teams.map((t) => (
-                  <option key={t.id} value={t.id}>[{t.code}] {t.name}{t.isHorsDeCompetition ? " (AV)" : ""}</option>
+                  <option key={t.id} value={t.id}>{teamDisplayName(t)}{t.isHorsDeCompetition ? " (AV)" : ""}</option>
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-2">Muuda võistkonna tulemusi ja vaata, kuidas elemendi punktid muutuksid. Muudatused on ainult selles vaates — andmebaasi ei salvestata.</p>
@@ -726,7 +731,11 @@ export default function AnalysisView({
                 competitionId={competitionId}
                 teamId={selectedTeamId}
                 teamName={simTeam?.name ?? ""}
-                teamCode={simTeam?.code ?? ""}
+                teamCode={
+                  simTeam && !isAutomaticRegistrationCode(simTeam.code)
+                    ? simTeam.code
+                    : ""
+                }
                 teamClass={simTeam?.class ?? null}
                 scoringMode={scoringMode}
                 elements={simPanelElements}
