@@ -84,7 +84,9 @@ export function SimulatorPanel({ competitionId, teamId, teamName, teamCode, team
       <div className={`rounded-xl p-5 text-white ${hasOverrides ? "bg-purple-600" : "bg-blue-600"}`}>
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <span className="font-mono text-xs opacity-80 mr-1">{teamCode}</span>
+            {teamCode && (
+              <span className="font-mono text-xs opacity-80 mr-1">{teamCode}</span>
+            )}
             <span className="font-bold">{teamName}</span>
             {teamClass && <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">{teamClass}</span>}
           </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { teamDisplayName } from "@/lib/teamDisplay"
 
 type Team = { id: string; code: string; name: string }
 
@@ -56,7 +57,7 @@ export function LeaderboardHighlighter({ competitionId, teams }: { competitionId
       >
         <option value="">— vali —</option>
         {teams.map((t) => (
-          <option key={t.id} value={t.id}>[{t.code}] {t.name}</option>
+          <option key={t.id} value={t.id}>{teamDisplayName(t)}</option>
         ))}
       </select>
     </div>
