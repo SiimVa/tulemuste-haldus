@@ -1594,6 +1594,12 @@ test.describe.serial("võistluse põhivoog", () => {
       )
     ).toBe(true)
 
+    await page.goto(`/public/${competitionId}/leaderboard`)
+    await expect(page.locator("body")).not.toContainText("REG-")
+
+    await page.goto(`/public/${competitionId}/analysis`)
+    await expect(page.locator("body")).not.toContainText("REG-")
+
     await page.goto("/dashboard")
     await expect(
       page.getByRole("heading", { name: "Aktiivsed võistlused" })
