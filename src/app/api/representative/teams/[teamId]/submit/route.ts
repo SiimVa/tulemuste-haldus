@@ -153,7 +153,8 @@ export async function POST(
         tx,
         teamId,
         "REGISTRATION",
-        nextStatus
+        nextStatus,
+        { automaticApproval: approvalMode === "AUTOMATIC" }
       )
       return result
     })
@@ -246,7 +247,10 @@ export async function POST(
       },
       include: { members: true, competition: true },
     })
-    await queueTeamWorkflowNotification(tx, teamId, "MANDATE", nextStatus)
+    await queueTeamWorkflowNotification(tx, teamId, "MANDATE", nextStatus, {
+      batchEmail: approvalMode === "MANUAL",
+      automaticApproval: approvalMode === "AUTOMATIC",
+    })
     return result
   })
   await deliverPendingNotificationsSafely()

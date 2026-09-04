@@ -4,6 +4,25 @@ export type NotificationContent = {
   message: string
 }
 
+export const NOTIFICATION_EMAIL_BATCH_WINDOW_MS = 10 * 60 * 1000
+
+const DIGEST_TITLES: Record<string, string> = {
+  REGISTRATION_CONFIRMED: "Võistkonnad on võistlusele kinnitatud",
+  REGISTRATION_CHANGES_REQUESTED: "Registreeringud vajavad täiendamist",
+  MANDATE_OPENED: "Mandaadid on avatud",
+  MANDATE_SUBMITTED: "Mandaadid on esitatud",
+  MANDATE_APPROVED: "Mandaadid on kinnitatud",
+  MANDATE_CHANGES_REQUESTED: "Mandaadid vajavad täiendamist",
+}
+
+export function notificationDigestTitle(
+  type: string,
+  fallbackTitle: string,
+  itemCount: number
+) {
+  return itemCount > 1 ? DIGEST_TITLES[type] ?? fallbackTitle : fallbackTitle
+}
+
 function appendNote(message: string, note?: string | null) {
   const normalized = note?.trim()
   return normalized ? `${message} Korraldaja märkus: ${normalized}` : message
@@ -26,7 +45,7 @@ export function registrationNotificationContent({
     return {
       type: "REGISTRATION_CONFIRMED",
       title: "Registreering kinnitatud",
-      message: `Võistkonna „${teamName}” koht võistlusel „${competitionName}” on kinnitatud.`,
+      message: `Võistkond „${teamName}” on registreeritud võistlusele „${competitionName}” ja tema koht on kinnitatud.`,
     }
   }
   if (status === "WAITLISTED") {
@@ -36,7 +55,7 @@ export function registrationNotificationContent({
     return {
       type: "REGISTRATION_WAITLISTED",
       title: "Võistkond on ootenimekirjas",
-      message: `Võistkond „${teamName}” lisati võistluse „${competitionName}” ootenimekirja.${position}`,
+      message: `Võistkond „${teamName}” on registreeritud võistlusele „${competitionName}” ja lisatud ootenimekirja.${position}`,
     }
   }
   if (status === "PENDING_REVIEW" || status === "SUBMITTED") {
@@ -75,19 +94,25 @@ export function teamWorkflowNotificationContent({
   competitionName,
   teamName,
   note,
+  automaticApproval = false,
 }: {
   phase: "REGISTRATION" | "MANDATE"
   status: string
   competitionName: string
   teamName: string
   note?: string | null
+  automaticApproval?: boolean
 }): NotificationContent | null {
   if (phase === "REGISTRATION") {
     if (status === "APPROVED") {
       return {
         type: "REGISTRATION_CONFIRMED",
-        title: "Registreering kinnitatud",
-        message: `Võistkonna „${teamName}” registreering võistlusele „${competitionName}” on kinnitatud.`,
+        title: automaticApproval
+          ? "Võistkond registreeritud ja kinnitatud"
+          : "Registreering kinnitatud",
+        message: automaticApproval
+          ? `Võistkond „${teamName}” on registreeritud võistlusele „${competitionName}” ja tema koht kinnitati automaatselt.`
+          : `Võistkonna „${teamName}” registreering võistlusele „${competitionName}” on kinnitatud.`,
       }
     }
     if (status === "SUBMITTED") {
@@ -113,8 +138,12 @@ export function teamWorkflowNotificationContent({
   if (status === "APPROVED") {
     return {
       type: "MANDATE_APPROVED",
-      title: "Mandaat kinnitatud",
-      message: `Võistkonna „${teamName}” mandaat võistlusele „${competitionName}” on kinnitatud.`,
+      title: automaticApproval
+        ? "Mandaat esitatud ja kinnitatud"
+        : "Mandaat kinnitatud",
+      message: automaticApproval
+        ? `Võistkonna „${teamName}” mandaat võistlusele „${competitionName}” on esitatud ja automaatselt kinnitatud.`
+        : `Võistkonna „${teamName}” mandaat võistlusele „${competitionName}” on kinnitatud.`,
     }
   }
   if (status === "SUBMITTED") {
@@ -177,14 +206,24 @@ export function escapeNotificationHtml(value: string) {
 export function notificationEmailHtml({
   title,
   message,
+  messages,
   actionUrl,
 }: {
   title: string
-  message: string
+  message?: string
+  messages?: string[]
   actionUrl?: string | null
 }) {
+  const emailMessages =
+    messages?.filter((item) => item.trim()) ?? (message ? [message] : [])
+  const content =
+    emailMessages.length > 1
+      ? `<ul style="font-size:16px;line-height:1.6;margin:0;padding-left:24px">${emailMessages
+          .map((item) => `<li style="margin:0 0 8px">${escapeNotificationHtml(item)}</li>`)
+          .join("")}</ul>`
+      : `<p style="font-size:16px;line-height:1.6;margin:0">${escapeNotificationHtml(emailMessages[0] ?? "")}</p>`
   const action = actionUrl
-    ? `<p style="margin:24px 0 0"><a href="${escapeNotificationHtml(actionUrl)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600">Ava tulemuste haldus</a></p>`
+    ? `<p style="margin:24px 0 0"><a href="${escapeNotificationHtml(actionUrl)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:600">Ava Matkamängu portaal</a></p>`
     : ""
-  return `<!doctype html><html lang="et"><body style="margin:0;background:#f9fafb;font-family:Arial,sans-serif;color:#111827"><div style="max-width:600px;margin:0 auto;padding:32px 20px"><div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:28px"><h1 style="font-size:22px;margin:0 0 16px">${escapeNotificationHtml(title)}</h1><p style="font-size:16px;line-height:1.6;margin:0">${escapeNotificationHtml(message)}</p>${action}</div><p style="font-size:12px;color:#6b7280;margin:16px 4px">Automaatne teavitus tulemuste halduse rakendusest.</p></div></body></html>`
+  return `<!doctype html><html lang="et"><body style="margin:0;background:#f9fafb;font-family:Arial,sans-serif;color:#111827"><div style="max-width:600px;margin:0 auto;padding:32px 20px"><div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:28px"><h1 style="font-size:22px;margin:0 0 16px">${escapeNotificationHtml(title)}</h1>${content}${action}</div><p style="font-size:12px;color:#6b7280;margin:16px 4px">Automaatne teavitus Matkamängu portaalist.</p></div></body></html>`
 }
