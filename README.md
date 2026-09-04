@@ -18,8 +18,6 @@ npm run db:deploy
 npm run dev
 ```
 
-Rakendus avaneb aadressil <http://localhost:3000>.
-
 Kasulikud andmebaasikäsud:
 
 ```bash
