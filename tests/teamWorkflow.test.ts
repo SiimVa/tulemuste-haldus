@@ -6,6 +6,7 @@ import {
   canReviewWorkflow,
   canSubmitMandate,
   canSubmitRegistration,
+  isMandateEditableInPhase,
 } from "../src/lib/teamWorkflow"
 
 test("registreerimist saab muuta ja esitada mustandist või parandamisel", () => {
@@ -29,6 +30,19 @@ test("mandaati saab muuta alles kinnitatud registreerimise järel", () => {
 test("mandaadi esitamiseks peab olema vähemalt üks võistleja", () => {
   assert.equal(canSubmitMandate("APPROVED", "DRAFT", 0), false)
   assert.equal(canSubmitMandate("APPROVED", "DRAFT", 1), true)
+})
+
+test("tagasi saadetud mandaati saab parandada ka pärast mandaadiperioodi sulgemist", () => {
+  assert.equal(isMandateEditableInPhase("DRAFT", "OPEN"), true)
+  assert.equal(isMandateEditableInPhase("DRAFT", "CLOSED"), false)
+  assert.equal(
+    isMandateEditableInPhase("CHANGES_REQUESTED", "CLOSED"),
+    true
+  )
+  assert.equal(
+    isMandateEditableInPhase("CHANGES_REQUESTED", "FINALIZED"),
+    true
+  )
 })
 
 test("korraldaja kinnitab esitatud etapi ja võib kinnitatud etapi tagasi saata", () => {

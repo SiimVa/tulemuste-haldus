@@ -22,7 +22,7 @@ Rakenduse teenuses peavad olema järgmised privaatsed muutujad:
 
 ```text
 RESEND_API_KEY=re_...
-EMAIL_FROM=Tulemuste haldus <teavitused@teated.matkamang.ee>
+EMAIL_FROM=Matkamängu portaal <teavitused@teated.matkamang.ee>
 CRON_SECRET=pikk-juhuslik-saladus
 ```
 

@@ -909,6 +909,32 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(confirmResponse.status(), await confirmResponse.text()).toBe(200)
     expect((await confirmResponse.json()).status).toBe("CONFIRMED")
 
+    const closeRegistrationResponse = await adminPage.request.patch(
+      `/api/competitions/${manualCompetitionId}/registration-settings`,
+      {
+        data: {
+          isPublic: true,
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "CLOSED",
+          registrationCapacity: null,
+          registrationClassBalanceMode: "OFF",
+          registrationApprovalMode: "MANUAL",
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "AUTO",
+          mandateApprovalMode: "MANUAL",
+          classes: defaults.registrationClasses,
+          formFields: defaults.registrationFormFields,
+          allocationRules: defaults.registrationAllocationRules,
+        },
+      }
+    )
+    expect(
+      closeRegistrationResponse.status(),
+      await closeRegistrationResponse.text()
+    ).toBe(200)
+
     const changesResponse = await adminPage.request.patch(
       `/api/competitions/${manualCompetitionId}/registration-applications/${application.id}`,
       {
@@ -923,18 +949,29 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(changes.status).toBe("CHANGES_REQUESTED")
     expect(changes.allocationReason).toBe("Täpsusta võistkonna nime")
 
-    const resubmitResponse = await page.request.patch(
-      `/api/registration-applications/${application.id}`,
-      {
-        data: {
-          teamName: "Täpsustatud võistkonna nimi",
-          classId: null,
-          answers: {},
-        },
-      }
+    await page.goto(`/competitions/${manualCompetitionId}`)
+    await expect(
+      page.getByText("Registreerimine ei ole praegu avatud.")
+    ).toBeVisible()
+    await page.getByRole("button", { name: "Muuda" }).click()
+    await expect(page.getByLabel("Võistkonna nimi")).toBeEditable()
+    await page
+      .getByLabel("Võistkonna nimi")
+      .fill("Täpsustatud võistkonna nimi")
+    await page.getByRole("button", { name: "Salvesta muudatused" }).click()
+    await expect(
+      page.getByText(
+        "Muudatused salvestatud. Uus staatus: Ootab ülevaatamist."
+      )
+    ).toBeVisible()
+    const resubmittedResponse = await adminPage.request.get(
+      `/api/competitions/${manualCompetitionId}/registrations`
     )
-    expect(resubmitResponse.status(), await resubmitResponse.text()).toBe(200)
-    expect((await resubmitResponse.json()).status).toBe("PENDING_REVIEW")
+    expect(resubmittedResponse.status()).toBe(200)
+    const resubmitted = (await resubmittedResponse.json()).applications.find(
+      (item: { id: string }) => item.id === application.id
+    )
+    expect(resubmitted.status).toBe("PENDING_REVIEW")
 
     await page.goto("/dashboard")
     const notificationLink = page.getByRole("link", {
@@ -1511,6 +1548,31 @@ test.describe.serial("võistluse põhivoog", () => {
       "APPROVED"
     )
 
+    const closeMandateResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/registration-settings`,
+      {
+        data: {
+          registrationAccessMode: "LINK_ONLY",
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "CLOSED",
+          registrationCapacity: 2,
+          registrationClassBalanceMode:
+            settings.registrationClassBalanceMode,
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "CLOSED",
+          classes: settings.registrationClasses,
+          formFields: settings.registrationFormFields,
+          allocationRules: settings.registrationAllocationRules,
+        },
+      }
+    )
+    expect(
+      closeMandateResponse.status(),
+      await closeMandateResponse.text()
+    ).toBe(200)
+
     await adminPage.goto(
       `/dashboard/competitions/${competitionId}/registrations`
     )
@@ -1528,7 +1590,49 @@ test.describe.serial("võistluse põhivoog", () => {
     await expect(
       automaticTeamCard.getByText("Vajab parandamist", { exact: true })
     ).toBeVisible()
+
+    await page.goto("/dashboard")
+    await expect(
+      page.getByRole("heading", { name: "Tagasi saadetud mandaadid" })
+    ).toBeVisible()
+    await page.goto(`/dashboard/representative/teams/${assignment.team.id}`)
+    await expect(
+      page.getByText("Korraldaja märkus: Täpsusta mandaadi andmeid")
+    ).toBeVisible()
+    await expect(page.getByLabel("Kontaktisiku e-post")).toBeEditable()
+    await page
+      .getByLabel("Kontaktisiku e-post")
+      .fill("parandatud@example.com")
+    await page.getByRole("button", { name: "Esita mandaat" }).click()
+    await expect(
+      page.getByText("Mandaat kinnitati automaatselt")
+    ).toBeVisible()
     await expect(page.getByText("Kontoga seotud liikmed")).toHaveCount(0)
+
+    const reopenMandateResponse = await adminPage.request.patch(
+      `/api/competitions/${competitionId}/registration-settings`,
+      {
+        data: {
+          registrationAccessMode: "LINK_ONLY",
+          registrationOpensAt: null,
+          registrationClosesAt: null,
+          registrationOverride: "CLOSED",
+          registrationCapacity: 2,
+          registrationClassBalanceMode:
+            settings.registrationClassBalanceMode,
+          mandateOpensAt: null,
+          mandateClosesAt: null,
+          mandateOverride: "OPEN",
+          classes: settings.registrationClasses,
+          formFields: settings.registrationFormFields,
+          allocationRules: settings.registrationAllocationRules,
+        },
+      }
+    )
+    expect(
+      reopenMandateResponse.status(),
+      await reopenMandateResponse.text()
+    ).toBe(200)
 
     const conflictingAssignment = assignments.find(
       (item: { team: { name: string; competition: { id: string } } }) =>

@@ -61,3 +61,13 @@ export function canEditRegistration(
   | "CHANGES_REQUESTED" {
   return canWithdrawRegistration(status)
 }
+
+export function canEditRegistrationInPhase(
+  status: string,
+  registrationOpen: boolean
+) {
+  return (
+    canEditRegistration(status) &&
+    (registrationOpen || status === "CHANGES_REQUESTED")
+  )
+}

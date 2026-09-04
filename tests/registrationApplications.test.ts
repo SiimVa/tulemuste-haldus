@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   canEditRegistration,
+  canEditRegistrationInPhase,
   canWithdrawRegistration,
   initialRegistrationStatus,
   isPublicRegistrationApplicationStatus,
@@ -32,6 +33,13 @@ test("ainult aktiivset avaldust saab registreerimise ajal muuta", () => {
   assert.equal(canEditRegistration("CHANGES_REQUESTED"), true)
   assert.equal(canEditRegistration("REJECTED"), false)
   assert.equal(canEditRegistration("WITHDRAWN"), false)
+})
+
+test("tagasi saadetud avaldust saab parandada ka pärast registreerimise sulgemist", () => {
+  assert.equal(canEditRegistrationInPhase("CONFIRMED", true), true)
+  assert.equal(canEditRegistrationInPhase("CONFIRMED", false), false)
+  assert.equal(canEditRegistrationInPhase("CHANGES_REQUESTED", false), true)
+  assert.equal(canEditRegistrationInPhase("REJECTED", true), false)
 })
 
 test("avalikus nimekirjas on ainult aktiivselt esitatud registreeringud", () => {
