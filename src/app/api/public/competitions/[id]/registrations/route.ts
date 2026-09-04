@@ -8,6 +8,10 @@ import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
+import {
+  deliverPendingNotificationsSafely,
+  queueRegistrationApplicationNotification,
+} from "@/lib/notifications.server"
 import { isRegistrationLinkToken } from "@/lib/registrationAccess"
 import { hashRegistrationLinkToken } from "@/lib/registrationAccess.server"
 import {
@@ -168,12 +172,19 @@ async function createApplication(
         await recalculateRegistrationAllocation(tx, competitionId, {
           actorId: submittedById,
           eventNote: "Registreerimise järel arvutatud koht",
+          notifyTransitions: false,
         })
       }
-      return tx.registrationApplication.findUniqueOrThrow({
+      const application = await tx.registrationApplication.findUniqueOrThrow({
         where: { id: created.id },
         include: { class: { select: { id: true, name: true } } },
       })
+      await queueRegistrationApplicationNotification(
+        tx,
+        application.id,
+        application.status
+      )
+      return application
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   )
@@ -218,6 +229,7 @@ export async function POST(
         },
         registrationLinkToken
       )
+      await deliverPendingNotificationsSafely()
       return NextResponse.json(application)
     } catch (error) {
       if (

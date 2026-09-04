@@ -2,10 +2,15 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import Link from "next/link"
 import { SignOutButton } from "@/components/SignOutButton"
+import { NotificationNavLink } from "@/components/notifications/NotificationNavLink"
+import { prisma } from "@/lib/prisma"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
+  const unreadNotifications = await prisma.notification.count({
+    where: { userId: session.user.id, readAt: null },
+  })
   const roleLabel =
     session.user.role === "ADMIN"
       ? "Admin"
@@ -28,6 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <span className="sm:hidden">Avalikud</span>
               <span className="hidden sm:inline">Avalikud võistlused</span>
             </Link>
+            <NotificationNavLink unreadCount={unreadNotifications} />
             {session.user.role === "ADMIN" && (
               <Link href="/dashboard/users" className="hidden text-sm text-gray-500 hover:text-blue-600 sm:inline">
                 Kasutajad

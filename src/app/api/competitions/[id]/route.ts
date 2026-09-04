@@ -5,6 +5,10 @@ import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { parseTeamMemberRoles } from "@/lib/teamComposition"
 import { ensureCompetitionAccessTokens } from "@/lib/accessTokens.server"
+import {
+  deliverPendingNotificationsSafely,
+  queueCompetitionStartedNotifications,
+} from "@/lib/notifications.server"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -68,6 +72,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      const previous = await tx.competition.findUnique({
+        where: { id },
+        select: { status: true },
+      })
       const competition = await tx.competition.update({
         where: { id },
         data: {
@@ -121,9 +129,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       })
       if (body.status === "ACTIVE") {
         await ensureCompetitionAccessTokens(tx, id)
+        if (previous?.status !== "ACTIVE") {
+          await queueCompetitionStartedNotifications(tx, id)
+        }
       }
       return competition
     })
+    await deliverPendingNotificationsSafely()
     return NextResponse.json(updated)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

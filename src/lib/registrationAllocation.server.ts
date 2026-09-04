@@ -7,6 +7,7 @@ import {
   isClassBalanceMode,
 } from "@/lib/registrationAllocation"
 import { parseFormAnswer } from "@/lib/registrationForm"
+import { queueRegistrationApplicationNotification } from "@/lib/notifications.server"
 
 type TransactionClient = Prisma.TransactionClient
 
@@ -27,7 +28,12 @@ export async function recalculateRegistrationAllocation(
   {
     actorId = null,
     eventNote = "Automaatne kohtade ümberarvutus",
-  }: { actorId?: string | null; eventNote?: string } = {}
+    notifyTransitions = true,
+  }: {
+    actorId?: string | null
+    eventNote?: string
+    notifyTransitions?: boolean
+  } = {}
 ) {
   const competition = await tx.competition.findUnique({
     where: { id: competitionId },
@@ -159,6 +165,13 @@ export async function recalculateRegistrationAllocation(
         fromStatus: application.status,
         toStatus: nextStatus,
       })
+      if (notifyTransitions) {
+        await queueRegistrationApplicationNotification(
+          tx,
+          application.id,
+          nextStatus
+        )
+      }
     }
   }
 

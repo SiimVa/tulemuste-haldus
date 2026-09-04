@@ -22,6 +22,7 @@
     "src/lib/registrationAllocation.ts",
     "src/lib/registrationClasses.ts",
     "src/lib/registrationForm.ts",
+    "src/lib/notifications.ts",
     "src/lib/teamWorkflow.ts",
     "tests/**/*.test.ts"
   ]

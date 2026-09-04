@@ -936,6 +936,29 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(resubmitResponse.status(), await resubmitResponse.text()).toBe(200)
     expect((await resubmitResponse.json()).status).toBe("PENDING_REVIEW")
 
+    await page.goto("/dashboard")
+    const notificationLink = page.getByRole("link", {
+      name: /Teavitused, \d+ lugemata/,
+    })
+    await expect(notificationLink).toBeVisible()
+    await notificationLink.click()
+    await expect(
+      page.getByRole("heading", { name: "Teavitused" })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("heading", {
+        name: "Registreering vajab täiendamist",
+      })
+    ).toBeVisible()
+    await expect(page.getByText(/Täpsusta võistkonna nime/)).toBeVisible()
+    await expect(
+      page.getByRole("heading", { name: "Registreering esitatud" }).first()
+    ).toBeVisible()
+    const unauthorizedDelivery = await page.request.get(
+      "/api/internal/notifications/deliver"
+    )
+    expect(unauthorizedDelivery.status()).toBe(401)
+
     await representativeContext.close()
     await adminContext.close()
   })

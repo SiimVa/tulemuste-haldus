@@ -10,6 +10,10 @@ import {
 } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import {
+  deliverPendingNotificationsSafely,
+  queueMandateOpenedNotifications,
+} from "@/lib/notifications.server"
+import {
   type AllocationRuleDefinition,
   isAllocationRuleSource,
   isAllocationRuleType,
@@ -670,6 +674,8 @@ export async function PATCH(
         },
       })
       if (!current) throw new Error("Võistlust ei leitud")
+      const mandateWasOpen =
+        getCompetitionMandateStatus(current) === "OPEN"
       const representativeRequired =
         body.representativeRequired === undefined
           ? current.representativeRequired
@@ -977,10 +983,18 @@ export async function PATCH(
         })
       }
 
+      if (
+        !mandateWasOpen &&
+        getCompetitionMandateStatus(competition) === "OPEN"
+      ) {
+        await queueMandateOpenedNotifications(tx, id)
+      }
+
       return { competition, registrationLinkToken }
     })
 
     const { competition: updated, registrationLinkToken } = result
+    await deliverPendingNotificationsSafely()
     const { registrationTokenHash, ...publicCompetition } = updated
     return NextResponse.json({
       ...responseData(publicCompetition),
