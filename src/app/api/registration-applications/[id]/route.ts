@@ -26,6 +26,10 @@ import {
   validateFormAnswers,
   withRepresentativeIdentity,
 } from "@/lib/registrationForm"
+import {
+  deliverPendingNotificationsSafely,
+  queueRegistrationApplicationNotification,
+} from "@/lib/notifications.server"
 
 class RegistrationUpdateValidationError extends Error {}
 
@@ -221,15 +225,22 @@ async function updateApplication(
         await recalculateRegistrationAllocation(tx, application.competitionId, {
           actorId: userId,
           eventNote: "Registreeringu muutmise järel arvutatud koht",
+          notifyTransitions: false,
         })
       } else {
         await reindexWaitlistPositions(tx, application.competitionId)
       }
 
-      return tx.registrationApplication.findUniqueOrThrow({
+      const updated = await tx.registrationApplication.findUniqueOrThrow({
         where: { id: application.id },
         include: { class: { select: { id: true, name: true } } },
       })
+      await queueRegistrationApplicationNotification(
+        tx,
+        updated.id,
+        updated.status
+      )
+      return updated
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
   )
@@ -321,7 +332,9 @@ export async function DELETE(
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return NextResponse.json(await withdrawApplication(id, session.user.id))
+      const result = await withdrawApplication(id, session.user.id)
+      await deliverPendingNotificationsSafely()
+      return NextResponse.json(result)
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -372,6 +385,7 @@ export async function PATCH(
           email: session.user.email ?? "",
         }
       )
+      await deliverPendingNotificationsSafely()
       return NextResponse.json(application)
     } catch (error) {
       if (

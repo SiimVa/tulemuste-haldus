@@ -6,6 +6,10 @@ import {
 } from "@/lib/competitionAccess"
 import { prisma } from "@/lib/prisma"
 import {
+  deliverPendingNotificationsSafely,
+  queueTeamWorkflowNotification,
+} from "@/lib/notifications.server"
+import {
   canReviewWorkflow,
   isTeamWorkflowDecision,
   isTeamWorkflowPhase,
@@ -138,42 +142,49 @@ export async function POST(
   const status =
     body.decision === "APPROVE" ? "APPROVED" : "CHANGES_REQUESTED"
   const reviewedAt = new Date()
-  const updated = await prisma.team.update({
-    where: { id: teamId },
-    data:
-      body.phase === "REGISTRATION"
-        ? {
-            registrationStatus: status,
-            registrationReviewedAt: reviewedAt,
-            registrationReviewNote: note || null,
-            ...(body.decision === "REQUEST_CHANGES" &&
-            team.mandateStatus !== "DRAFT"
-              ? {
-                  mandateStatus: "CHANGES_REQUESTED",
-                  mandateReviewedAt: reviewedAt,
-                  mandateReviewNote:
-                    "Registreerimise andmed vajavad täiendamist",
-                }
-              : {}),
-          }
-        : {
-            mandateStatus: status,
-            mandateReviewedAt: reviewedAt,
-            mandateReviewNote: note || null,
-          },
-    include: {
-      members: true,
-      representative: {
-        include: {
-          member: {
-            include: {
-              user: { select: { id: true, name: true, email: true } },
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.team.update({
+      where: { id: teamId },
+      data:
+        body.phase === "REGISTRATION"
+          ? {
+              registrationStatus: status,
+              registrationReviewedAt: reviewedAt,
+              registrationReviewNote: note || null,
+              ...(body.decision === "REQUEST_CHANGES" &&
+              team.mandateStatus !== "DRAFT"
+                ? {
+                    mandateStatus: "CHANGES_REQUESTED",
+                    mandateReviewedAt: reviewedAt,
+                    mandateReviewNote:
+                      "Registreerimise andmed vajavad täiendamist",
+                  }
+                : {}),
+            }
+          : {
+              mandateStatus: status,
+              mandateReviewedAt: reviewedAt,
+              mandateReviewNote: note || null,
+            },
+      include: {
+        members: true,
+        representative: {
+          include: {
+            member: {
+              include: {
+                user: { select: { id: true, name: true, email: true } },
+              },
             },
           },
         },
       },
-    },
+    })
+    await queueTeamWorkflowNotification(tx, teamId, body.phase, status, {
+      note,
+    })
+    return result
   })
 
+  await deliverPendingNotificationsSafely()
   return NextResponse.json(updated)
 }

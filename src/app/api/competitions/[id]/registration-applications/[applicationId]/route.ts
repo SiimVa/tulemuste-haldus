@@ -17,6 +17,10 @@ import {
   validateFormAnswers,
   type FormAnswers,
 } from "@/lib/registrationForm"
+import {
+  deliverPendingNotificationsSafely,
+  queueRegistrationApplicationNotification,
+} from "@/lib/notifications.server"
 
 const ACTION_STATUS = {
   CONFIRM: "CONFIRMED",
@@ -328,6 +332,13 @@ export async function PATCH(
           },
         })
 
+        await queueRegistrationApplicationNotification(
+          tx,
+          application.id,
+          nextStatus,
+          { note }
+        )
+
         const approvalMode = isApprovalMode(
           application.competition.registrationApprovalMode
         )
@@ -348,6 +359,7 @@ export async function PATCH(
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     )
+    await deliverPendingNotificationsSafely()
     return NextResponse.json(updated)
   } catch (error) {
     const message =

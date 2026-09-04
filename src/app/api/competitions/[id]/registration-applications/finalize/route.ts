@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
-import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
+import {
+  getCompetitionMandateStatus,
+  getCompetitionRegistrationStatus,
+} from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import {
+  deliverPendingNotificationsSafely,
+  queueMandateOpenedNotifications,
+} from "@/lib/notifications.server"
 import {
   type MemberAnswer,
   parseFormAnswer,
@@ -51,6 +58,10 @@ export async function POST(
           registrationOpensAt: true,
           registrationClosesAt: true,
           registrationFinalizedAt: true,
+          mandateOverride: true,
+          mandateOpensAt: true,
+          mandateClosesAt: true,
+          mandateFinalizedAt: true,
         },
       })
       if (!competition) throw new Error("Võistlust ei leitud")
@@ -217,9 +228,19 @@ export async function POST(
         },
       })
 
+      if (
+        getCompetitionMandateStatus({
+          ...competition,
+          registrationFinalizedAt: finalizedAt,
+        }) === "OPEN"
+      ) {
+        await queueMandateOpenedNotifications(tx, competitionId)
+      }
+
       return { finalizedAt, createdTeams }
     })
 
+    await deliverPendingNotificationsSafely()
     return NextResponse.json(result)
   } catch (error) {
     const message =

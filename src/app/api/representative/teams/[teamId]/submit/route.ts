@@ -8,6 +8,10 @@ import { canManageTeamRegistration } from "@/lib/competitionAccess"
 import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import {
+  deliverPendingNotificationsSafely,
+  queueTeamWorkflowNotification,
+} from "@/lib/notifications.server"
+import {
   type FormAnswers,
   parseFormAnswer,
   toFormFieldDefinition,
@@ -132,17 +136,27 @@ export async function POST(
       : "AUTOMATIC"
     const nextStatus = workflowStatusAfterSubmission(approvalMode)
     const submittedAt = new Date()
-    const updated = await prisma.team.update({
-      where: { id: teamId },
-      data: {
-        registrationStatus: nextStatus,
-        registrationSubmittedAt: submittedAt,
-        registrationReviewedAt:
-          approvalMode === "AUTOMATIC" ? submittedAt : null,
-        registrationReviewNote: null,
-      },
-      include: { members: true, competition: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.team.update({
+        where: { id: teamId },
+        data: {
+          registrationStatus: nextStatus,
+          registrationSubmittedAt: submittedAt,
+          registrationReviewedAt:
+            approvalMode === "AUTOMATIC" ? submittedAt : null,
+          registrationReviewNote: null,
+        },
+        include: { members: true, competition: true },
+      })
+      await queueTeamWorkflowNotification(
+        tx,
+        teamId,
+        "REGISTRATION",
+        nextStatus
+      )
+      return result
     })
+    await deliverPendingNotificationsSafely()
     return NextResponse.json(updated)
   }
 
@@ -216,16 +230,21 @@ export async function POST(
     : "MANUAL"
   const nextStatus = workflowStatusAfterSubmission(approvalMode)
   const submittedAt = new Date()
-  const updated = await prisma.team.update({
-    where: { id: teamId },
-    data: {
-      mandateStatus: nextStatus,
-      mandateSubmittedAt: submittedAt,
-      mandateReviewedAt:
-        approvalMode === "AUTOMATIC" ? submittedAt : null,
-      mandateReviewNote: null,
-    },
-    include: { members: true, competition: true },
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.team.update({
+      where: { id: teamId },
+      data: {
+        mandateStatus: nextStatus,
+        mandateSubmittedAt: submittedAt,
+        mandateReviewedAt:
+          approvalMode === "AUTOMATIC" ? submittedAt : null,
+        mandateReviewNote: null,
+      },
+      include: { members: true, competition: true },
+    })
+    await queueTeamWorkflowNotification(tx, teamId, "MANDATE", nextStatus)
+    return result
   })
+  await deliverPendingNotificationsSafely()
   return NextResponse.json(updated)
 }
