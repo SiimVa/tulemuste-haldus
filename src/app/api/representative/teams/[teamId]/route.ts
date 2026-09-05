@@ -15,6 +15,7 @@ import {
 import {
   canEditMandate,
   canEditWorkflow,
+  isMandateEditableInPhase,
   isTeamWorkflowPhase,
   isTeamWorkflowStatus,
 } from "@/lib/teamWorkflow"
@@ -250,7 +251,10 @@ export async function PATCH(
   }
   if (
     team.registrationApplication &&
-    getCompetitionMandateStatus(team.competition) !== "OPEN"
+    !isMandateEditableInPhase(
+      mandateStatus,
+      getCompetitionMandateStatus(team.competition)
+    )
   ) {
     return NextResponse.json(
       { error: "Mandaat ei ole praegu avatud" },

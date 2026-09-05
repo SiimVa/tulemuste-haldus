@@ -1,9 +1,12 @@
+import { randomUUID } from "node:crypto"
 import type { Prisma } from "@prisma/client"
 import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import {
   competitionStartedNotificationContent,
   mandateOpenedNotificationContent,
+  NOTIFICATION_EMAIL_BATCH_WINDOW_MS,
+  notificationDigestTitle,
   notificationEmailHtml,
   registrationNotificationContent,
   teamWorkflowNotificationContent,
@@ -19,12 +22,34 @@ type QueueNotificationInput = NotificationContent & {
   emailTo: string
   emailReplyTo?: string | null
   dedupeKey?: string | null
+  batchEmail?: boolean
 }
 
 export async function queueUserNotification(
   tx: TransactionClient,
   input: QueueNotificationInput
 ) {
+  const now = new Date()
+  let emailBatchId: string | null = null
+  let emailNextAttemptAt = now
+  if (input.batchEmail) {
+    const openBatch = await tx.notification.findFirst({
+      where: {
+        userId: input.userId,
+        competitionId: input.competitionId ?? null,
+        type: input.type,
+        emailBatchId: { not: null },
+        emailStatus: "PENDING",
+        emailNextAttemptAt: { gt: now },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { emailBatchId: true, emailNextAttemptAt: true },
+    })
+    emailBatchId = openBatch?.emailBatchId ?? randomUUID()
+    emailNextAttemptAt =
+      openBatch?.emailNextAttemptAt ??
+      new Date(now.getTime() + NOTIFICATION_EMAIL_BATCH_WINDOW_MS)
+  }
   const data = {
     userId: input.userId,
     competitionId: input.competitionId ?? null,
@@ -35,6 +60,8 @@ export async function queueUserNotification(
     emailTo: input.emailTo.trim().toLowerCase(),
     emailReplyTo: input.emailReplyTo?.trim().toLowerCase() || null,
     dedupeKey: input.dedupeKey ?? null,
+    emailBatchId,
+    emailNextAttemptAt,
   }
   if (data.dedupeKey) {
     return tx.notification.upsert({
@@ -51,7 +78,11 @@ export async function queueRegistrationApplicationNotification(
   tx: TransactionClient,
   applicationId: string,
   status: string,
-  options: { note?: string | null; dedupeKey?: string | null } = {}
+  options: {
+    note?: string | null
+    dedupeKey?: string | null
+    batchEmail?: boolean
+  } = {}
 ) {
   const application = await tx.registrationApplication.findUnique({
     where: { id: applicationId },
@@ -86,6 +117,7 @@ export async function queueRegistrationApplicationNotification(
     emailTo: application.submittedBy.email,
     emailReplyTo: application.competition.organizer.email,
     dedupeKey: options.dedupeKey,
+    batchEmail: options.batchEmail,
   })
 }
 
@@ -94,7 +126,12 @@ export async function queueTeamWorkflowNotification(
   teamId: string,
   phase: "REGISTRATION" | "MANDATE",
   status: string,
-  options: { note?: string | null; dedupeKey?: string | null } = {}
+  options: {
+    note?: string | null
+    dedupeKey?: string | null
+    batchEmail?: boolean
+    automaticApproval?: boolean
+  } = {}
 ) {
   const team = await tx.team.findUnique({
     where: { id: teamId },
@@ -123,6 +160,7 @@ export async function queueTeamWorkflowNotification(
     competitionName: team.competition.name,
     teamName: team.name,
     note: options.note,
+    automaticApproval: options.automaticApproval,
   })
   if (!content) return null
   return queueUserNotification(tx, {
@@ -133,6 +171,7 @@ export async function queueTeamWorkflowNotification(
     emailTo: recipient.email,
     emailReplyTo: team.competition.organizer.email,
     dedupeKey: options.dedupeKey,
+    batchEmail: options.batchEmail,
   })
 }
 
@@ -159,9 +198,13 @@ export async function queueMandateOpenedNotifications(
     },
   })
   const notifications: Prisma.NotificationCreateManyInput[] = []
+  const batchIds = new Map<string, string>()
+  const queuedAt = new Date()
   for (const team of teams) {
     const recipient = team.representative?.member.user
     if (!recipient) continue
+    const emailBatchId = batchIds.get(recipient.id) ?? randomUUID()
+    batchIds.set(recipient.id, emailBatchId)
     const content = mandateOpenedNotificationContent({
       competitionName: team.competition.name,
       teamName: team.name,
@@ -175,6 +218,8 @@ export async function queueMandateOpenedNotifications(
       emailReplyTo:
         team.competition.organizer.email.trim().toLowerCase() || null,
       dedupeKey: `mandate-opened:${competitionId}:${team.id}:${recipient.id}`,
+      emailBatchId,
+      emailNextAttemptAt: queuedAt,
     })
   }
   if (notifications.length === 0) return 0
@@ -323,10 +368,36 @@ export async function deliverPendingNotifications(
 
   let sent = 0
   let failed = 0
+  const processedBatchIds = new Set<string>()
   for (const notification of pending) {
+    if (
+      notification.emailBatchId &&
+      processedBatchIds.has(notification.emailBatchId)
+    ) {
+      continue
+    }
+    if (notification.emailBatchId) {
+      processedBatchIds.add(notification.emailBatchId)
+    }
+
+    const emailNotifications = notification.emailBatchId
+      ? await prisma.notification.findMany({
+          where: {
+            emailBatchId: notification.emailBatchId,
+            emailStatus: { in: ["PENDING", "FAILED"] },
+            emailNextAttemptAt: { lte: now },
+            emailAttempts: { lt: 6 },
+          },
+          include: { competition: { select: { name: true } } },
+          orderBy: { createdAt: "asc" },
+        })
+      : [notification]
+    if (emailNotifications.length === 0) continue
+
+    const notificationIds = emailNotifications.map(({ id }) => id)
     const claimed = await prisma.notification.updateMany({
       where: {
-        id: notification.id,
+        id: { in: notificationIds },
         emailStatus: { in: ["PENDING", "FAILED"] },
         emailNextAttemptAt: { lte: now },
       },
@@ -336,31 +407,47 @@ export async function deliverPendingNotifications(
         emailLastError: null,
       },
     })
-    if (claimed.count !== 1) continue
+    if (claimed.count !== notificationIds.length) continue
 
-    const actionUrl = absoluteNotificationUrl(notification.href)
+    const first = emailNotifications[0]
+    const messages = emailNotifications.map(({ message }) => message)
+    const title = notificationDigestTitle(
+      first.type,
+      first.title,
+      emailNotifications.length
+    )
+    const actionUrl = absoluteNotificationUrl(
+      emailNotifications.length > 1 ? "/dashboard" : first.href
+    )
+    const textMessage =
+      messages.length > 1
+        ? messages.map((message) => `- ${message}`).join("\n")
+        : messages[0]
+    const idempotencyKey = first.emailBatchId
+      ? `notification-batch-${first.emailBatchId}`
+      : first.id
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "Idempotency-Key": notification.id,
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify({
           from,
-          to: [notification.emailTo],
-          subject: notification.competition?.name
-            ? `${notification.title} – ${notification.competition.name}`
-            : notification.title,
-          text: `${notification.message}${actionUrl ? `\n\n${actionUrl}` : ""}`,
+          to: [first.emailTo],
+          subject: first.competition?.name
+            ? `${title} – ${first.competition.name}`
+            : title,
+          text: `${textMessage}${actionUrl ? `\n\n${actionUrl}` : ""}`,
           html: notificationEmailHtml({
-            title: notification.title,
-            message: notification.message,
+            title,
+            messages,
             actionUrl,
           }),
-          ...(notification.emailReplyTo
-            ? { reply_to: notification.emailReplyTo }
+          ...(first.emailReplyTo
+            ? { reply_to: first.emailReplyTo }
             : {}),
         }),
         signal: AbortSignal.timeout(10_000),
@@ -371,8 +458,8 @@ export async function deliverPendingNotifications(
           `Resend vastas staatusega ${response.status}${detail ? `: ${detail}` : ""}`
         )
       }
-      await prisma.notification.update({
-        where: { id: notification.id },
+      await prisma.notification.updateMany({
+        where: { id: { in: notificationIds } },
         data: {
           emailStatus: "SENT",
           emailSentAt: new Date(),
@@ -381,12 +468,14 @@ export async function deliverPendingNotifications(
       })
       sent += 1
     } catch (error) {
-      const attempts = notification.emailAttempts + 1
+      const attempts = Math.max(
+        ...emailNotifications.map(({ emailAttempts }) => emailAttempts + 1)
+      )
       const delayMinutes = Math.min(2 ** attempts, 60)
       const message =
         error instanceof Error ? error.message : "E-kirja saatmine ebaõnnestus"
-      await prisma.notification.update({
-        where: { id: notification.id },
+      await prisma.notification.updateMany({
+        where: { id: { in: notificationIds } },
         data: {
           emailStatus: "FAILED",
           emailLastError: message.slice(0, 2000),

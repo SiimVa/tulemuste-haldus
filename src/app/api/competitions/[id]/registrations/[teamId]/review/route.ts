@@ -181,6 +181,7 @@ export async function POST(
     })
     await queueTeamWorkflowNotification(tx, teamId, body.phase, status, {
       note,
+      batchEmail: true,
     })
     return result
   })

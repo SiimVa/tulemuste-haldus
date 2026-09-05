@@ -11,6 +11,10 @@ import {
   REPRESENTATIVE_FORM_FIELD_KEYS,
   validateFormAnswers,
 } from "@/lib/registrationForm"
+import {
+  canEditRegistrationInPhase,
+  canWithdrawRegistration,
+} from "@/lib/registrationApplications"
 
 type CompetitionClass = { id: string; name: string }
 type Application = {
@@ -90,6 +94,9 @@ export function RegistrationPanel({
   const [withdrawing, setWithdrawing] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
+  const editingApplication = applications.find(({ id }) => id === editingId)
+  const registrationFormAvailable =
+    registrationOpen || editingApplication?.status === "CHANGES_REQUESTED"
 
   function resetForm() {
     setTeamName("")
@@ -135,9 +142,6 @@ export function RegistrationPanel({
       setError("Kontrolli kohustuslikke ja vigaseid vormivälju")
       return
     }
-    const editingApplication = applications.find(
-      ({ id }) => id === editingId
-    )
     const response = await fetch(
       editingId
         ? `/api/registration-applications/${editingId}`
@@ -241,31 +245,29 @@ export function RegistrationPanel({
                   >
                     {STATUS_LABEL[application.status] ?? application.status}
                   </span>
+                  {canEditRegistrationInPhase(
+                    application.status,
+                    registrationOpen
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => edit(application)}
+                      disabled={saving || withdrawing === application.id}
+                      className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      Muuda
+                    </button>
+                  )}
                   {registrationOpen &&
-                    [
-                      "CONFIRMED",
-                      "WAITLISTED",
-                      "PENDING_REVIEW",
-                      "CHANGES_REQUESTED",
-                    ].includes(application.status) && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => edit(application)}
-                          disabled={saving || withdrawing === application.id}
-                          className="text-xs text-blue-600 hover:underline disabled:opacity-50"
-                        >
-                          Muuda
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => withdraw(application.id)}
-                          disabled={withdrawing === application.id}
-                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                        >
-                          Loobu
-                        </button>
-                      </>
+                    canWithdrawRegistration(application.status) && (
+                      <button
+                        type="button"
+                        onClick={() => withdraw(application.id)}
+                        disabled={withdrawing === application.id}
+                        className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Loobu
+                      </button>
                     )}
                 </div>
                 {application.allocationReason && (
@@ -290,7 +292,7 @@ export function RegistrationPanel({
           {editingId ? "Muuda registreeringut" : "Registreeri võistkond"}
         </h2>
 
-        {!registrationOpen ? (
+        {!registrationFormAvailable ? (
           <p className="text-sm text-gray-500 mt-3">
             Registreerimine ei ole praegu avatud.
           </p>

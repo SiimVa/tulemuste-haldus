@@ -47,6 +47,13 @@ export function canEditMandate(
   )
 }
 
+export function isMandateEditableInPhase(
+  mandateStatus: TeamWorkflowStatus,
+  phaseStatus: string
+) {
+  return phaseStatus === "OPEN" || mandateStatus === "CHANGES_REQUESTED"
+}
+
 export function canSubmitMandate(
   registrationStatus: TeamWorkflowStatus,
   mandateStatus: TeamWorkflowStatus,

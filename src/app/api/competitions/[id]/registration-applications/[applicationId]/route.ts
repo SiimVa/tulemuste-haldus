@@ -336,7 +336,12 @@ export async function PATCH(
           tx,
           application.id,
           nextStatus,
-          { note }
+          {
+            note,
+            batchEmail:
+              nextStatus === "CONFIRMED" ||
+              nextStatus === "CHANGES_REQUESTED",
+          }
         )
 
         const approvalMode = isApprovalMode(

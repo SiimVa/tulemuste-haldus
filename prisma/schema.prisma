@@ -217,6 +217,7 @@ model Notification {
   emailTo            String
   emailReplyTo       String?
   emailStatus        String       @default("PENDING")
+  emailBatchId       String?
   emailAttempts      Int          @default(0)
   emailNextAttemptAt DateTime     @default(now())
   emailSentAt        DateTime?
@@ -226,6 +227,7 @@ model Notification {
 
   @@index([userId, readAt, createdAt])
   @@index([emailStatus, emailNextAttemptAt])
+  @@index([emailBatchId, emailStatus, emailNextAttemptAt])
   @@index([competitionId, createdAt])
 }
 

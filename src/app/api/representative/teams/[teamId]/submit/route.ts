@@ -20,6 +20,7 @@ import {
 import {
   canSubmitMandate,
   canSubmitRegistration,
+  isMandateEditableInPhase,
   isTeamWorkflowPhase,
   isTeamWorkflowStatus,
 } from "@/lib/teamWorkflow"
@@ -152,7 +153,8 @@ export async function POST(
         tx,
         teamId,
         "REGISTRATION",
-        nextStatus
+        nextStatus,
+        { automaticApproval: approvalMode === "AUTOMATIC" }
       )
       return result
     })
@@ -162,7 +164,10 @@ export async function POST(
 
   if (
     team.registrationApplication &&
-    getCompetitionMandateStatus(team.competition) !== "OPEN"
+    !isMandateEditableInPhase(
+      mandateStatus,
+      getCompetitionMandateStatus(team.competition)
+    )
   ) {
     return NextResponse.json(
       { error: "Mandaat ei ole praegu avatud" },
@@ -242,7 +247,10 @@ export async function POST(
       },
       include: { members: true, competition: true },
     })
-    await queueTeamWorkflowNotification(tx, teamId, "MANDATE", nextStatus)
+    await queueTeamWorkflowNotification(tx, teamId, "MANDATE", nextStatus, {
+      batchEmail: approvalMode === "MANUAL",
+      automaticApproval: approvalMode === "AUTOMATIC",
+    })
     return result
   })
   await deliverPendingNotificationsSafely()

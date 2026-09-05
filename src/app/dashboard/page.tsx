@@ -328,7 +328,11 @@ export default async function DashboardPage() {
       return false
     }
     const phase = getCompetitionMandateStatus(team.competition)
-    return phase === "OPEN" || phase === "CLOSED"
+    return (
+      team.mandateStatus === "CHANGES_REQUESTED" ||
+      phase === "OPEN" ||
+      phase === "CLOSED"
+    )
   })
   const registrationItems = [
     ...registrationApplications.map((application) => ({

@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   escapeNotificationHtml,
+  notificationDigestTitle,
   notificationEmailHtml,
   registrationNotificationContent,
   teamWorkflowNotificationContent,
@@ -41,6 +42,29 @@ test("parandamisele saadetud mandaadi teavitus sisaldab korraldaja märkust", ()
   assert.match(notification?.message ?? "", /Lisa sünniajad/)
 })
 
+test("automaatne mandaadikinnitus kinnitab esitamise ja vastuvõtmise ühes teavituses", () => {
+  const notification = teamWorkflowNotificationContent({
+    phase: "MANDATE",
+    status: "APPROVED",
+    competitionName: "Sügisvõistlus",
+    teamName: "Hundid",
+    automaticApproval: true,
+  })
+  assert.equal(notification?.title, "Mandaat esitatud ja kinnitatud")
+  assert.match(notification?.message ?? "", /automaatselt kinnitatud/)
+})
+
+test("mitme sama sündmuse e-kiri saab koondkirja pealkirja", () => {
+  assert.equal(
+    notificationDigestTitle("MANDATE_OPENED", "Mandaat on avatud", 2),
+    "Mandaadid on avatud"
+  )
+  assert.equal(
+    notificationDigestTitle("MANDATE_OPENED", "Mandaat on avatud", 1),
+    "Mandaat on avatud"
+  )
+})
+
 test("tundmatu olek ei tekita eksitavat teavitust", () => {
   assert.equal(
     registrationNotificationContent({
@@ -62,4 +86,16 @@ test("e-kirja HTML kodeerib kasutaja sisendi", () => {
   assert.doesNotMatch(html, /<test>/)
   assert.match(html, /Märkus &amp; kontroll/)
   assert.match(html, /a=1&amp;b=2/)
+})
+
+test("koondkirja HTML kuvab kõik sündmused ja kodeerib nende sisu", () => {
+  const html = notificationEmailHtml({
+    title: "Mandaadid on avatud",
+    messages: ["Võistkond A", "Võistkond <B>"],
+    actionUrl: "https://www.matkamang.ee/dashboard",
+  })
+  assert.match(html, /<ul/)
+  assert.match(html, /Võistkond A/)
+  assert.match(html, /Võistkond &lt;B&gt;/)
+  assert.doesNotMatch(html, /Võistkond <B>/)
 })

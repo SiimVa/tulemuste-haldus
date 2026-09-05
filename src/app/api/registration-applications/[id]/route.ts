@@ -13,6 +13,7 @@ import {
 } from "@/lib/registrationAllocation.server"
 import {
   canEditRegistration,
+  canEditRegistrationInPhase,
   canWithdrawRegistration,
 } from "@/lib/registrationApplications"
 import {
@@ -101,16 +102,21 @@ async function updateApplication(
         throw new Error("Registreerimisavaldust ei leitud")
       }
       if (
-        getCompetitionRegistrationStatus(application.competition) !== "OPEN"
-      ) {
-        throw new Error("Pärast registreerimise sulgemist võta ühendust korraldajaga")
-      }
-      if (
         application.competition.registrationFinalizedAt ||
         application.teamId ||
         !canEditRegistration(application.status)
       ) {
         throw new Error("Seda registreerimisavaldust ei saa enam muuta")
+      }
+      if (
+        !canEditRegistrationInPhase(
+          application.status,
+          getCompetitionRegistrationStatus(application.competition) === "OPEN"
+        )
+      ) {
+        throw new Error(
+          "Pärast registreerimise sulgemist võta ühendust korraldajaga"
+        )
       }
 
       const classId = resolveRegistrationClass(

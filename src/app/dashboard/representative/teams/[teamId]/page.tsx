@@ -12,6 +12,7 @@ import {
   validateFormAnswers,
 } from "@/lib/registrationForm"
 import type { TeamCompositionSettings } from "@/lib/teamComposition"
+import { isMandateEditableInPhase } from "@/lib/teamWorkflow"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -317,7 +318,11 @@ export default function RepresentativeTeamPage({
     team.registrationStatus === "APPROVED" &&
     (team.mandateStatus === "DRAFT" ||
       team.mandateStatus === "CHANGES_REQUESTED") &&
-    (!team.registrationApplication || team.mandatePhaseStatus === "OPEN")
+    (!team.registrationApplication ||
+      isMandateEditableInPhase(
+        team.mandateStatus,
+        team.mandatePhaseStatus
+      ))
   const memberFormFields = team.formFields.filter(
     (field) => field.type === "MEMBER_LIST" && field.showInMandate
   )
@@ -455,7 +460,10 @@ export default function RepresentativeTeamPage({
         )}
         {team.registrationApplication &&
           team.registrationStatus === "APPROVED" &&
-          team.mandatePhaseStatus !== "OPEN" && (
+          !isMandateEditableInPhase(
+            team.mandateStatus,
+            team.mandatePhaseStatus
+          ) && (
             <p className="bg-gray-50 text-gray-600 rounded-lg px-4 py-3 text-sm">
               Mandaat ei ole praegu avatud. Korraldaja saab selle avada
               registreerimise seadete lehel.
