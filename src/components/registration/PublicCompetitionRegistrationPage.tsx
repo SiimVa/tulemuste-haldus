@@ -59,6 +59,7 @@ export async function PublicCompetitionRegistrationPage({
     select: {
       id: true,
       name: true,
+      status: true,
       date: true,
       endDate: true,
       location: true,
@@ -239,6 +240,9 @@ export async function PublicCompetitionRegistrationPage({
           <RegistrationPanel
             competitionId={competition.id}
             registrationOpen={registrationStatus === "OPEN"}
+            readOnly={
+              registrationStatus === "FINALIZED" || competition.status !== "SETUP"
+            }
             loggedIn={Boolean(session?.user)}
             classes={competition.registrationClasses}
             formFields={competition.registrationFormFields.map(

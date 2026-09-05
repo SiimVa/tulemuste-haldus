@@ -71,6 +71,13 @@ registreeringuid ja loobunud võistkondi nimekirjas ei näidata.
 
 ## Esindaja töölaud
 
+Töölaua registreeringukaart ja registreeringu teavitus avavad sisselogitud
+esitajale tema enda avalduse lehe. Ligipääs oma avaldusele säilib ka ainult
+lingiga või privaatse võistluse puhul ning registreerimislingi vahetamisel.
+Leht ei ava teiste esitajate avaldusi ega võimalda ilma registreerimislingita
+uusi võistkondi lisada. Tagasi saadetud avaldust saab täiendada ka pärast
+registreerimise sulgemist, kuni osalejate nimekiri pole lõplikult kinnitatud.
+
 Esindaja töölaud kuvab ainult käimasoleva etapiga seotud tegevusi:
 
 - avalikud võistlused, mille registreerimine on avatud;

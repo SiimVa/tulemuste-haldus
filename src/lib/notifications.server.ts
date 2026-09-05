@@ -113,7 +113,7 @@ export async function queueRegistrationApplicationNotification(
     ...content,
     userId: application.submittedBy.id,
     competitionId: application.competition.id,
-    href: "/dashboard",
+    href: `/dashboard/registrations/${application.id}`,
     emailTo: application.submittedBy.email,
     emailReplyTo: application.competition.organizer.email,
     dedupeKey: options.dedupeKey,

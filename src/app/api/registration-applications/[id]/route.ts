@@ -58,6 +58,7 @@ async function updateApplication(
           },
           competition: {
             select: {
+              status: true,
               registrationOverride: true,
               registrationOpensAt: true,
               registrationClosesAt: true,
@@ -102,6 +103,7 @@ async function updateApplication(
         throw new Error("Registreerimisavaldust ei leitud")
       }
       if (
+        application.competition.status !== "SETUP" ||
         application.competition.registrationFinalizedAt ||
         application.teamId ||
         !canEditRegistration(application.status)
@@ -260,6 +262,7 @@ async function withdrawApplication(applicationId: string, userId: string) {
         include: {
           competition: {
             select: {
+              status: true,
               registrationOverride: true,
               registrationOpensAt: true,
               registrationClosesAt: true,
@@ -272,7 +275,11 @@ async function withdrawApplication(applicationId: string, userId: string) {
       if (!application || application.submittedById !== userId) {
         throw new Error("Registreerimisavaldust ei leitud")
       }
-      if (getCompetitionRegistrationStatus(application.competition) !== "OPEN") {
+      if (
+        application.competition.status !== "SETUP" ||
+        application.teamId ||
+        getCompetitionRegistrationStatus(application.competition) !== "OPEN"
+      ) {
         throw new Error("Pärast registreerimise sulgemist võta ühendust korraldajaga")
       }
       if (!canWithdrawRegistration(application.status)) {
