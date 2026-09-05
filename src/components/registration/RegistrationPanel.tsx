@@ -69,6 +69,9 @@ export function RegistrationPanel({
   representativeDefaults,
   registrationPath,
   registrationLinkToken,
+  allowCreate = true,
+  readOnly = false,
+  initialApplicationId,
 }: {
   competitionId: string
   registrationOpen: boolean
@@ -79,16 +82,29 @@ export function RegistrationPanel({
   representativeDefaults: { name: string; email: string }
   registrationPath?: string
   registrationLinkToken?: string
+  allowCreate?: boolean
+  readOnly?: boolean
+  initialApplicationId?: string
 }) {
   const router = useRouter()
-  const [teamName, setTeamName] = useState("")
+  const initialApplication = readOnly
+    ? undefined
+    : applications.find(
+        (application) =>
+          application.id === initialApplicationId &&
+          canEditRegistrationInPhase(application.status, registrationOpen)
+      )
+  const [teamName, setTeamName] = useState(initialApplication?.teamName ?? "")
   const [classId, setClassId] = useState(
-    classes.length === 1 ? classes[0].id : ""
+    initialApplication?.class?.id ?? (classes.length === 1 ? classes[0].id : "")
   )
-  const [answers, setAnswers] = useState<FormAnswers>(() =>
-    representativeDefaultAnswers(representativeDefaults)
+  const [answers, setAnswers] = useState<FormAnswers>(() => ({
+    ...representativeDefaultAnswers(representativeDefaults),
+    ...initialApplication?.formValues,
+  }))
+  const [editingId, setEditingId] = useState<string | null>(
+    initialApplication?.id ?? null
   )
-  const [editingId, setEditingId] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [withdrawing, setWithdrawing] = useState<string | null>(null)
@@ -96,7 +112,10 @@ export function RegistrationPanel({
   const [message, setMessage] = useState("")
   const editingApplication = applications.find(({ id }) => id === editingId)
   const registrationFormAvailable =
-    registrationOpen || editingApplication?.status === "CHANGES_REQUESTED"
+    !readOnly &&
+    (editingApplication
+      ? canEditRegistrationInPhase(editingApplication.status, registrationOpen)
+      : allowCreate && registrationOpen)
 
   function resetForm() {
     setTeamName("")
@@ -128,6 +147,7 @@ export function RegistrationPanel({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
+    if (!registrationFormAvailable) return
     setSaving(true)
     setError("")
     setMessage("")
@@ -245,7 +265,7 @@ export function RegistrationPanel({
                   >
                     {STATUS_LABEL[application.status] ?? application.status}
                   </span>
-                  {canEditRegistrationInPhase(
+                  {!readOnly && canEditRegistrationInPhase(
                     application.status,
                     registrationOpen
                   ) && (
@@ -258,7 +278,7 @@ export function RegistrationPanel({
                       Muuda
                     </button>
                   )}
-                  {registrationOpen &&
+                  {!readOnly && registrationOpen &&
                     canWithdrawRegistration(application.status) && (
                       <button
                         type="button"
@@ -287,137 +307,139 @@ export function RegistrationPanel({
         </section>
       )}
 
-      <section id="registration-form" className="bg-white border rounded-xl p-5">
-        <h2 className="font-semibold text-gray-900">
-          {editingId ? "Muuda registreeringut" : "Registreeri võistkond"}
-        </h2>
+      {(allowCreate || editingId) && (
+        <section id="registration-form" className="bg-white border rounded-xl p-5">
+          <h2 className="font-semibold text-gray-900">
+            {editingId ? "Muuda registreeringut" : "Registreeri võistkond"}
+          </h2>
 
-        {!registrationFormAvailable ? (
-          <p className="text-sm text-gray-500 mt-3">
-            Registreerimine ei ole praegu avatud.
-          </p>
-        ) : !loggedIn ? (
-          <div className="mt-4">
-            <p className="text-sm text-gray-500 mb-3">
-              Võistkonna registreerimiseks logi sisse.
+          {!registrationFormAvailable ? (
+            <p className="text-sm text-gray-500 mt-3">
+              Registreerimine ei ole praegu avatud.
             </p>
-            <Link
-              href={`/login?callbackUrl=${encodeURIComponent(
-                registrationPath ?? `/competitions/${competitionId}`
-              )}`}
-              className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-            >
-              Logi sisse ja registreeri
-            </Link>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="space-y-4 mt-4">
-            {editingId && (
-              <p className="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
-                Klassi või kohtade jaotamise reeglites kasutatavate väljade
-                muutmine võib viia võistkonna ootenimekirja või vabastada talle
-                koha.
+          ) : !loggedIn ? (
+            <div className="mt-4">
+              <p className="text-sm text-gray-500 mb-3">
+                Võistkonna registreerimiseks logi sisse.
               </p>
-            )}
-            <div>
-              <label
-                htmlFor="registration-team-name"
-                className="text-sm font-medium text-gray-700 mb-1 block"
+              <Link
+                href={`/login?callbackUrl=${encodeURIComponent(
+                  registrationPath ?? `/competitions/${competitionId}`
+                )}`}
+                className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
               >
-                Võistkonna nimi *
-              </label>
-              <input
-                id="registration-team-name"
-                required
-                maxLength={200}
-                value={teamName}
-                onChange={(event) => setTeamName(event.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+                Logi sisse ja registreeri
+              </Link>
             </div>
-            {classes.length === 1 && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-1">Klass</p>
-                <p className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-sm text-gray-700">
-                  {classes[0].name}
-                  <span className="text-xs text-gray-400 ml-2">
-                    määratakse automaatselt
-                  </span>
+          ) : (
+            <form onSubmit={submit} className="space-y-4 mt-4">
+              {editingId && (
+                <p className="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
+                  Klassi või kohtade jaotamise reeglites kasutatavate väljade
+                  muutmine võib viia võistkonna ootenimekirja või vabastada talle
+                  koha.
                 </p>
-              </div>
-            )}
-            {classes.length > 1 && (
+              )}
               <div>
                 <label
-                  htmlFor="registration-class"
+                  htmlFor="registration-team-name"
                   className="text-sm font-medium text-gray-700 mb-1 block"
                 >
-                  Klass *
+                  Võistkonna nimi *
                 </label>
-                <select
-                  id="registration-class"
+                <input
+                  id="registration-team-name"
                   required
-                  value={classId}
-                  onChange={(event) => setClassId(event.target.value)}
+                  maxLength={200}
+                  value={teamName}
+                  onChange={(event) => setTeamName(event.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm"
-                >
-                  <option value="">Vali klass</option>
-                  {classes.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
-            )}
-            {formFields.some((field) => field.showInRegistration) && (
-              <DynamicFormFields
-                fields={formFields}
-                phase="REGISTRATION"
-                values={answers}
-                onChange={updateAnswer}
-                errors={formErrors}
-              />
-            )}
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving
-                  ? editingId
-                    ? "Salvestan..."
-                    : "Registreerin..."
-                  : editingId
-                    ? "Salvesta muudatused"
-                    : "Registreeri võistkond"}
-              </button>
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  disabled={saving}
-                  className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Loobu muutmisest
-                </button>
+              {classes.length === 1 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Klass</p>
+                  <p className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-sm text-gray-700">
+                    {classes[0].name}
+                    <span className="text-xs text-gray-400 ml-2">
+                      määratakse automaatselt
+                    </span>
+                  </p>
+                </div>
               )}
-            </div>
-          </form>
-        )}
+              {classes.length > 1 && (
+                <div>
+                  <label
+                    htmlFor="registration-class"
+                    className="text-sm font-medium text-gray-700 mb-1 block"
+                  >
+                    Klass *
+                  </label>
+                  <select
+                    id="registration-class"
+                    required
+                    value={classId}
+                    onChange={(event) => setClassId(event.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                  >
+                    <option value="">Vali klass</option>
+                    {classes.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {formFields.some((field) => field.showInRegistration) && (
+                <DynamicFormFields
+                  fields={formFields}
+                  phase="REGISTRATION"
+                  values={answers}
+                  onChange={updateAnswer}
+                  errors={formErrors}
+                />
+              )}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {saving
+                    ? editingId
+                      ? "Salvestan..."
+                      : "Registreerin..."
+                    : editingId
+                      ? "Salvesta muudatused"
+                      : "Registreeri võistkond"}
+                </button>
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    disabled={saving}
+                    className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Loobu muutmisest
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+        </section>
+      )}
 
-        {error && (
-          <p className="mt-4 text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2">
-            {error}
-          </p>
-        )}
-        {message && (
-          <p className="mt-4 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
-            {message}
-          </p>
-        )}
-      </section>
+      {error && (
+        <p className="mt-4 text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p className="mt-4 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
+          {message}
+        </p>
+      )}
     </div>
   )
 }

@@ -337,7 +337,7 @@ export default async function DashboardPage() {
   const registrationItems = [
     ...registrationApplications.map((application) => ({
       id: `application-${application.id}`,
-      href: `/competitions/${application.competition.id}`,
+      href: `/dashboard/registrations/${application.id}`,
       competitionName: application.competition.name,
       teamName: application.teamName,
       className: application.class?.name ?? null,

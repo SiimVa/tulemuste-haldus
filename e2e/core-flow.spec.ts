@@ -840,7 +840,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await adminContext.close()
   })
 
-  test("käsitsi kinnitatav registreering ootab korraldaja otsust", async ({
+  test("lingiga registreeringut saab privaatsena tagasi saata ja omanik saab seda täiendada", async ({
     browser,
   }) => {
     const adminContext = await browser.newContext()
@@ -864,7 +864,7 @@ test.describe.serial("võistluse põhivoog", () => {
       `/api/competitions/${manualCompetitionId}/registration-settings`,
       {
         data: {
-          isPublic: true,
+          registrationAccessMode: "LINK_ONLY",
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "OPEN",
@@ -882,6 +882,8 @@ test.describe.serial("võistluse põhivoog", () => {
       }
     )
     expect(settingsResponse.status(), await settingsResponse.text()).toBe(200)
+    const { registrationLinkToken } = await settingsResponse.json()
+    expect(registrationLinkToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
 
     const representativeContext = await browser.newContext()
     const page = await representativeContext.newPage()
@@ -893,6 +895,7 @@ test.describe.serial("võistluse põhivoog", () => {
           teamName: "Käsitsi kinnitatav võistkond",
           classId: null,
           answers: {},
+          registrationLinkToken,
         },
       }
     )
@@ -901,6 +904,21 @@ test.describe.serial("võistluse põhivoog", () => {
     )
     const application = await applicationResponse.json()
     expect(application.status).toBe("PENDING_REVIEW")
+    const ownRegistrationPath = `/dashboard/registrations/${application.id}`
+
+    await page.goto("/dashboard")
+    const registrationCard = page.getByRole("link").filter({
+      hasText: "Käsitsi kinnitatav võistkond",
+    })
+    await expect(registrationCard).toHaveAttribute("href", ownRegistrationPath)
+    await registrationCard.click()
+    await expect(page).toHaveURL(ownRegistrationPath)
+    await expect(page.getByLabel("Võistkonna nimi")).toHaveValue(
+      "Käsitsi kinnitatav võistkond"
+    )
+    await expect(
+      page.getByRole("button", { name: "Registreeri võistkond", exact: true })
+    ).toHaveCount(0)
 
     const confirmResponse = await adminPage.request.patch(
       `/api/competitions/${manualCompetitionId}/registration-applications/${application.id}`,
@@ -913,7 +931,7 @@ test.describe.serial("võistluse põhivoog", () => {
       `/api/competitions/${manualCompetitionId}/registration-settings`,
       {
         data: {
-          isPublic: true,
+          registrationAccessMode: "PRIVATE",
           registrationOpensAt: null,
           registrationClosesAt: null,
           registrationOverride: "CLOSED",
@@ -949,11 +967,27 @@ test.describe.serial("võistluse põhivoog", () => {
     expect(changes.status).toBe("CHANGES_REQUESTED")
     expect(changes.allocationReason).toBe("Täpsusta võistkonna nime")
 
-    await page.goto(`/competitions/${manualCompetitionId}`)
+    const publicResponse = await page.goto(`/competitions/${manualCompetitionId}`)
+    expect(publicResponse?.status()).toBe(404)
+    const oldInvitationResponse = await page.goto(`/register/${registrationLinkToken}`)
+    expect(oldInvitationResponse?.status()).toBe(404)
+
+    const unrelatedResponse = await adminPage.goto(ownRegistrationPath)
+    expect(unrelatedResponse?.status()).toBe(404)
     await expect(
-      page.getByText("Registreerimine ei ole praegu avatud.")
-    ).toBeVisible()
-    await page.getByRole("button", { name: "Muuda" }).click()
+      adminPage.getByText("Täpsusta võistkonna nime", { exact: true })
+    ).toHaveCount(0)
+    const anonymousContext = await browser.newContext()
+    const anonymousPage = await anonymousContext.newPage()
+    await anonymousPage.goto(ownRegistrationPath)
+    await expect(anonymousPage).toHaveURL(/\/login(?:\?|$)/)
+    await anonymousContext.close()
+
+    await page.goto("/dashboard")
+    await expect(registrationCard).toHaveAttribute("href", ownRegistrationPath)
+    await registrationCard.click()
+    await expect(page).toHaveURL(ownRegistrationPath)
+    await expect(page.getByText("Täpsusta võistkonna nime")).toBeVisible()
     await expect(page.getByLabel("Võistkonna nimi")).toBeEditable()
     await page
       .getByLabel("Võistkonna nimi")
@@ -988,6 +1022,9 @@ test.describe.serial("võistluse põhivoog", () => {
       })
     ).toBeVisible()
     await expect(page.getByText(/Täpsusta võistkonna nime/)).toBeVisible()
+    await expect(
+      page.getByRole("link").filter({ hasText: "Täpsusta võistkonna nime" })
+    ).toHaveAttribute("href", ownRegistrationPath)
     await expect(
       page.getByRole("heading", { name: "Registreering esitatud" }).first()
     ).toBeVisible()
@@ -1435,6 +1472,28 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBeVisible()
     await linkContext.close()
 
+    await page.goto("/dashboard")
+    const ownerRegistrationCard = page.getByRole("link").filter({
+      hasText: "Avalik testvõistkond 2",
+    })
+    await expect(ownerRegistrationCard).toHaveAttribute(
+      "href",
+      `/dashboard/registrations/${secondApplicationId}`
+    )
+    await ownerRegistrationCard.click()
+    await expect(page.getByLabel("Võistkonna nimi")).toHaveValue(
+      "Avalik testvõistkond 2"
+    )
+    await expect(page.getByLabel("Liige 1 nimi")).toHaveValue(
+      "Korraldaja lisatud liige"
+    )
+    await expect(
+      page.getByText("Avalik testvõistkond 3", { exact: true })
+    ).toHaveCount(0)
+    await expect(
+      page.getByRole("button", { name: "Registreeri võistkond", exact: true })
+    ).toHaveCount(0)
+
     await page.goto(secondRegistrationLink)
     await page.getByLabel("Esindaja telefon").fill("+372 5555 0099")
     await page.getByLabel("Võistkonna nimi").fill("Lingiga testvõistkond")
@@ -1482,6 +1541,20 @@ test.describe.serial("võistluse põhivoog", () => {
     )
     expect(finalizeResponse.status(), await finalizeResponse.text()).toBe(200)
     expect((await finalizeResponse.json()).createdTeams).toBe(2)
+
+    await page.goto(`/dashboard/registrations/${secondApplicationId}`)
+    await expect(
+      page.getByText("Registreerimisetapp on lõppenud.", { exact: false })
+    ).toBeVisible()
+    await expect(
+      page.getByText("Avalik testvõistkond 2", { exact: true })
+    ).toBeVisible()
+    await expect(
+      page.getByRole("button", {
+        name: /^(Muuda|Loobu|Registreeri võistkond|Salvesta muudatused)$/,
+      })
+    ).toHaveCount(0)
+    await expect(page.getByLabel("Võistkonna nimi")).toHaveCount(0)
 
     const mandateSettingsResponse = await adminPage.request.patch(
       `/api/competitions/${competitionId}/registration-settings`,
