@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
@@ -31,7 +32,7 @@ function nextTeamCode(existing: Set<string>, sequence: number): string {
   }
 }
 
-export async function POST(
+async function handlePOST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -248,3 +249,5 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 409 })
   }
 }
+
+export const POST = withSecurityRoute("/api/competitions/[id]/registration-applications/finalize", handlePOST)

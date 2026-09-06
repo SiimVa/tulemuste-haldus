@@ -1,9 +1,10 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessSection } from "@/lib/competitionAccess"
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
+async function handlePATCH(req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -71,7 +72,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   return NextResponse.json(section)
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
+async function handleDELETE(_req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -82,3 +83,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   await prisma.elementSection.delete({ where: { id: sectionId } })
   return NextResponse.json({ ok: true })
 }
+
+export const PATCH = withSecurityRoute("/api/elements/[id]/sections/[sectionId]", handlePATCH)
+export const DELETE = withSecurityRoute("/api/elements/[id]/sections/[sectionId]", handleDELETE)

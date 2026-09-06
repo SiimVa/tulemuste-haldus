@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
@@ -7,7 +8,7 @@ import {
   hashRegistrationLinkToken,
 } from "@/lib/registrationAccess.server"
 
-export async function POST(
+async function handlePOST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -49,3 +50,5 @@ export async function POST(
 
   return NextResponse.json({ registrationLinkToken })
 }
+
+export const POST = withSecurityRoute("/api/competitions/[id]/registration-link/rotate", handlePOST)

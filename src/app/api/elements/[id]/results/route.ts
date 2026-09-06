@@ -1,3 +1,5 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityActor, setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -9,7 +11,7 @@ import {
 } from "@/lib/competitionAccess"
 
 // GET – kõik tulemused selle elemendi jaoks
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -26,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 // POST – sisesta / uuenda tulemus (kohtunik)
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: elementId } = await params
   const targetElement = await prisma.scoringElement.findUnique({
     where: { id: elementId },
@@ -71,6 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  setSecurityActor(enteredByUserId, enteredByTokenId)
   const body = await req.json().catch(() => ({}))
   const { teamId, values, exceptionLabel } = body
   if (typeof teamId !== "string" || !teamId) {
@@ -79,6 +82,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!await teamBelongsToCompetition(teamId, targetElement.competitionId)) {
     return NextResponse.json({ error: "Võistkond ei kuulu sellele võistlusele" }, { status: 400 })
   }
+  setSecurityTargets({ competitionId: targetElement.competitionId, elementId, teamId })
   if (values != null && (typeof values !== "object" || Array.isArray(values))) {
     return NextResponse.json({ error: "Väljade väärtused peavad olema objekt" }, { status: 400 })
   }
@@ -179,3 +183,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json(result)
 }
+
+export const GET = withSecurityRoute("/api/elements/[id]/results", handleGET)
+export const POST = withSecurityRoute("/api/elements/[id]/results", handlePOST)

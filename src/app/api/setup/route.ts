@@ -1,10 +1,11 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { timingSafeEqual } from "node:crypto"
 
 // Ühekordne setup: loo admin konto (kasutada ainult esimest korda)
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const configuredSecret = process.env.SETUP_SECRET
   if (!configuredSecret) {
     return NextResponse.json({ error: "Algseadistus ei ole lubatud" }, { status: 503 })
@@ -39,3 +40,5 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ id: user.id, email: user.email, name: user.name })
 }
+
+export const POST = withSecurityRoute("/api/setup", handlePOST)

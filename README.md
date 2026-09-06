@@ -64,3 +64,6 @@ failis [docs/competition-copying.md](docs/competition-copying.md).
 
 Rakendusesiseste teavituste, Resendi e-kirjade ja saatmise korduskatsete seadistus
 on kirjeldatud failis [docs/notifications.md](docs/notifications.md).
+
+Administraatori turvalogi, päringupiirangute, turvapäiste ning seire piiride
+kirjeldus on failis [docs/security.md](docs/security.md).

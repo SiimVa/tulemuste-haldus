@@ -1,10 +1,11 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
 // Admin: lähtesta teise kasutaja parool
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
@@ -19,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleDELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
@@ -29,3 +30,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   await prisma.user.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+
+export const PATCH = withSecurityRoute("/api/users/[id]", handlePATCH)
+export const DELETE = withSecurityRoute("/api/users/[id]", handleDELETE)

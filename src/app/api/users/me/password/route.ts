@@ -1,10 +1,11 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
 // Oma parooli muutmine (vajab praeguse parooli kinnitust)
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -31,3 +32,5 @@ export async function POST(req: Request) {
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } })
   return NextResponse.json({ ok: true })
 }
+
+export const POST = withSecurityRoute("/api/users/me/password", handlePOST)

@@ -1,3 +1,5 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -9,7 +11,7 @@ import {
 } from "@/lib/competitionAccess"
 
 // Loo juurdepääsu token (kohtunik / võistleja)
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -55,11 +57,12 @@ export async function POST(req: Request) {
       team: { select: { name: true } },
     },
   })
+  setSecurityTargets({ id: token.id, competitionId, elementId, teamId })
   return NextResponse.json(token)
 }
 
 // Kustuta token
-export async function DELETE(req: Request) {
+async function handleDELETE(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -68,6 +71,10 @@ export async function DELETE(req: Request) {
   if (!await canAccessToken(id, { id: session.user.id, role: session.user.role })) {
     return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   }
+  setSecurityTargets({ id })
   await prisma.accessToken.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+
+export const POST = withSecurityRoute("/api/tokens", handlePOST)
+export const DELETE = withSecurityRoute("/api/tokens", handleDELETE)

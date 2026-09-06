@@ -1,7 +1,8 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 
-export async function GET() {
+async function handleGET() {
   const wsData = [
     ["code", "name", "class", "members"],
     ["VK 1", "Näidis meeskond", "P", "Jaan Tamm; Mari Mägi"],
@@ -22,3 +23,5 @@ export async function GET() {
     },
   })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/teams/template", handleGET)

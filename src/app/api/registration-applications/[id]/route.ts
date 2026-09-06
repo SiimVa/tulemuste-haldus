@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
 import {
@@ -333,7 +334,7 @@ async function withdrawApplication(applicationId: string, userId: string) {
   )
 }
 
-export async function DELETE(
+async function handleDELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -365,7 +366,7 @@ export async function DELETE(
   return NextResponse.json({ error: "Loobumine ebaõnnestus" }, { status: 409 })
 }
 
-export async function PATCH(
+async function handlePATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -428,3 +429,6 @@ export async function PATCH(
     { status: 409 }
   )
 }
+
+export const DELETE = withSecurityRoute("/api/registration-applications/[id]", handleDELETE)
+export const PATCH = withSecurityRoute("/api/registration-applications/[id]", handlePATCH)

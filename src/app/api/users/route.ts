@@ -1,10 +1,12 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { linkPendingTeamMembersToUser } from "@/lib/teamMemberAccounts.server"
 import bcrypt from "bcryptjs"
 
-export async function GET() {
+async function handleGET() {
   const session = await auth()
   if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
@@ -15,7 +17,7 @@ export async function GET() {
   return NextResponse.json(users)
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const session = await auth()
   if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
@@ -47,5 +49,9 @@ export async function POST(req: Request) {
     await linkPendingTeamMembersToUser(tx, createdUser)
     return createdUser
   })
+  setSecurityTargets({ userId: user.id })
   return NextResponse.json(user)
 }
+
+export const GET = withSecurityRoute("/api/users", handleGET)
+export const POST = withSecurityRoute("/api/users", handlePOST)

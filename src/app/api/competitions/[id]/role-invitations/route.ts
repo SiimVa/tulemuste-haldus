@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { randomBytes } from "node:crypto"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -38,7 +39,7 @@ async function authorizeInvitationManager(competitionId: string) {
   return { session, allowed, canManageOrganizers }
 }
 
-export async function GET(
+async function handleGET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -85,7 +86,7 @@ export async function GET(
   )
 }
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -191,7 +192,7 @@ export async function POST(
   )
 }
 
-export async function DELETE(
+async function handleDELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -236,3 +237,7 @@ export async function DELETE(
   })
   return NextResponse.json({ ok: true })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/role-invitations", handleGET)
+export const POST = withSecurityRoute("/api/competitions/[id]/role-invitations", handlePOST)
+export const DELETE = withSecurityRoute("/api/competitions/[id]/role-invitations", handleDELETE)

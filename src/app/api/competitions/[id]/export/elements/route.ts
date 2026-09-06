@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -6,7 +7,7 @@ import { computeFields } from "@/lib/calculators"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import * as XLSX from "xlsx"
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -97,3 +98,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     },
   })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/export/elements", handleGET)

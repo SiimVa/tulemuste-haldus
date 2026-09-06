@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -8,7 +9,7 @@ import {
 } from "@/lib/competitionAccess"
 import { recomputeElementScores } from "@/lib/recompute"
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string; elementId: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string; elementId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId, elementId } = await params
@@ -27,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json(entries)
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string; elementId: string }> }) {
+async function handlePOST(req: Request, { params }: { params: Promise<{ id: string; elementId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId, elementId } = await params
@@ -63,3 +64,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await recomputeElementScores(elementId)
   return NextResponse.json(entry)
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/elements/[elementId]/misc", handleGET)
+export const POST = withSecurityRoute("/api/competitions/[id]/elements/[elementId]/misc", handlePOST)

@@ -1,9 +1,10 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { generateAccessToken } from "@/lib/accessTokens.server"
 import { prisma } from "@/lib/prisma"
 
-export async function POST(
+async function handlePOST(
   _req: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
@@ -74,3 +75,5 @@ export async function POST(
   })
   return NextResponse.json(accessToken)
 }
+
+export const POST = withSecurityRoute("/api/representative/teams/[teamId]/results-link", handlePOST)

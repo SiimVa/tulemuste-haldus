@@ -1,10 +1,12 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import { canCreateCompetition } from "@/lib/permissions"
 
-export async function GET() {
+async function handleGET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -24,7 +26,7 @@ export async function GET() {
   return NextResponse.json(competitions)
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!canCreateCompetition(session.user.role)) {
@@ -70,5 +72,9 @@ export async function POST(req: Request) {
         ? JSON.stringify(defaults.defaultFixedRankingPoints) : "[]",
     },
   })
+  setSecurityTargets({ competitionId: competition.id })
   return NextResponse.json(competition)
 }
+
+export const GET = withSecurityRoute("/api/competitions", handleGET)
+export const POST = withSecurityRoute("/api/competitions", handlePOST)

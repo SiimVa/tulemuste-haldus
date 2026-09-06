@@ -1,8 +1,9 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = await params
 
   const [competition, teams, scores, penalties, elements] = await Promise.all([
@@ -66,3 +67,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json({ leaderboard: result, elements, scoringMode })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/leaderboard", handleGET)

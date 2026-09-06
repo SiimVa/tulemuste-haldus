@@ -1,8 +1,9 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function POST() {
+async function handlePOST() {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -13,3 +14,5 @@ export async function POST() {
   })
   return NextResponse.json({ updated: result.count })
 }
+
+export const POST = withSecurityRoute("/api/notifications/read", handlePOST)

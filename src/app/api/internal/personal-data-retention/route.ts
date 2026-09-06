@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto"
 import { NextResponse } from "next/server"
 import { purgeExpiredPersonalData } from "@/lib/personalDataRetention.server"
+import { purgeExpiredSecurityData } from "@/lib/security.server"
 
 export const dynamic = "force-dynamic"
 
@@ -22,8 +23,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   const results = await purgeExpiredPersonalData()
+  const security = await purgeExpiredSecurityData()
   return NextResponse.json({
     purgedCompetitions: results.length,
     results,
+    ...security,
   })
 }

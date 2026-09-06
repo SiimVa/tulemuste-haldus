@@ -19,6 +19,34 @@ enum CompetitionRole {
 // ─── Kasutajad ──────────────────────────────────────────────────────────────
 // Süsteemiülene role: "ADMIN" | "USER" (legacy kasutajatel võib olla "ORGANIZER")
 
+// Deliberately no cascading relations: deleting a user must not erase the audit trail.
+model SecurityEvent {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  action         String
+  outcome        String
+  route          String
+  method         String
+  status         Int?
+  actorUserId    String?
+  actorTokenId   String?
+  fingerprint    String?
+  targetIds      Json     @default("{}")
+  durationMs     Int?
+
+  @@index([createdAt, id])
+  @@index([outcome, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  expiresAt DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique

@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
@@ -13,7 +14,7 @@ const EXCEPTION_MAP: Record<string, "defaultNotPassed" | "defaultPassedNotDone">
   "läbis aga ei sooritanud": "defaultPassedNotDone",
 }
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id: competitionId } = await params
@@ -113,3 +114,5 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     },
   })
 }
+
+export const POST = withSecurityRoute("/api/competitions/[id]/apply-defaults", handlePOST)

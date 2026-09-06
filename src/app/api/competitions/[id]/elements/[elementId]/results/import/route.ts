@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -51,7 +52,7 @@ export type ImportResult = {
   }
 }
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ id: string; elementId: string }> }
 ) {
@@ -348,3 +349,5 @@ export async function POST(
 
   return NextResponse.json({ rows, missingTeams, summary: finalSummary, importErrors })
 }
+
+export const POST = withSecurityRoute("/api/competitions/[id]/elements/[elementId]/results/import", handlePOST)

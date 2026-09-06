@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -9,7 +10,7 @@ function actorFromSession(session: {
   return { id: session.user.id, role: session.user.role }
 }
 
-export async function GET(
+async function handleGET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -39,7 +40,7 @@ export async function GET(
   return NextResponse.json(representatives)
 }
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -179,7 +180,7 @@ export async function POST(
   return NextResponse.json(assignments)
 }
 
-export async function DELETE(
+async function handleDELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -235,3 +236,7 @@ export async function DELETE(
   })
   return NextResponse.json({ ok: true })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/representatives", handleGET)
+export const POST = withSecurityRoute("/api/competitions/[id]/representatives", handlePOST)
+export const DELETE = withSecurityRoute("/api/competitions/[id]/representatives", handleDELETE)
