@@ -1,13 +1,49 @@
 @import "tailwindcss";
 
+/* Disainitokenid.
+   Väärtused on võetud koodis juba domineerivatest valikutest, et olemasolev
+   ilme ei muutuks: pind on blue-600, kaardid rounded-xl, juhtelemendid
+   rounded-lg. Uus kood kasutab semantilisi nimesid, vana Tailwindi skaala
+   klassid töötavad edasi muutmata kujul. */
+@theme {
+  /* Pinnad ja tekst */
+  --color-canvas: #f9fafb; /* gray-50  — lehe taust */
+  --color-surface: #ffffff; /* kaardi taust */
+  --color-line: #e5e7eb; /* gray-200 — äär */
+  --color-ink: #111827; /* gray-900 — põhitekst */
+  --color-ink-muted: #6b7280; /* gray-500 — teisene tekst */
+  --color-ink-subtle: #9ca3af; /* gray-400 — vihjed */
+
+  /* Tegevusvärv */
+  --color-primary: #2563eb; /* blue-600 */
+  --color-primary-hover: #1d4ed8; /* blue-700 */
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #dbeafe; /* blue-100 — pehme taust */
+
+  /* Olekud */
+  --color-danger: #dc2626; /* red-600 */
+  --color-danger-hover: #b91c1c; /* red-700 */
+  --color-danger-soft: #fee2e2; /* red-100 */
+  --color-success: #15803d; /* green-700 */
+  --color-success-soft: #dcfce7; /* green-100 */
+  --color-warning: #c2410c; /* orange-700 */
+  --color-warning-soft: #ffedd5; /* orange-100 */
+
+  /* Nurgad — kaart on xl, juhtelement lg */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+}
+
 @layer base {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 
   body {
     font-family: Inter, system-ui, sans-serif;
-    background-color: #f9fafb;
-    color: #111827;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
   }
 }
