@@ -167,9 +167,24 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-blue-800 font-medium w-20 shrink-0">Analüüs</span>
-          <span className="flex-1 text-xs font-mono text-gray-600 bg-white border rounded px-2 py-1 truncate">{publicAnalysisUrl}</span>
-          <CopyButton text={publicAnalysisUrl} />
-          <a href={publicAnalysisUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline shrink-0">Ava</a>
+          {competition.analysisAccessMode === "PUBLIC" ? (
+            <>
+              <span className="flex-1 text-xs font-mono text-gray-600 bg-white border rounded px-2 py-1 truncate">{publicAnalysisUrl}</span>
+              <CopyButton text={publicAnalysisUrl} />
+              <a href={publicAnalysisUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline shrink-0">Ava</a>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-xs text-gray-600 bg-white border rounded px-2 py-1">
+                {competition.analysisAccessMode === "LINK_ONLY"
+                  ? "Ainult eraldi lingiga — seda aadressi ei saa jagada."
+                  : "Avalik analüüs on suletud."}
+              </span>
+              <Link href={`/dashboard/competitions/${id}/public-view`} className="text-xs text-blue-600 hover:underline shrink-0">
+                Muuda
+              </Link>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-blue-800 font-medium w-20 shrink-0">Ülevaade</span>

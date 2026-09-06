@@ -100,9 +100,11 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${isPlusMode ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
                 {isPlusMode ? "Plusspunktid" : "Karistuspunktid"}
               </span>
-              <Link href={`/public/${id}/analysis`} className="text-xs text-blue-600 hover:underline">
-                VK analüüs →
-              </Link>
+              {competition.analysisAccessMode === "PUBLIC" && (
+                <Link href={`/public/${id}/analysis`} className="text-xs text-blue-600 hover:underline">
+                  VK analüüs →
+                </Link>
+              )}
             </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
