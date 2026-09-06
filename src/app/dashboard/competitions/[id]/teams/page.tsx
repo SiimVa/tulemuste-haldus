@@ -3,6 +3,10 @@
 import { use, useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import type { TeamMemberRoleDefinition } from "@/lib/teamComposition"
+import { Card, cardClass } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import { Input, Select } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 type Team = {
   id: string
@@ -308,10 +312,9 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
             <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
               onChange={handleFileImport} disabled={importing} />
           </label>
-          <button onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-            + Lisa võistkond
-          </button>
+          <Button onClick={() => setShowForm(!showForm)}
+            >
+            + Lisa võistkond</Button>
         </div>
       </div>
 
@@ -323,33 +326,32 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
       )}
 
       {showForm && (
-        <form onSubmit={addTeam} className="bg-white border rounded-xl p-5 mb-6 space-y-3">
+        <form onSubmit={addTeam} className={cn(cardClass, "p-5 mb-6 space-y-3")}>
           <h3 className="font-medium text-gray-900">Uus võistkond</h3>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Nimi *</label>
-              <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+              <Input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Uulukad"
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Tähis *</label>
-              <input type="text" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
+              <Input type="text" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="VK 1"
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
             </div>
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Klass</label>
-              <input type="text" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })}
+              <Input type="text" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })}
                 placeholder="P/S"
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" disabled={saving}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-              {saving ? "Salvestan..." : "Lisa"}
-            </button>
+            <Button type="submit" disabled={saving}
+              >
+              {saving ? "Salvestan..." : "Lisa"}</Button>
             <button type="button" onClick={() => setShowForm(false)}
               className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
               Tühista
@@ -367,24 +369,24 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Katkestab alates KP järjekorrast</label>
-                <select value={dnfOrder} onChange={e => setDnfOrder(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <Select value={dnfOrder} onChange={e => setDnfOrder(e.target.value)}
+ >
                   <option value="">— Ei ole katkestanud —</option>
                   {elements.map(el => (
                     <option key={el.id} value={String(el.order)}>
                       [{el.code}] {el.name} (järj. {el.order})
                     </option>
                   ))}
-                </select>
+                </Select>
                 <p className="text-xs text-gray-400 mt-1">
                   Valitud KP-st alates ei arvestata võistkonna tulemusi.
                 </p>
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Põhjus (valikuline)</label>
-                <input type="text" value={dnfReason} onChange={e => setDnfReason(e.target.value)}
+                <Input type="text" value={dnfReason} onChange={e => setDnfReason(e.target.value)}
                   placeholder="nt vigastus, loobumine"
-                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
@@ -488,7 +490,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
           <p>Ühtegi võistkonda pole lisatud</p>
         </div>
       ) : (
-        <div className="bg-white border rounded-xl divide-y">
+        <Card className="divide-y">
           {teams.map((team) =>
             editingId === team.id ? (
               <div key={team.id} className="px-5 py-3 bg-blue-50">
@@ -616,10 +618,9 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
                   </p>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => saveEdit(team.id)} disabled={editSaving}
-                    className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                    {editSaving ? "Salvestan..." : "Salvesta"}
-                  </button>
+                  <Button size="sm" className="text-sm" onClick={() => saveEdit(team.id)} disabled={editSaving}
+                    >
+                    {editSaving ? "Salvestan..." : "Salvesta"}</Button>
                   <button onClick={() => { setEditingId(null); setEditError("") }}
                     className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
                     Tühista
@@ -706,7 +707,7 @@ export default function TeamsPage({ params }: { params: Promise<{ id: string }> 
               </div>
             )
           )}
-        </div>
+        </Card>
       )}
     </div>
   )

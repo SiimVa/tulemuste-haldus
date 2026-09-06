@@ -12,6 +12,10 @@ import type {
 } from "@/lib/registrationAllocation"
 import type { FormFieldDefinition } from "@/lib/registrationForm"
 import type { TeamMemberRoleDefinition } from "@/lib/teamComposition"
+import { cardClass } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import { Input, Select } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 type PhaseOverride = "AUTO" | "OPEN" | "CLOSED"
 type PhaseStatus = "NOT_OPEN" | "OPEN" | "CLOSED" | "FINALIZED"
@@ -92,7 +96,7 @@ function phaseCard(
   }
 
   return (
-    <section className="bg-white border rounded-xl p-5 space-y-4">
+    <section className={cn(cardClass, "p-5 space-y-4")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold text-gray-900">{title}</h2>
@@ -107,35 +111,34 @@ function phaseCard(
 
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Juhtimine</label>
-        <select
+        <Select
           value={override}
           disabled={Boolean(finalized)}
           onChange={(event) =>
             update(`${prefix}Override`, event.target.value)
           }
-          className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
+          className="disabled:bg-gray-100"
         >
           <option value="AUTO">Automaatne ajakava</option>
           <option value="OPEN">Käsitsi avatud</option>
           <option value="CLOSED">Käsitsi suletud</option>
-        </select>
+        </Select>
       </div>
 
       <div>
         <label className="text-xs text-gray-500 mb-1 block">
           Kinnitamine
         </label>
-        <select
+        <Select
           aria-label={`${title} kinnitamine`}
           value={approvalMode}
           onChange={(event) =>
             update(`${prefix}ApprovalMode`, event.target.value)
           }
-          className="w-full px-3 py-2 border rounded-lg text-sm"
         >
           <option value="AUTOMATIC">Automaatne kinnitamine</option>
           <option value="MANUAL">Käsitsi kinnitamine</option>
-        </select>
+        </Select>
         <p className="text-xs text-gray-500 mt-1">
           {prefix === "registration"
             ? approvalMode === "AUTOMATIC"
@@ -152,28 +155,28 @@ function phaseCard(
           <label className="text-xs text-gray-500 mb-1 block">
             Automaatne avamine
           </label>
-          <input
+          <Input
             type="datetime-local"
             value={opensAt}
             disabled={Boolean(finalized)}
             onChange={(event) =>
               update(`${prefix}OpensAt`, event.target.value)
             }
-            className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
+            className="disabled:bg-gray-100"
           />
         </div>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
             Automaatne sulgemine
           </label>
-          <input
+          <Input
             type="datetime-local"
             value={closesAt}
             disabled={Boolean(finalized)}
             onChange={(event) =>
               update(`${prefix}ClosesAt`, event.target.value)
             }
-            className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
+            className="disabled:bg-gray-100"
           />
         </div>
       </div>
@@ -495,7 +498,7 @@ export default function RegistrationSettingsPage({
 
       {form && (
         <form onSubmit={save} className="space-y-6">
-          <section className="bg-white border rounded-xl p-5 space-y-4">
+          <section className={cn(cardClass, "p-5 space-y-4")}>
             <div>
               <h2 className="font-semibold text-gray-900">
                 Registreerimislehe ligipääs
@@ -541,26 +544,24 @@ export default function RegistrationSettingsPage({
                   <>
                     <label className="block text-xs text-gray-600">
                       Registreerimislink
-                      <input
+                      <Input
                         aria-label="Registreerimislink"
                         readOnly
                         value={`${origin}/register/${form.registrationLinkToken}`}
                         onFocus={(event) => event.currentTarget.select()}
-                        className="mt-1 w-full px-3 py-2 border rounded-lg bg-white text-sm"
+                        className="mt-1 bg-white"
                       />
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button size="sm" className="py-2 text-sm"
                         type="button"
                         onClick={() =>
                           copyRegistrationLink(
                             `${origin}/register/${form.registrationLinkToken}`
                           )
                         }
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
                       >
-                        {linkCopied ? "Kopeeritud" : "Kopeeri link"}
-                      </button>
+                        {linkCopied ? "Kopeeritud" : "Kopeeri link"}</Button>
                       <button
                         type="button"
                         onClick={rotateRegistrationLink}
@@ -597,7 +598,7 @@ export default function RegistrationSettingsPage({
             )}
           </section>
 
-          <section className="bg-white border rounded-xl p-5 space-y-4">
+          <section className={cn(cardClass, "p-5 space-y-4")}>
             <div>
               <h2 className="font-semibold text-gray-900">Klassid</h2>
               <p className="text-xs text-gray-500 mt-1">
@@ -609,12 +610,12 @@ export default function RegistrationSettingsPage({
             <div className="space-y-2">
               {form.registrationClasses.map((item, index) => (
                 <div key={item.id ?? `new-${index}`} className="flex gap-2">
-                  <input
+                  <Input
                     type="text"
                     value={item.name}
                     onChange={(event) => updateClass(index, event.target.value)}
                     placeholder="nt Põhiklass"
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                    className="flex-1"
                   />
                   <button
                     type="button"
@@ -668,7 +669,7 @@ export default function RegistrationSettingsPage({
             }
           />
 
-          <section className="bg-white border rounded-xl p-5 space-y-4">
+          <section className={cn(cardClass, "p-5 space-y-4")}>
             <div>
               <h2 className="font-semibold text-gray-900">
                 Isikuandmete säilitamine
@@ -737,7 +738,7 @@ export default function RegistrationSettingsPage({
             ) : null}
           </section>
 
-          <section className="bg-white border rounded-xl p-5 space-y-4">
+          <section className={cn(cardClass, "p-5 space-y-4")}>
             <div>
               <h2 className="font-semibold text-gray-900">
                 Koosseisu nõuded
@@ -810,7 +811,7 @@ export default function RegistrationSettingsPage({
                     key={index}
                     className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
                   >
-                    <input
+                    <Input
                       type="text"
                       value={role.name}
                       onChange={(event) =>
@@ -818,7 +819,6 @@ export default function RegistrationSettingsPage({
                       }
                       aria-label={`Liikmeroll ${index + 1}`}
                       placeholder="nt Meedik"
-                      className="px-3 py-2 border rounded-lg text-sm"
                     />
                     <label className="flex items-center gap-2 text-sm text-gray-600">
                       <input
@@ -863,13 +863,11 @@ export default function RegistrationSettingsPage({
           {phaseCard("Mandaat", "mandate", form, setForm)}
 
           <div className="flex items-center gap-3 pb-8">
-            <button
+            <Button size="lg"
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {saving ? "Salvestan..." : "Salvesta seaded"}
-            </button>
+              {saving ? "Salvestan..." : "Salvesta seaded"}</Button>
             {saved && <span className="text-sm text-green-600">Salvestatud</span>}
           </div>
         </form>

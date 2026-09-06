@@ -10,6 +10,9 @@ import {
   type FormAnswers,
   type FormFieldDefinition,
 } from "@/lib/registrationForm"
+import { Card, cardClass } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -344,7 +347,7 @@ export default function RegistrationsPage({
 
       {overview && (
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
-          <section className="bg-white border rounded-xl p-4">
+          <section className={cn(cardClass, "p-4")}>
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">Registreerimine</p>
@@ -367,19 +370,17 @@ export default function RegistrationsPage({
             </div>
             {overview.registrationStatus === "CLOSED" &&
               !overview.registrationFinalizedAt && (
-                <button
+                <Button size="sm" className="mt-4 py-2"
                   type="button"
                   onClick={finalizeRegistrations}
                   disabled={finalizing}
-                  className="mt-4 px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium disabled:opacity-50"
                 >
                   {finalizing
                     ? "Kinnitan..."
-                    : "Kinnita osalejate nimekiri"}
-                </button>
+                    : "Kinnita osalejate nimekiri"}</Button>
               )}
           </section>
-          <section className="bg-white border rounded-xl p-4">
+          <section className={cn(cardClass, "p-4")}>
             <p className="text-xs text-gray-500">Mandaat</p>
             <p className="font-semibold text-gray-900 mt-1">
               {PHASE_LABEL[overview.mandateStatus]}
@@ -416,7 +417,7 @@ export default function RegistrationsPage({
           {applications.map((application, index) => (
             <article
               key={application.id}
-              className="bg-white border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4"
+              className={cn(cardClass, "p-4 flex flex-wrap items-center justify-between gap-4")}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -476,14 +477,12 @@ export default function RegistrationsPage({
                       errors={editingErrors}
                     />
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button size="sm" className="py-2"
                         type="button"
                         onClick={() => saveApplicationMembers(application.id)}
                         disabled={Boolean(reviewing)}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs disabled:opacity-50"
                       >
-                        Salvesta osalejad
-                      </button>
+                        Salvesta osalejad</Button>
                       <button
                         type="button"
                         onClick={() => {
@@ -605,9 +604,9 @@ export default function RegistrationsPage({
           ))}
 
           {applications.length === 0 && (
-            <div className="bg-white border rounded-xl py-10 text-center text-sm text-gray-400">
+            <Card className="py-10 text-center text-sm text-gray-400">
               Uue töövoo registreerimisavaldusi veel pole.
-            </div>
+            </Card>
           )}
         </div>
       </section>
@@ -621,7 +620,7 @@ export default function RegistrationsPage({
       )}
       <div className="space-y-4">
         {teams.map((team) => (
-          <article key={team.id} className="bg-white border rounded-xl p-5">
+          <article key={team.id} className={cn(cardClass, "p-5")}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="font-semibold text-gray-900">
