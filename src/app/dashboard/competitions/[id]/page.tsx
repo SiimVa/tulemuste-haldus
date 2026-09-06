@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { CompetitionNav } from "@/components/competition/CompetitionNav"
 import { RecalculateButton } from "@/components/RecalculateButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { ElementList } from "@/components/competition/ElementList"
@@ -39,19 +40,6 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
 
   if (!competition) notFound()
 
-  const nav = [
-    { href: `/dashboard/competitions/${id}`, label: "Ülevaade" },
-    { href: `/dashboard/competitions/${id}/elements/new`, label: "+ Element" },
-    { href: `/dashboard/competitions/${id}/teams`, label: "Võistkonnad" },
-    { href: `/dashboard/competitions/${id}/registrations`, label: "Registreerimine" },
-    { href: `/dashboard/competitions/${id}/registration-settings`, label: "Registreerimise seaded" },
-    { href: `/dashboard/competitions/${id}/access`, label: "Juurdepääs" },
-    { href: `/dashboard/competitions/${id}/athlete-view`, label: "Võistlejate vaade" },
-    { href: `/dashboard/competitions/${id}/public-view`, label: "Avalik vaade" },
-    { href: `/dashboard/competitions/${id}/leaderboard`, label: "Pingerida" },
-    { href: `/dashboard/competitions/${id}/overview`, label: "Statistika" },
-    { href: `/dashboard/competitions/${id}/settings`, label: "Seaded" },
-  ]
 
   return (
     <div>
@@ -98,15 +86,7 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      {/* Navigatsioon */}
-      <div className="flex gap-2 mb-6 border-b">
-        {nav.map((n) => (
-          <Link key={n.href} href={n.href}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 transition-colors">
-            {n.label}
-          </Link>
-        ))}
-      </div>
+      <CompetitionNav competitionId={id} />
 
       {/* Statistika */}
       <div className="grid grid-cols-3 gap-4 mb-8">
