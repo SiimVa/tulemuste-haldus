@@ -16,6 +16,7 @@ import { ResultsImportTrigger } from "@/components/competition/ResultsImportTrig
 import { RecalcButton } from "@/components/competition/RecalcButton"
 import { explainElementScores } from "@/lib/scoreExplainer"
 import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
+import { Card } from "@/components/ui/card"
 
 export const dynamic = "force-dynamic"
 
@@ -170,7 +171,7 @@ export default async function ElementPage({
 
       {/* Arvutusvalem */}
       {element.calcMethod && (
-        <div className="bg-white border rounded-xl p-4 mb-4">
+        <Card className="p-4 mb-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">
             Arvutusvalem
             <span className="ml-2 text-xs font-normal text-gray-400">
@@ -183,12 +184,12 @@ export default async function ElementPage({
             customFormula={element.calcMethod.customFormula}
             maxValue={element.maxValue}
           />
-        </div>
+        </Card>
       )}
 
       {/* Kombineeritud hindamise sektsioonid */}
       {element.sections.length > 0 && (
-        <div className="bg-white border rounded-xl p-5 mb-4">
+        <Card className="p-5 mb-4">
           <div className="flex items-center gap-2 mb-4">
             <h3 className="font-semibold text-gray-900">Hindamisosad</h3>
             {element.sections.length > 0 && (
@@ -222,12 +223,12 @@ export default async function ElementPage({
               } : null,
             }))}
           />
-        </div>
+        </Card>
       )}
 
       {/* Käsitsi kirjed (misc bonus/karistus) — CHECKPOINT ja MANUAL tüüpidele */}
       {(element.type === "CHECKPOINT" || element.type === "MANUAL") && (
-        <div className="bg-white border rounded-xl p-5 mb-4">
+        <Card className="p-5 mb-4">
           <div className="flex items-center gap-2 mb-4">
             <h3 className="font-semibold text-gray-900">Käsitsi kirjed</h3>
             <span className="text-xs text-gray-400 font-normal">lisanduvad arvutatud skoorile</span>
@@ -244,12 +245,12 @@ export default async function ElementPage({
               description: e.description,
             }))}
           />
-        </div>
+        </Card>
       )}
 
       {/* Väljad + erandid info */}
       <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-white border rounded-xl p-4">
+        <Card className="p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Sisendväljad</h3>
           <div className="space-y-2">
             {element.fields.map((f) => {
@@ -291,9 +292,9 @@ export default async function ElementPage({
             }
             return null
           })()}
-        </div>
+        </Card>
 
-        <div className="bg-white border rounded-xl p-4">
+        <Card className="p-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Erandid</h3>
           <div className="space-y-1.5">
             {element.exceptions.map((ex) => {
@@ -314,12 +315,12 @@ export default async function ElementPage({
               ? "Erandid lahutavad punkte kogusummast"
               : "Erandid lisavad karistuspunkte kogusummale"}
           </p>
-        </div>
+        </Card>
       </div>
 
       {/* Muu element: kirjete haldus */}
       {element.type === "OTHER" && (
-        <div className="bg-white border rounded-xl p-5 mb-4">
+        <Card className="p-5 mb-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Kirjed</h3>
           <MiscEntriesTable
             competitionId={competitionId}
@@ -333,7 +334,7 @@ export default async function ElementPage({
               description: e.description,
             }))}
           />
-        </div>
+        </Card>
       )}
 
       {/* Katkestamine: liikmete/võistkonna katkestamise haldus */}
@@ -341,7 +342,7 @@ export default async function ElementPage({
         let cfg: { mode?: string; penaltyPerMember?: number } = {}
         try { cfg = JSON.parse(element.config || "{}") } catch {}
         return (
-          <div className="bg-white border rounded-xl p-5 mb-4">
+          <Card className="p-5 mb-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Katkestamised</h3>
             <AbandonmentTable
               competitionId={competitionId}
@@ -363,7 +364,7 @@ export default async function ElementPage({
                 abandonTime: e.abandonTime,
               }))}
             />
-          </div>
+          </Card>
         )
       })()}
 

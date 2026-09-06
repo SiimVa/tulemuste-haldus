@@ -21,6 +21,7 @@
   --color-primary-hover: #1d4ed8; /* blue-700 */
   --color-primary-foreground: #ffffff;
   --color-primary-soft: #dbeafe; /* blue-100 — pehme taust */
+  --color-focus: #3b82f6; /* blue-500 — fookusrõngas sisendväljadel */
 
   /* Olekud */
   --color-danger: #dc2626; /* red-600 */
