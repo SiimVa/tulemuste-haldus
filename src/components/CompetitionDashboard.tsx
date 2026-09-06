@@ -1,15 +1,18 @@
 import type { CompetitionOverview } from "@/lib/competitionOverview"
+import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-white border rounded-xl px-4 py-3">
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-400">{sub}</p>}
-    </div>
+    <Card className="px-4 py-3">
+      <p className="text-2xl font-bold text-ink">{value}</p>
+      <p className="text-xs text-ink-muted mt-0.5">{label}</p>
+      {sub && <p className="text-xs text-ink-subtle">{sub}</p>}
+    </Card>
   )
 }
 
+// Elemenditüübi värvid on kategooriavärvid, mitte tokenid — need tähistavad
+// andmeliiki ja jäävad Tailwindi skaalale.
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
   CHECKPOINT: { label: "KP", cls: "bg-blue-100 text-blue-700" },
   PENALTY_BOX: { label: "PK", cls: "bg-orange-100 text-orange-700" },
@@ -45,25 +48,25 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
       </div>
 
       {/* Üldine edenemine */}
-      <div className="bg-white border rounded-xl p-5">
+      <Card className="p-5">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="font-semibold text-gray-900">Üldine edenemine</h2>
-          <span className="text-sm text-gray-500">{totalEntered} / {totalSlots} sooritust</span>
+          <CardTitle>Üldine edenemine</CardTitle>
+          <span className="text-sm text-ink-muted">{totalEntered} / {totalSlots} sooritust</span>
         </div>
-        <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+        <div className="w-full h-3 bg-sunken rounded-full overflow-hidden">
           <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
         </div>
-      </div>
+      </Card>
 
       {/* Per-element edenemine */}
-      <div className="bg-white border rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b">
-          <h2 className="font-semibold text-gray-900">Sooritused elementide kaupa</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Mitu võistkonda on igas elemendis tulemuse saanud</p>
-        </div>
-        <div className="divide-y">
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Sooritused elementide kaupa</CardTitle>
+          <p className="text-xs text-ink-subtle mt-0.5">Mitu võistkonda on igas elemendis tulemuse saanud</p>
+        </CardHeader>
+        <div className="divide-y divide-line">
           {elements.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-gray-400 text-center">Ühtegi elementi pole lisatud</p>
+            <p className="px-5 py-6 text-sm text-ink-subtle text-center">Ühtegi elementi pole lisatud</p>
           ) : (
             elements.map((el) => {
               const pct = el.total > 0 ? Math.round((el.entered / el.total) * 100) : 0
@@ -71,13 +74,13 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
               const done = el.entered >= el.total && el.total > 0
               return (
                 <div key={el.id} className={`px-5 py-3 flex items-center gap-3 ${el.isCancelled ? "opacity-50" : ""}`}>
-                  <span className="font-mono text-xs text-gray-400 w-7 shrink-0">{el.code}</span>
+                  <span className="font-mono text-xs text-ink-subtle w-7 shrink-0">{el.code}</span>
                   <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${badge.cls}`}>{badge.label}</span>
-                  <span className={`text-sm font-medium shrink-0 w-40 truncate ${el.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>{el.name}</span>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <span className={`text-sm font-medium shrink-0 w-40 truncate ${el.isCancelled ? "line-through text-ink-subtle" : "text-ink"}`}>{el.name}</span>
+                  <div className="flex-1 h-2 bg-sunken rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${done ? "bg-green-500" : "bg-blue-400"}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <span className={`text-sm font-mono shrink-0 w-16 text-right ${done ? "text-green-700 font-semibold" : "text-gray-600"}`}>
+                  <span className={`text-sm font-mono shrink-0 w-16 text-right ${done ? "text-green-700 font-semibold" : "text-ink-soft"}`}>
                     {el.entered}/{el.total}
                   </span>
                 </div>
@@ -85,9 +88,9 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
             })
           )}
         </div>
-      </div>
+      </Card>
 
-      <p className="text-center text-xs text-gray-400">
+      <p className="text-center text-xs text-ink-subtle">
         {statusLabel} · {competition.location ?? "Tulemuste haldus"}
       </p>
     </div>

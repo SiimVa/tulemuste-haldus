@@ -6,6 +6,8 @@ import { AutoRefresh } from "@/components/AutoRefresh"
 import { MiscScoreCell } from "@/components/competition/MiscScoreCell"
 import { LeaderboardHighlighter } from "@/components/public/LeaderboardHighlighter"
 import { isAutomaticRegistrationCode } from "@/lib/teamDisplay"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 export const dynamic = "force-dynamic"
 
@@ -97,9 +99,9 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               </p>
             </div>
             <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 sm:gap-1">
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${isPlusMode ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
+              <Badge tone={isPlusMode ? "info" : "warning"}>
                 {isPlusMode ? "Plusspunktid" : "Karistuspunktid"}
-              </span>
+              </Badge>
               {competition.analysisAccessMode === "PUBLIC" && (
                 <Link href={`/public/${id}/analysis`} className="text-xs text-blue-600 hover:underline">
                   VK analüüs →
@@ -231,7 +233,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
         </div>
 
         {/* Arvutivaade: täielik tabel kõigi elemendi-veergudega */}
-        <div className="hidden md:block bg-white border rounded-xl overflow-hidden shadow-sm">
+        <Card className="hidden md:block overflow-hidden shadow-sm">
           <div className="overflow-auto max-h-[75vh]">
             <table className="w-full text-sm">
               <thead>
@@ -399,7 +401,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
         <p className="text-center text-xs text-gray-400 mt-6">Tulemuste haldus · Andmed uuenevad lehe värskendamisel</p>
       </div>
     </div>

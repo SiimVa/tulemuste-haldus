@@ -2,6 +2,8 @@
 
 import { useState, useEffect, Fragment } from "react"
 import Link from "next/link"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { SimulatorPanel, type SimEl, type Standing } from "@/components/public/SimulatorPanel"
 import { isAutomaticRegistrationCode, teamDisplayName } from "@/lib/teamDisplay"
 
@@ -280,7 +282,7 @@ export default function AnalysisView({
         {tab === "team" && (
           <>
             {/* Team selector */}
-            <div className="bg-white border rounded-xl p-4 mb-5">
+            <Card className="p-4 mb-5">
               <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
               <select
                 value={selectedTeamId}
@@ -305,12 +307,12 @@ export default function AnalysisView({
                   </optgroup>
                 )}
               </select>
-            </div>
+            </Card>
 
             {selectedTeam && (
               <>
                 {/* Summary card */}
-                <div className="bg-white border rounded-xl p-5 mb-5">
+                <Card className="p-5 mb-5">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -353,7 +355,7 @@ export default function AnalysisView({
                       )}
                     </div>
                   </div>
-                </div>
+                </Card>
 
                 {/* Strengths & weaknesses */}
                 {(strengths.length > 0 || weaknesses.length > 0) && (
@@ -400,7 +402,7 @@ export default function AnalysisView({
                 )}
 
                 {/* Per-element table */}
-                <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+                <Card className="overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b">
                     <h3 className="font-semibold text-gray-900">KP kaupa</h3>
                   </div>
@@ -483,7 +485,7 @@ export default function AnalysisView({
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </Card>
                 <p className="text-xs text-gray-400 mt-2 px-1">
                   <strong>Positsioon</strong> näitab, kui suure osa võistkondadest see tiim igas elemendis edestas: 100% = parim, 0% = halvim. Sama tulemus = sama %.
                 </p>
@@ -496,7 +498,7 @@ export default function AnalysisView({
         {tab === "kp" && (
           <>
             {/* Element selector */}
-            <div className="bg-white border rounded-xl p-4 mb-5 grid sm:grid-cols-2 gap-4">
+            <Card className="p-4 mb-5 grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-2">Hindamiselement</label>
                 <select
@@ -524,13 +526,13 @@ export default function AnalysisView({
                   ))}
                 </select>
               </div>
-            </div>
+            </Card>
 
             {selectedElement && (
               <>
                 {/* Element stats bar */}
                 {kpElStat && (
-                  <div className="bg-white border rounded-xl p-4 mb-5 space-y-4">
+                  <Card className="p-4 mb-5 space-y-4">
                     {/* Loendurid */}
                     <div className="flex flex-wrap gap-6">
                       <div>
@@ -567,18 +569,18 @@ export default function AnalysisView({
                         </table>
                       </div>
                     )}
-                  </div>
+                  </Card>
                 )}
 
                 {/* KP comparison table */}
-                <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+                <Card className="overflow-hidden shadow-sm">
                   <div className="px-5 py-4 border-b flex items-center justify-between flex-wrap gap-2">
                     <h3 className={`font-semibold ${selectedElement.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>
                       <span className="font-mono mr-2">{selectedElement.code}</span>
                       {selectedElement.name} — kõik tulemused
                     </h3>
                     {selectedElement.isCancelled && (
-                      <span className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded-full font-medium">TÜHISTATUD — kõik tulemused 0p</span>
+                      <Badge tone="danger">TÜHISTATUD — kõik tulemused 0p</Badge>
                     )}
                   </div>
                   <div className="overflow-auto max-h-[70vh]">
@@ -699,7 +701,7 @@ export default function AnalysisView({
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </Card>
                 <p className="text-xs text-gray-400 mt-2 px-1">
                   <strong>Positsioon</strong> näitab, kui suure osa võistkondadest see tiim selles elemendis edestas: 100% = parim, 0% = halvim. Sama tulemusega võistkonnad saavad sama protsendi. Erandid (nt &quot;ei läbinud&quot;) loevad halvimaks tulemuseks.
                 </p>
@@ -711,7 +713,7 @@ export default function AnalysisView({
         {/* ── SIMULAATOR TAB ── */}
         {tab === "sim" && (
           <>
-            <div className="bg-white border rounded-xl p-4 mb-5">
+            <Card className="p-4 mb-5">
               <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
               <select
                 value={selectedTeamId}
@@ -723,7 +725,7 @@ export default function AnalysisView({
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-2">Muuda võistkonna tulemusi ja vaata, kuidas elemendi punktid muutuksid. Muudatused on ainult selles vaates — andmebaasi ei salvestata.</p>
-            </div>
+            </Card>
             {simPanelElements.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-8 bg-white border rounded-xl">Valitud võistkonnal pole simuleeritavaid tulemusi</p>
             ) : (

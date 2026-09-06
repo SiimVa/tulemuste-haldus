@@ -9,8 +9,10 @@
   /* Pinnad ja tekst */
   --color-canvas: #f9fafb; /* gray-50  — lehe taust */
   --color-surface: #ffffff; /* kaardi taust */
+  --color-sunken: #f3f4f6; /* gray-100 — süvend, edenemisriba taust */
   --color-line: #e5e7eb; /* gray-200 — äär */
   --color-ink: #111827; /* gray-900 — põhitekst */
+  --color-ink-soft: #4b5563; /* gray-600 — tugevam teisene tekst */
   --color-ink-muted: #6b7280; /* gray-500 — teisene tekst */
   --color-ink-subtle: #9ca3af; /* gray-400 — vihjed */
 
@@ -39,6 +41,11 @@
   *::before,
   *::after {
     box-sizing: border-box;
+    /* Tailwind v4 preflight seab `border: 0 solid` ilma värvita, seega paljas
+       `border` renderduks currentColor-is ja äär muudaks värvi konteksti järgi.
+       Koodis on 385 paljast `border`-klassi, mis eeldavad heledat äärt —
+       taastame v3-st tuttava vaikeväärtuse. */
+    border-color: var(--color-line);
   }
 
   body {
