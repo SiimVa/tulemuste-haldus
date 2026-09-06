@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 type Form = {
   name: string
@@ -144,7 +146,7 @@ export default function NewCompetitionPage() {
       <form onSubmit={handleSubmit} className="space-y-5">
 
         {/* Põhiandmed */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Põhiandmed</h2>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Nimi <span className="text-red-500">*</span></label>
@@ -171,10 +173,10 @@ export default function NewCompetitionPage() {
               placeholder="nt. Kõrvemaa matkarajad"
               className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-        </div>
+        </Card>
 
         {/* Hindamissüsteem */}
-        <div className="bg-white border rounded-xl p-5 space-y-3">
+        <Card className="p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Hindamissüsteem</h2>
           {SCORING_MODES.map(m => (
             <label key={m.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.scoringMode === m.value ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"}`}>
@@ -187,10 +189,10 @@ export default function NewCompetitionPage() {
               </div>
             </label>
           ))}
-        </div>
+        </Card>
 
         {/* Arvutusmeetod */}
-        <div className="bg-white border rounded-xl p-5 space-y-3">
+        <Card className="p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Arvutusmeetod — vaikimisi KP/PK elementidele</h2>
           <p className="text-xs text-gray-500">Iga elemendi loomisel eeltäidetakse see arvutusmeetod. Elemente saab hiljem eraldi muuta.</p>
           {CALC_TYPES.map(ct => (
@@ -280,10 +282,10 @@ export default function NewCompetitionPage() {
               )}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* KP vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded">KP</span>
             <h2 className="font-semibold text-gray-900">Kontrollpunkt — vaikeväärtused</h2>
@@ -293,10 +295,10 @@ export default function NewCompetitionPage() {
             {numInput("defaultNotPassed", "Ei läbinud KP-d", "p", undefined)}
             {numInput("defaultPassedNotDone", "Läbis aga ei sooritanud", "p", undefined)}
           </div>
-        </div>
+        </Card>
 
         {/* PK vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded">PK</span>
             <h2 className="font-semibold text-gray-900">Postkast — vaikeväärtused</h2>
@@ -304,10 +306,10 @@ export default function NewCompetitionPage() {
           <div className="grid grid-cols-2 gap-4">
             {numInput("defaultPKMaxValue", form.scoringMode === "PLUS" ? "Maks (parim saab X p)" : "Maks (halvim saab X p)")}
           </div>
-        </div>
+        </Card>
 
         {/* Vastutegevus */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded">VT</span>
             <h2 className="font-semibold text-gray-900">Vastutegevus — vaikeväärtused</h2>
@@ -316,10 +318,10 @@ export default function NewCompetitionPage() {
           <div className="grid grid-cols-2 gap-4">
             {numInput("defaultVastutegevusPenaltyPerLife", "Karistus 1 elu kaotamise eest")}
           </div>
-        </div>
+        </Card>
 
         {/* Varustus */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">VA</span>
             <h2 className="font-semibold text-gray-900">Varustus — vaikeväärtused</h2>
@@ -328,10 +330,10 @@ export default function NewCompetitionPage() {
           <div className="grid grid-cols-2 gap-4">
             {numInput("defaultVarustusPenaltyPerItem", "Karistus ühe puuduoleva eseme eest")}
           </div>
-        </div>
+        </Card>
 
         {/* Hilinemine */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded">HL</span>
             <h2 className="font-semibold text-gray-900">Hilinemine — vaikeväärtused</h2>
@@ -365,14 +367,13 @@ export default function NewCompetitionPage() {
               Valem: iga {form.defaultHilinemineIntervalMinutes} min = {form.defaultHilineminePenaltyPerInterval}p, max {form.defaultHilinemineMaxPenalty}p
             </p>
           )}
-        </div>
+        </Card>
 
         {error && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</div>}
 
-        <button type="submit" disabled={loading}
-          className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        <Button type="submit" disabled={loading} className="w-full py-2.5">
           {loading ? "Loon..." : "Loo võistlus"}
-        </button>
+        </Button>
 
       </form>
     </div>

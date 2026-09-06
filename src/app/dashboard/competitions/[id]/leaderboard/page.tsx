@@ -6,6 +6,7 @@ import { headers } from "next/headers"
 import { CopyButton } from "@/components/CopyButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { MiscScoreCell } from "@/components/competition/MiscScoreCell"
+import { Card } from "@/components/ui/card"
 
 export const dynamic = "force-dynamic"
 
@@ -215,7 +216,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
         {horsCompRows.length > 0 && ` + ${horsCompRows.length} arvestusvälised`}
       </p>
 
-      <div className="bg-white border rounded-xl overflow-hidden">
+      <Card className="overflow-hidden">
         <div className="overflow-auto max-h-[75vh]">
           <table className="w-full text-sm">
             <thead>
@@ -268,7 +269,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
