@@ -6,6 +6,9 @@ import Link from "next/link"
 import { FormulaInput } from "@/components/FormulaInput"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
+import { Card } from "@/components/ui/card"
+import { Input, Select } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 type FieldRow = { name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
 type ExceptionRow = { label: string; penalty: string }
@@ -547,20 +550,20 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Põhiandmed */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Põhiandmed</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nimi *</label>
-              <input type="text" required value={name} onChange={e => setName(e.target.value)}
+              <Input type="text" required value={name} onChange={e => setName(e.target.value)}
                 placeholder="KP 1 Politsei"
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tähis *</label>
-              <input type="text" required value={code} onChange={e => setCode(e.target.value)}
+              <Input type="text" required value={code} onChange={e => setCode(e.target.value)}
                 placeholder="1"
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
             </div>
           </div>
 
@@ -589,18 +592,18 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                   (tühi = vaikimisi {type === "PENALTY_BOX" ? compDefs?.defaultPKMaxValue : compDefs?.defaultKPMaxValue}p)
                 </span>
               </label>
-              <input type="number" min={0} step={0.5} value={maxValue}
+              <Input type="number" min={0} step={0.5} value={maxValue}
                 onChange={e => setMaxValue(e.target.value)}
                 placeholder={String(type === "PENALTY_BOX" ? compDefs?.defaultPKMaxValue ?? 30 : compDefs?.defaultKPMaxValue ?? 30)}
                 onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Vastutegevuse seaded */}
         {type === "COUNTER_ACTION" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded">VT</span>
               <h2 className="font-semibold text-gray-900">Vastutegevuse seaded</h2>
@@ -608,7 +611,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Karistus elu kaotamise eest (p)</label>
-                <input type="number" min={0} step={0.5}
+                <Input type="number" min={0} step={0.5}
                   value={(elementConfig.penaltyPerLife as number) ?? compDefs?.defaultVastutegevusPenaltyPerLife ?? 30}
                   onChange={e => {
                     const v = Number(e.target.value)
@@ -616,18 +619,18 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                     setCustomFormula(`result * ${v}`)
                   }}
                   onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
               </div>
             </div>
             <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
               Kohtunik sisestab: kaotatud elude arv. Karistus = elud × {(elementConfig.penaltyPerLife as number) ?? 30}p
             </p>
-          </div>
+          </Card>
         )}
 
         {/* Varustuse seaded */}
         {type === "EQUIPMENT_CHECK" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">VA</span>
               <h2 className="font-semibold text-gray-900">Varustuskontrolli seaded</h2>
@@ -635,7 +638,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Karistus puuduoleva eseme eest (p)</label>
-                <input type="number" min={0} step={0.5}
+                <Input type="number" min={0} step={0.5}
                   value={(elementConfig.penaltyPerItem as number) ?? compDefs?.defaultVarustusPenaltyPerItem ?? 5}
                   onChange={e => {
                     const v = Number(e.target.value)
@@ -643,18 +646,18 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                     setCustomFormula(`result * ${v}`)
                   }}
                   onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
               </div>
             </div>
             <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
               Kohtunik sisestab: puuduolevate esemete arv. Karistus = esemed × {(elementConfig.penaltyPerItem as number) ?? 5}p
             </p>
-          </div>
+          </Card>
         )}
 
         {/* Hilinemise seaded */}
         {type === "LATENESS" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded">HL</span>
               <h2 className="font-semibold text-gray-900">Hilinemise seaded</h2>
@@ -705,11 +708,11 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             {elementConfig.mode === "ONE_TIME" && (
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Hilinemise karistus (p)</label>
-                <input type="number" min={0} step={0.5}
+                <Input type="number" min={0} step={0.5}
                   value={exceptions[0]?.penalty ?? compDefs?.defaultPassedNotDone ?? 35}
                   onChange={e => setExceptions([{ label: "Hilines", penalty: e.target.value }])}
                   onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
               </div>
             )}
 
@@ -717,7 +720,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Intervall (min)</label>
-                  <input type="number" min={1} step={1}
+                  <Input type="number" min={1} step={1}
                     value={(elementConfig.intervalMinutes as number) ?? 1}
                     onChange={e => {
                       const iv = Number(e.target.value)
@@ -727,11 +730,11 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                       setCustomFormula(`min(floor(result / ${iv}) * ${pp}, ${mp})`)
                     }}
                     onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Karistus intervallis (p)</label>
-                  <input type="number" min={0} step={0.5}
+                  <Input type="number" min={0} step={0.5}
                     value={(elementConfig.penaltyPerInterval as number) ?? 1}
                     onChange={e => {
                       const pp = Number(e.target.value)
@@ -741,11 +744,11 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                       setCustomFormula(`min(floor(result / ${iv}) * ${pp}, ${mp})`)
                     }}
                     onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Maksimaalne karistus (p)</label>
-                  <input type="number" min={0} step={0.5}
+                  <Input type="number" min={0} step={0.5}
                     value={(elementConfig.maxPenalty as number) ?? 30}
                     onChange={e => {
                       const mp = Number(e.target.value)
@@ -755,7 +758,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                       setCustomFormula(`min(floor(result / ${iv}) * ${pp}, ${mp})`)
                     }}
                     onFocus={e => e.target.select()}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                 </div>
               </div>
             )}
@@ -765,12 +768,12 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 Valem: iga {elementConfig.intervalMinutes as number} min = {elementConfig.penaltyPerInterval as number}p, max {elementConfig.maxPenalty as number}p
               </p>
             )}
-          </div>
+          </Card>
         )}
 
         {/* Postkasti konfiguratsioon */}
         {type === "PENALTY_BOX" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded">PK</span>
               <h2 className="font-semibold text-gray-900">Postkasti režiim</h2>
@@ -867,7 +870,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 <p className="text-xs text-gray-400 mt-2">Kohtunik sisestab kogupunktid otse (ühekordne arv).</p>
               </div>
             )}
-          </div>
+          </Card>
         )}
 
         {/* Muu elemendi info */}
@@ -882,7 +885,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
 
         {/* Katkestamise seaded */}
         {type === "ABANDONMENT" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium bg-rose-100 text-rose-700 px-2 py-0.5 rounded">KT</span>
               <h2 className="font-semibold text-gray-900">Katkestamise seaded</h2>
@@ -909,14 +912,14 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
               Katkestamisi hallatakse elemendi lehel pärast loomist — saab märkida üksikuid liikmeid või kogu võistkonna katkestanuks. Annab ainult karistuspunktid (ei muuda automaatselt staatust).
             </p>
-          </div>
+          </Card>
         )}
 
         {/* Arvutusmeetod enne, sisendväljad pärast (flex-col-reverse pöörab järjekorra) */}
         <div className="flex flex-col-reverse gap-6">
         {/* Sisendväljad (ainult tavaliste tüüpide jaoks, mitte PK/OTHER/DIRECT_ENTRY) */}
         {!isSpecialType && !isMiscType && type !== "PENALTY_BOX" && calcType !== "DIRECT_ENTRY" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <h2 className="font-semibold text-gray-900">Sisendväljad</h2>
             <p className="text-xs text-gray-500">Märgi ära, milline väli läheb rankingusse (tulemusväli).</p>
             {fields.map((f, i) => (
@@ -1008,12 +1011,12 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium border border-dashed border-blue-300 hover:border-blue-400 rounded-lg py-2 transition-colors">
               + Lisa väli
             </button>
-          </div>
+          </Card>
         )}
 
         {/* Arvutusmeetod */}
         {!isSpecialType && !isMiscType && type !== "PENALTY_BOX" && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <h2 className="font-semibold text-gray-900">Arvutusmeetod</h2>
             <div className="space-y-2">
               {CALC_TYPES.filter(ct => ct.value !== "COMBINED" || canCombine).map(ct => (
@@ -1035,32 +1038,32 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                     <>
                       <div>
                         <label className="text-xs text-gray-500 mb-1 block">Parima tulemus (p)</label>
-                        <input type="number" min={0} step={0.5} value={minPoints}
+                        <Input type="number" min={0} step={0.5} value={minPoints}
                           onChange={e => setMinPoints(Number(e.target.value))} onFocus={e => e.target.select()}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                       </div>
                       <div>
                         <label className="text-xs text-gray-500 mb-1 block">Halvima tulemus (p)</label>
-                        <input type="number" min={0} step={0.5}
+                        <Input type="number" min={0} step={0.5}
                           value={maxValue !== "" ? maxValue : (compDefs?.defaultKPMaxValue ?? 30)}
                           onChange={e => setMaxValue(e.target.value)} onFocus={e => e.target.select()}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                       </div>
                     </>
                   ) : (
                     <>
                       <div>
                         <label className="text-xs text-gray-500 mb-1 block">Parima tulemus (p)</label>
-                        <input type="number" min={0} step={0.5}
+                        <Input type="number" min={0} step={0.5}
                           value={maxValue !== "" ? maxValue : (compDefs?.defaultKPMaxValue ?? 30)}
                           onChange={e => setMaxValue(e.target.value)} onFocus={e => e.target.select()}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                       </div>
                       <div>
                         <label className="text-xs text-gray-500 mb-1 block">Halvima tulemus (p)</label>
-                        <input type="number" min={0} step={0.5} value={minPoints}
+                        <Input type="number" min={0} step={0.5} value={minPoints}
                           onChange={e => setMinPoints(Number(e.target.value))} onFocus={e => e.target.select()}
-                          className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+ />
                       </div>
                     </>
                   )}
@@ -1101,9 +1104,9 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               <div className="space-y-3 pt-1 border-t">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Õigete elementide koguarv</label>
-                  <input type="number" min={1} step={1} value={totalElements}
+                  <Input type="number" min={1} step={1} value={totalElements}
                     onChange={e => setTotalElements(Number(e.target.value))} onFocus={e => e.target.select()}
-                    className="w-32 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    className="w-32" />
                 </div>
                 <p className="text-xs text-gray-400">
                   Tulemusväljale sisestatakse õigesti sooritatud elementide arv. Iga element annab maxP / {totalElements} punkti.
@@ -1115,14 +1118,14 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 <label className="text-sm font-medium text-gray-700 mb-1 block">
                   Valem (muutujad: <code className="bg-gray-100 px-1 rounded">result</code>, <code className="bg-gray-100 px-1 rounded">n</code>, <code className="bg-gray-100 px-1 rounded">rank</code>)
                 </label>
-                <input type="text" value={customFormula} onChange={e => setCustomFormula(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <Input type="text" value={customFormula} onChange={e => setCustomFormula(e.target.value)}
+                  className="font-mono" />
                 <label className="text-sm font-medium text-gray-700 mb-1 mt-3 block">Tulemuse suund (parima/halvima kuvamiseks)</label>
-                <select value={customHigherIsBetter ? "true" : "false"} onChange={e => setCustomHigherIsBetter(e.target.value === "true")}
-                  className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <Select value={customHigherIsBetter ? "true" : "false"} onChange={e => setCustomHigherIsBetter(e.target.value === "true")}
+ >
                   <option value="false">Väiksem on parem</option>
                   <option value="true">Suurem on parem</option>
-                </select>
+                </Select>
                 <p className="text-xs text-gray-500 mt-1">Määrab, kumb tulemusväärtus loetakse paremaks tulemuste analüüsis. Ei mõjuta summat.</p>
               </div>
             )}
@@ -1133,11 +1136,11 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Tulemuse suund (parima/halvima kuvamiseks)</label>
-                  <select value={directHigherIsBetter ? "true" : "false"} onChange={e => setDirectHigherIsBetter(e.target.value === "true")}
-                    className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <Select value={directHigherIsBetter ? "true" : "false"} onChange={e => setDirectHigherIsBetter(e.target.value === "true")}
+ >
                     <option value="false">Väiksem on parem</option>
                     <option value="true">Suurem on parem</option>
-                  </select>
+                  </Select>
                   <p className="text-xs text-gray-500 mt-1">Määrab, kumb suund loetakse paremaks tulemuste analüüsis (parim, halvim, positsioon). Ei mõjuta summat.</p>
                 </div>
               </div>
@@ -1282,13 +1285,13 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 </button>
               </div>
             )}
-          </div>
+          </Card>
         )}
         </div>
 
         {/* Erandid */}
         {type !== "COUNTER_ACTION" && type !== "EQUIPMENT_CHECK" && type !== "OTHER" && type !== "ABANDONMENT" && type !== "PENALTY_BOX" && !(type === "LATENESS" && elementConfig.mode === "PER_INTERVAL") && (
-          <div className="bg-white border rounded-xl p-5 space-y-4">
+          <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-900">Erandid</h2>
               <button type="button" onClick={addException}
@@ -1296,27 +1299,27 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             </div>
             {exceptions.map((ex, i) => (
               <div key={i} className="flex gap-2 items-center">
-                <input type="text" value={ex.label} onChange={e => updateException(i, "label", e.target.value)}
+                <Input type="text" value={ex.label} onChange={e => updateException(i, "label", e.target.value)}
                   placeholder="Erand (nt Ei läbinud)"
-                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                <input type="number" value={ex.penalty} onChange={e => updateException(i, "penalty", e.target.value)}
+                  className="flex-1 focus:ring-1" />
+                <Input type="number" value={ex.penalty} onChange={e => updateException(i, "penalty", e.target.value)}
                   placeholder="Karistus"
                   onFocus={e => e.target.select()}
-                    className="w-24 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    className="w-24 focus:ring-1" />
                 <button type="button" onClick={() => setExceptions(exceptions.filter((_, idx) => idx !== i))}
                   className="text-red-400 hover:text-red-600">✕</button>
               </div>
             ))}
-          </div>
+          </Card>
         )}
 
 
         {error && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</div>}
 
-        <button type="submit" disabled={loading}
-          className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        <Button type="submit" disabled={loading}
+          className="w-full py-2.5">
           {loading ? "Salvestan..." : "Salvesta element"}
-        </button>
+        </Button>
       </form>
     </div>
   )
