@@ -7,6 +7,7 @@ import { RecalculateButton } from "@/components/RecalculateButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { ElementList } from "@/components/competition/ElementList"
 import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
+import { Card } from "@/components/ui/card"
 
 const STATUS_LABEL: Record<string, string> = {
   SETUP: "Ettevalmistus",
@@ -95,16 +96,16 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
           { label: "Võistkonnad", value: competition._count.teams, icon: "👥" },
           { label: "Juurdepääsud", value: competition._count.accessTokens, icon: "🔑" },
         ].map((s) => (
-          <div key={s.label} className="bg-white border rounded-xl p-4 text-center">
+          <Card key={s.label} className="p-4 text-center">
             <p className="text-2xl mb-1">{s.icon}</p>
-            <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-            <p className="text-sm text-gray-500">{s.label}</p>
-          </div>
+            <p className="text-2xl font-bold text-ink">{s.value}</p>
+            <p className="text-sm text-ink-muted">{s.label}</p>
+          </Card>
         ))}
       </div>
 
       {/* Hindamiselemendid */}
-      <div className="bg-white border rounded-xl">
+      <Card>
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="font-semibold text-gray-900">Hindamiselemendid</h2>
           <div className="flex items-center gap-4">
@@ -129,7 +130,7 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
           }))}
           teamCount={competition._count.teams}
         />
-      </div>
+      </Card>
     </div>
   )
 }

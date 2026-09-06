@@ -3,6 +3,8 @@
 import { use, useState, useEffect } from "react"
 import Link from "next/link"
 import { CompetitionRoleManager } from "@/components/CompetitionRoleManager"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 type Token = { id: string; token: string; type: string; name: string; elementId?: string | null; teamId?: string | null; element?: { name: string } | null; team?: { name: string } | null; lastUsedAt?: string | null }
 type Element = { id: string; name: string; code: string }
@@ -152,14 +154,13 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
           </div>
         )}
 
-        <button type="submit" disabled={saving}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+        <Button type="submit" disabled={saving}>
           {saving ? "Loon..." : "Loo link"}
-        </button>
+        </Button>
       </form>
 
       {/* Tokenite nimekiri */}
-      <div className="bg-white border rounded-xl divide-y">
+      <Card className="divide-y">
         {tokens.length === 0 ? (
           <div className="text-center py-10 text-gray-400 text-sm">Ühtegi juurdepääsulinki pole loodud</div>
         ) : (() => {
@@ -204,7 +205,7 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
           </div>
           ))
         })()}
-      </div>
+      </Card>
     </div>
   )
 }

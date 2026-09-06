@@ -3,6 +3,9 @@
 import { use, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { Card } from "@/components/ui/card"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 type CompetitionForm = {
   name: string
@@ -200,7 +203,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Põhiandmed */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Põhiandmed</h2>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Nimi *</label>
@@ -236,10 +239,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               <option value="ARCHIVED">Arhiveeritud</option>
             </select>
           </div>
-        </div>
+        </Card>
 
         {/* Hindamissüsteem */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Hindamissüsteem</h2>
           <div className="space-y-2">
             {SCORING_MODES.map(m => (
@@ -254,10 +257,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               </label>
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Arvutusmeetod */}
-        <div className="bg-white border rounded-xl p-5 space-y-3">
+        <Card className="p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Arvutusmeetod — vaikimisi KP/PK elementidele</h2>
           <p className="text-xs text-gray-500">Iga elemendi loomisel eeltäidetakse see arvutusmeetod. Elemente saab hiljem eraldi muuta.</p>
           {CALC_TYPES.map(ct => (
@@ -294,10 +297,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* KP vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded">KP</span>
             <h2 className="font-semibold text-gray-900">Kontrollpunkt — vaikeväärtused</h2>
@@ -307,10 +310,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             {numInput("defaultNotPassed", "Ei läbinud KP-d", "p", undefined)}
             {numInput("defaultPassedNotDone", "Läbis aga ei sooritanud", "p", undefined)}
           </div>
-        </div>
+        </Card>
 
         {/* PK vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded">PK</span>
             <h2 className="font-semibold text-gray-900">Postkast — vaikeväärtused</h2>
@@ -318,10 +321,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           <div className="grid grid-cols-2 gap-4">
             {numInput("defaultPKMaxValue", form.scoringMode === "PLUS" ? "Maks (parim saab X p)" : "Maks (halvim saab X p)")}
           </div>
-        </div>
+        </Card>
 
         {/* Vastutegevus vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded">VT</span>
             <h2 className="font-semibold text-gray-900">Vastutegevus — vaikeväärtused</h2>
@@ -330,10 +333,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           <div className="grid grid-cols-2 gap-4">
             {numInput("defaultVastutegevusPenaltyPerLife", "Karistus 1 elu kaotamise eest")}
           </div>
-        </div>
+        </Card>
 
         {/* Varustus vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">VA</span>
             <h2 className="font-semibold text-gray-900">Varustus — vaikeväärtused</h2>
@@ -342,10 +345,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           <div className="grid grid-cols-2 gap-4">
             {numInput("defaultVarustusPenaltyPerItem", "Karistus ühe puuduoleva eseme eest")}
           </div>
-        </div>
+        </Card>
 
         {/* Hilinemine vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded">HL</span>
             <h2 className="font-semibold text-gray-900">Hilinemine — vaikeväärtused</h2>
@@ -410,10 +413,10 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               Valem: iga {form.defaultHilinemineIntervalMinutes} min = {form.defaultHilineminePenaltyPerInterval}p, max {form.defaultHilinemineMaxPenalty}p
             </p>
           )}
-        </div>
+        </Card>
 
         {/* Fikseeritud pingerida vaikeväärtused */}
-        <div className="bg-white border rounded-xl p-5 space-y-4">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">PR</span>
             <h2 className="font-semibold text-gray-900">Fikseeritud pingerida — vaikeväärtused</h2>
@@ -469,21 +472,20 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               Kohad mis pole määratud saavad 0 punkti. Viigi korral saavad mõlemad kõrgema koha punktid.
             </p>
           )}
-        </div>
+        </Card>
 
         {error && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</div>}
 
         <div className="flex items-center gap-3">
-          <button type="submit" disabled={saving}
-            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+          <Button type="submit" size="lg" disabled={saving}>
             {saving ? "Salvestan..." : "Salvesta seaded"}
-          </button>
+          </Button>
           {saved && <span className="text-green-600 text-sm">✓ Salvestatud</span>}
         </div>
       </form>
 
       {/* Massuuendus */}
-      <div className="mt-6 bg-white border rounded-xl p-5">
+      <Card className="mt-6 p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="font-semibold text-gray-900 mb-1">Rakenda vaikeväärtused kõigile elementidele</h2>
@@ -516,9 +518,9 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         {applyError && (
           <div className="mt-4 bg-red-50 border border-red-100 rounded-lg px-4 py-3 text-sm text-red-700">{applyError}</div>
         )}
-      </div>
+      </Card>
 
-      <div className="mt-6 bg-white border rounded-xl p-5">
+      <Card className="mt-6 p-5">
         <div>
           <h2 className="font-semibold text-gray-900">Kasutajad ja rollid</h2>
           <p className="text-xs text-gray-500 mt-1">
@@ -528,11 +530,11 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         </div>
         <Link
           href={`/dashboard/competitions/${competitionId}/access`}
-          className="inline-flex mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+          className={cn(buttonVariants(), "mt-4")}
         >
           Ava rollihaldus
         </Link>
-      </div>
+      </Card>
 
       {/* Ohtlik tsoon */}
       <div className="mt-8 border border-red-200 rounded-xl p-5">
