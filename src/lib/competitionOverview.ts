@@ -11,7 +11,7 @@ export type ElementProgress = {
 }
 
 export type CompetitionOverview = {
-  competition: { id: string; name: string; status: string; date: Date | null; endDate: Date | null; location: string | null }
+  competition: { id: string; name: string; status: string; date: Date | null; endDate: Date | null; location: string | null; analysisAccessMode: string }
   teamCount: number
   inCompCount: number
   classCount: number
@@ -26,7 +26,7 @@ export type CompetitionOverview = {
 export async function getCompetitionOverview(id: string): Promise<CompetitionOverview | null> {
   const competition = await prisma.competition.findUnique({
     where: { id },
-    select: { id: true, name: true, status: true, date: true, endDate: true, location: true },
+    select: { id: true, name: true, status: true, date: true, endDate: true, location: true, analysisAccessMode: true },
   })
   if (!competition) return null
 

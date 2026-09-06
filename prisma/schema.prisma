@@ -144,6 +144,11 @@ model Competition {
   // Lingitunnusest säilitatakse ainult SHA-256 räsi.
   registrationAccessMode String    @default("PRIVATE")
   registrationTokenHash  String?   @unique
+  // VK analüüsi vaate ligipääs: "PUBLIC" | "LINK_ONLY" | "PRIVATE".
+  // PUBLIC hoiab senise käitumise — link on pingereas nähtav ja /public/<id>/analysis avatud.
+  // Lingitunnusest säilitatakse ainult SHA-256 räsi.
+  analysisAccessMode     String    @default("PUBLIC")
+  analysisTokenHash      String?   @unique
   organizerId            String
   organizer              User      @relation(fields: [organizerId], references: [id])
   createdAt              DateTime  @default(now())

@@ -29,7 +29,9 @@ export default async function PublicDashboardPage({ params }: { params: Promise<
           </div>
           <div className="flex items-center gap-3 text-sm">
             <Link href={`/public/${id}/leaderboard`} className="text-blue-600 hover:underline">Pingerida →</Link>
-            <Link href={`/public/${id}/analysis`} className="text-blue-600 hover:underline">Analüüs →</Link>
+            {data.competition.analysisAccessMode === "PUBLIC" && (
+              <Link href={`/public/${id}/analysis`} className="text-blue-600 hover:underline">Analüüs →</Link>
+            )}
           </div>
         </div>
 
