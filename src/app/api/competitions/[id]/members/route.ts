@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -12,7 +13,7 @@ import {
 
 const ASSIGNABLE_ROLES = COMPETITION_ROLES.filter((role) => role !== "OWNER")
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -47,7 +48,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json(members)
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -116,7 +117,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json(member)
 }
 
-export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleDELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -165,3 +166,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   })
   return NextResponse.json({ ok: true })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/members", handleGET)
+export const POST = withSecurityRoute("/api/competitions/[id]/members", handlePOST)
+export const DELETE = withSecurityRoute("/api/competitions/[id]/members", handleDELETE)

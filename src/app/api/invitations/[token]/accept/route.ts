@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import {
@@ -16,7 +17,7 @@ import {
 import { findCompetitionRoleInvitationByToken } from "@/lib/competitionRoleInvitations.server"
 import { prisma } from "@/lib/prisma"
 
-export async function POST(
+async function handlePOST(
   _req: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
@@ -143,3 +144,5 @@ export async function POST(
     competitionId: invitation.competitionId,
   })
 }
+
+export const POST = withSecurityRoute("/api/invitations/[token]/accept", handlePOST)

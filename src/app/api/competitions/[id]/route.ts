@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -10,7 +11,7 @@ import {
   queueCompetitionStartedNotifications,
 } from "@/lib/notifications.server"
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -50,7 +51,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   })
 }
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -144,7 +145,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleDELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { id } = await params
@@ -154,3 +155,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   await prisma.competition.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]", handleGET)
+export const PATCH = withSecurityRoute("/api/competitions/[id]", handlePATCH)
+export const DELETE = withSecurityRoute("/api/competitions/[id]", handleDELETE)

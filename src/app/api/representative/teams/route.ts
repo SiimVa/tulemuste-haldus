@@ -1,8 +1,9 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function GET() {
+async function handleGET() {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -53,3 +54,5 @@ export async function GET() {
 
   return NextResponse.json(assignments)
 }
+
+export const GET = withSecurityRoute("/api/representative/teams", handleGET)

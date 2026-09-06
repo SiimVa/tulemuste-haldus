@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import {
   isApprovalMode,
@@ -29,7 +30,7 @@ import {
   validateTeamComposition,
 } from "@/lib/teamComposition"
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
@@ -256,3 +257,5 @@ export async function POST(
   await deliverPendingNotificationsSafely()
   return NextResponse.json(updated)
 }
+
+export const POST = withSecurityRoute("/api/representative/teams/[teamId]/submit", handlePOST)

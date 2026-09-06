@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -150,7 +151,7 @@ async function getAssignedTeam(
   return allowed ? team : false
 }
 
-export async function GET(
+async function handleGET(
   _req: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
@@ -175,7 +176,7 @@ export async function GET(
   return NextResponse.json(responseTeam(team))
 }
 
-export async function PATCH(
+async function handlePATCH(
   req: Request,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
@@ -471,3 +472,6 @@ export async function PATCH(
     throw error
   }
 }
+
+export const GET = withSecurityRoute("/api/representative/teams/[teamId]", handleGET)
+export const PATCH = withSecurityRoute("/api/representative/teams/[teamId]", handlePATCH)

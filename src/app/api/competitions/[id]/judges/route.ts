@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
@@ -24,7 +25,7 @@ async function mayManageJudges(competitionId: string) {
   return { session, allowed }
 }
 
-export async function GET(
+async function handleGET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -49,7 +50,7 @@ export async function GET(
   return NextResponse.json(judges)
 }
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -160,7 +161,7 @@ export async function POST(
   return NextResponse.json(judge)
 }
 
-export async function DELETE(
+async function handleDELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -217,3 +218,7 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true })
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/judges", handleGET)
+export const POST = withSecurityRoute("/api/competitions/[id]/judges", handlePOST)
+export const DELETE = withSecurityRoute("/api/competitions/[id]/judges", handleDELETE)

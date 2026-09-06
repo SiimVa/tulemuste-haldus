@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { computeAllScores, type ComputeResult, type ComputeElement, type ComputeConfig } from "@/lib/scoreCompute"
@@ -5,7 +6,7 @@ import { computeAllScores, type ComputeResult, type ComputeElement, type Compute
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
 // Avalik dry-run: arvuta hüpoteetiline seis valitud võistkonnale (ei salvesta andmebaasi).
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = await params
   const body = await req.json().catch(() => ({}))
   const teamId: string = body.teamId
@@ -114,3 +115,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     elementScores,
   })
 }
+
+export const POST = withSecurityRoute("/api/competitions/[id]/simulate", handlePOST)

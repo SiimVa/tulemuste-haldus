@@ -50,6 +50,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <SignOutButton />
           </nav>
         </div>
+        {session.user.role === "ADMIN" && (
+          <nav aria-label="Administraatori tööriistad" className="mx-auto flex max-w-7xl flex-wrap gap-4 px-4 pb-2 text-sm">
+            <Link href="/dashboard/users" className="text-gray-600 hover:text-blue-600 sm:hidden">Kasutajad</Link>
+            <Link href="/dashboard/security" className="text-gray-600 hover:text-blue-600">Turvalogi</Link>
+          </nav>
+        )}
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6 sm:py-8">{children}</main>
     </div>

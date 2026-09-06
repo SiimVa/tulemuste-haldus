@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import {
@@ -20,7 +21,7 @@ import {
   validateTeamComposition,
 } from "@/lib/teamComposition"
 
-export async function POST(
+async function handlePOST(
   req: Request,
   {
     params,
@@ -189,3 +190,5 @@ export async function POST(
   await deliverPendingNotificationsSafely()
   return NextResponse.json(updated)
 }
+
+export const POST = withSecurityRoute("/api/competitions/[id]/registrations/[teamId]/review", handlePOST)

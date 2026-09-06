@@ -1,3 +1,5 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import {
@@ -34,7 +36,7 @@ async function authorizeRoleManager(competitionId: string) {
   return { session, allowed, canManageOrganizers }
 }
 
-export async function GET(
+async function handleGET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -86,7 +88,7 @@ export async function GET(
   })
 }
 
-export async function PUT(
+async function handlePUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -121,6 +123,7 @@ export async function PUT(
       { status: 404 }
     )
   }
+  setSecurityTargets({ competitionId: id, userId: user.id })
   try {
     const member = await updateCompetitionMemberRoles({
       competitionId: id,
@@ -150,3 +153,6 @@ export async function PUT(
     throw error
   }
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/roles", handleGET)
+export const PUT = withSecurityRoute("/api/competitions/[id]/roles", handlePUT)

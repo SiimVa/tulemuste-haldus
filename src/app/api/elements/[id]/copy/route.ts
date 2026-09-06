@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
@@ -7,7 +8,7 @@ import {
 } from "@/lib/competitionCopy.server"
 import { prisma } from "@/lib/prisma"
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -71,3 +72,5 @@ export async function POST(
     )
   }
 }
+
+export const POST = withSecurityRoute("/api/elements/[id]/copy", handlePOST)

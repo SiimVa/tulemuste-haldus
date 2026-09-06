@@ -1,11 +1,17 @@
 import NextAuth from "next-auth"
 import type { NextAuthConfig } from "next-auth"
+import { headers } from "next/headers"
 import Credentials from "next-auth/providers/credentials"
 import Google, { type GoogleProfile } from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { linkPendingTeamMembersToUser } from "@/lib/teamMemberAccounts.server"
+import { LOGIN_ACCOUNT_POLICY, LOGIN_IP_POLICY } from "@/lib/security"
+import { consumeRateLimit, recordSecurityEvent, requestFingerprint } from "@/lib/security.server"
+
+// Constant-cost comparison for unknown accounts as well as incorrect passwords.
+const dummyPasswordHash = bcrypt.hashSync("not-a-real-account-password", 12)
 
 const providers: NextAuthConfig["providers"] = [
   Credentials({
@@ -14,17 +20,34 @@ const providers: NextAuthConfig["providers"] = [
       email: { label: "E-post", type: "email" },
       password: { label: "Parool", type: "password" },
     },
-    async authorize(credentials) {
-      if (!credentials?.email || !credentials?.password) return null
+    async authorize(credentials, request) {
+      const fingerprint = requestFingerprint(request.headers)
+      const event = { action: "LOGIN", route: "/api/auth/callback/credentials", method: "POST", fingerprint }
+      const ipLimit = await consumeRateLimit(LOGIN_IP_POLICY, fingerprint)
+      if (!ipLimit.allowed) {
+        if (ipLimit.firstBlocked) await recordSecurityEvent({ ...event, outcome: "RATE_LIMITED", status: 429 })
+        return null
+      }
+      if (typeof credentials?.email !== "string" || typeof credentials?.password !== "string" ||
+          !credentials.email || !credentials.password || credentials.email.length > 320 || credentials.password.length > 1024) {
+        await recordSecurityEvent({ ...event, outcome: "DENIED", status: 401 })
+        return null
+      }
       const email = String(credentials.email).trim().toLowerCase()
+      const accountLimit = await consumeRateLimit(LOGIN_ACCOUNT_POLICY, email)
+      if (!accountLimit.allowed) {
+        if (accountLimit.firstBlocked) await recordSecurityEvent({ ...event, outcome: "RATE_LIMITED", status: 429 })
+        return null
+      }
       const user = await prisma.user.findUnique({ where: { email } })
-      if (!user?.passwordHash) return null
-
       const valid = await bcrypt.compare(
         String(credentials.password),
-        user.passwordHash
+        user?.passwordHash ?? dummyPasswordHash
       )
-      if (!valid) return null
+      if (!valid || !user?.passwordHash) {
+        await recordSecurityEvent({ ...event, outcome: "DENIED", status: 401 })
+        return null
+      }
       return { id: user.id, email: user.email, name: user.name, role: user.role }
     },
   }),
@@ -71,6 +94,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async signIn({ user }) {
       if (!user.id || !user.email) return
+      await recordSecurityEvent({
+        action: "LOGIN", outcome: "SUCCEEDED", route: "/api/auth/[...nextauth]",
+        method: "AUTH", actorUserId: user.id, fingerprint: requestFingerprint(await headers()),
+      })
       await prisma.$transaction((tx) =>
         linkPendingTeamMembersToUser(tx, {
           id: user.id as string,
@@ -83,15 +110,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ account, profile }) {
       if (account?.provider === "google") {
         const googleProfile = profile as GoogleProfile | undefined
-        return Boolean(googleProfile?.email_verified && googleProfile.email)
+        const verified = Boolean(googleProfile?.email_verified && googleProfile.email)
+        if (!verified) await recordSecurityEvent({
+          action: "LOGIN", outcome: "DENIED", route: "/api/auth/callback/google", method: "AUTH",
+          fingerprint: requestFingerprint(await headers()),
+        })
+        return verified
       }
       return true
     },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.role = (user as { role?: string }).role
       }
+      // Recheck authoritative role and account existence on every session read.
+      const currentUser = typeof token.id === "string"
+        ? await prisma.user.findUnique({ where: { id: token.id }, select: { role: true } })
+        : null
+      if (!currentUser) return null
+      token.role = currentUser.role
       return token
     },
     async session({ session, token }) {

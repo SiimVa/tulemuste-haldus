@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { isApprovalMode } from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
@@ -421,7 +422,7 @@ function parseFormFields(value: unknown): FormFieldDefinition[] {
   return fields
 }
 
-export async function GET(
+async function handleGET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -507,7 +508,7 @@ export async function GET(
   })
 }
 
-export async function PATCH(
+async function handlePATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -1015,3 +1016,6 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 400 })
   }
 }
+
+export const GET = withSecurityRoute("/api/competitions/[id]/registration-settings", handleGET)
+export const PATCH = withSecurityRoute("/api/competitions/[id]/registration-settings", handlePATCH)

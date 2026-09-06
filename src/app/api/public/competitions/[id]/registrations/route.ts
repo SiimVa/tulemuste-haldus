@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
 import {
@@ -190,7 +191,7 @@ async function createApplication(
   )
 }
 
-export async function POST(
+async function handlePOST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -259,3 +260,5 @@ export async function POST(
     { status: 409 }
   )
 }
+
+export const POST = withSecurityRoute("/api/public/competitions/[id]/registrations", handlePOST)

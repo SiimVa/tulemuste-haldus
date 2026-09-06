@@ -36,7 +36,7 @@ function LoginForm() {
     })
 
     if (res?.error) {
-      setError("Vale e-post või parool")
+      setError("Vale e-post või parool. Kui proovisid korduvalt, oota 15 minutit ja proovi uuesti.")
       setLoading(null)
     } else {
       router.push(callbackUrl)

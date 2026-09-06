@@ -1,3 +1,4 @@
+import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
 import { isApprovalMode } from "@/lib/approvalModes"
@@ -192,7 +193,7 @@ async function updateApplicationMembers(
   })
 }
 
-export async function PATCH(
+async function handlePATCH(
   req: Request,
   {
     params,
@@ -372,3 +373,5 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 409 })
   }
 }
+
+export const PATCH = withSecurityRoute("/api/competitions/[id]/registration-applications/[applicationId]", handlePATCH)
