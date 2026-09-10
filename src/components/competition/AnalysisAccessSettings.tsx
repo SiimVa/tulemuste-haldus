@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { AnalysisAccessMode } from "@/lib/analysisAccess"
+import { Input } from "@/components/ui/input"
 
 const MODES: { value: AnalysisAccessMode; label: string; desc: string }[] = [
   {
@@ -139,12 +140,12 @@ export function AnalysisAccessSettings({
             <>
               <label className="block text-xs text-gray-600">
                 Analüüsilink
-                <input
+                <Input
                   aria-label="Analüüsilink"
                   readOnly
                   value={link}
                   onFocus={(event) => event.currentTarget.select()}
-                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-white text-sm"
+                  className="mt-1 bg-white"
                 />
               </label>
               <p className="text-xs text-gray-500">

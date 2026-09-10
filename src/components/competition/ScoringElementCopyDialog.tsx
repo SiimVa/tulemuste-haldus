@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Select } from "@/components/ui/input"
 
 type CompetitionOption = {
   id: string
@@ -167,7 +168,7 @@ export function ScoringElementCopyDialog({
                   >
                     Lähtevõistlus
                   </label>
-                  <select
+                  <Select
                     id="copy-element-source-competition"
                     required
                     value={sourceCompetitionId}
@@ -175,14 +176,13 @@ export function ScoringElementCopyDialog({
                       setError("")
                       setSourceCompetitionId(event.target.value)
                     }}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
                   >
                     {competitions.map((competition) => (
                       <option key={competition.id} value={competition.id}>
                         {competition.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label
@@ -191,13 +191,13 @@ export function ScoringElementCopyDialog({
                   >
                     Hindamiselement
                   </label>
-                  <select
+                  <Select
                     id="copy-element-source"
                     required
                     value={sourceElementId}
                     onChange={(event) => setSourceElementId(event.target.value)}
                     disabled={loadingOptions || sourceElements.length === 0}
-                    className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                    className="disabled:bg-gray-50"
                   >
                     {sourceElements.length === 0 && (
                       <option value="">Elemente ei ole</option>
@@ -208,7 +208,7 @@ export function ScoringElementCopyDialog({
                         {element.isCancelled ? " (tühistatud)" : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </>
             )}
@@ -227,19 +227,18 @@ export function ScoringElementCopyDialog({
                 >
                   Sihtvõistlus
                 </label>
-                <select
+                <Select
                   id="copy-element-target-competition"
                   required
                   value={targetCompetitionId}
                   onChange={(event) => setTargetCompetitionId(event.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
                 >
                   {competitions.map((competition) => (
                     <option key={competition.id} value={competition.id}>
                       {competition.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 

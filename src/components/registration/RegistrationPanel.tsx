@@ -15,6 +15,7 @@ import {
   canEditRegistrationInPhase,
   canWithdrawRegistration,
 } from "@/lib/registrationApplications"
+import { Input, Select } from "@/components/ui/input"
 
 type CompetitionClass = { id: string; name: string }
 type Application = {
@@ -347,13 +348,13 @@ export function RegistrationPanel({
                 >
                   Võistkonna nimi *
                 </label>
-                <input
+                <Input
                   id="registration-team-name"
                   required
                   maxLength={200}
                   value={teamName}
                   onChange={(event) => setTeamName(event.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  
                 />
               </div>
               {classes.length === 1 && (
@@ -375,12 +376,12 @@ export function RegistrationPanel({
                   >
                     Klass *
                   </label>
-                  <select
+                  <Select
                     id="registration-class"
                     required
                     value={classId}
                     onChange={(event) => setClassId(event.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    
                   >
                     <option value="">Vali klass</option>
                     {classes.map((item) => (
@@ -388,7 +389,7 @@ export function RegistrationPanel({
                         {item.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
               {formFields.some((field) => field.showInRegistration) && (

@@ -7,6 +7,7 @@ import {
   type ClassBalanceMode,
 } from "@/lib/registrationAllocation"
 import type { FormFieldDefinition } from "@/lib/registrationForm"
+import { Input, Select } from "@/components/ui/input"
 
 type CompetitionClass = { id?: string; name: string }
 type SourceOption = {
@@ -170,13 +171,13 @@ export function AllocationRuleBuilder({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <label className="text-xs text-gray-600 flex-1 min-w-52">
                   Reegli nimetus *
-                  <input
+                  <Input
                     value={rule.label}
                     maxLength={200}
                     onChange={(event) =>
                       updateRule(index, { label: event.target.value })
                     }
-                    className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                    className="mt-1"
                   />
                 </label>
                 <div className="flex gap-1 pt-5">
@@ -211,10 +212,10 @@ export function AllocationRuleBuilder({
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="text-xs text-gray-600">
                   Rühmitamise alus *
-                  <select
+                  <Select
                     value={source?.key ?? ""}
                     onChange={(event) => changeSource(index, event.target.value)}
-                    className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                    className="mt-1"
                   >
                     <option value="">Vali registreerimisväli</option>
                     {sources.map((item) => (
@@ -222,12 +223,12 @@ export function AllocationRuleBuilder({
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 {rule.type === "GROUP_GUARANTEE" && (
                   <label className="text-xs text-gray-600">
                     Garanteeritud kohti iga väärtuse kohta *
-                    <input
+                    <Input
                       type="number"
                       min={1}
                       max={10000}
@@ -238,7 +239,7 @@ export function AllocationRuleBuilder({
                           quota: Number(event.target.value),
                         })
                       }
-                      className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                      className="mt-1"
                     />
                   </label>
                 )}
