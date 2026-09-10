@@ -2,11 +2,11 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
-import { PrintButton } from "@/components/PrintButton"
 import {
   EmptyProtocolSheet,
   emptyProtocolStyles,
 } from "@/components/protocol/EmptyProtocolSheet"
+import { ProtocolPrintToolbar } from "@/components/protocol/ProtocolPrintToolbar"
 
 export default async function ProtocolPage({
   params,
@@ -43,16 +43,11 @@ export default async function ProtocolPage({
     <>
       <style>{emptyProtocolStyles}</style>
 
-      <div className="no-print flex items-center gap-3 m-6 mb-0 p-3 bg-gray-50 rounded-lg border">
-        <a
-          href={`/dashboard/competitions/${competitionId}/elements/${elementId}`}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          ← Tagasi
-        </a>
-        <span className="text-gray-300">|</span>
-        <PrintButton />
-      </div>
+      <ProtocolPrintToolbar
+        backHref={`/dashboard/competitions/${competitionId}/elements/${elementId}`}
+        buttonLabel="Prindi protokoll"
+        className="m-6 mb-0 rounded-lg"
+      />
 
       <EmptyProtocolSheet
         competition={element.competition}

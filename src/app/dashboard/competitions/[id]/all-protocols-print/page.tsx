@@ -2,12 +2,11 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
-import Link from "next/link"
-import { PrintButton } from "@/components/PrintButton"
 import {
   EmptyProtocolSheet,
   emptyProtocolStyles,
 } from "@/components/protocol/EmptyProtocolSheet"
+import { ProtocolPrintToolbar } from "@/components/protocol/ProtocolPrintToolbar"
 
 export default async function AllProtocolsPrintPage({
   params,
@@ -39,19 +38,12 @@ export default async function AllProtocolsPrintPage({
     <>
       <style>{emptyProtocolStyles}</style>
 
-      <div className="no-print flex items-center gap-3 m-6 mb-0 p-4 bg-gray-50 border rounded-lg">
-        <Link
-          href={`/dashboard/competitions/${competitionId}`}
-          className="text-sm text-gray-500 hover:text-gray-700"
-        >
-          ← Tagasi
-        </Link>
-        <span className="text-gray-300">|</span>
-        <PrintButton label="Prindi kõik tühjad protokollid" />
-        <span className="text-xs text-gray-400 ml-2">
-          {competition.elements.length} elementi · iga element eraldi lehel
-        </span>
-      </div>
+      <ProtocolPrintToolbar
+        backHref={`/dashboard/competitions/${competitionId}`}
+        buttonLabel="Prindi kõik tühjad protokollid"
+        info={`${competition.elements.length} elementi · iga element eraldi lehel`}
+        className="m-6 mb-0 rounded-lg"
+      />
 
       {competition.elements.map((element, index) => (
         <EmptyProtocolSheet

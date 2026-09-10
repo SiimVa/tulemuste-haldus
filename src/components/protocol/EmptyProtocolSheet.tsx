@@ -1,4 +1,5 @@
 import { protocolFieldHeading } from "@/lib/protocol"
+import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentHeading"
 
 type ProtocolCompetition = {
   name: string
@@ -39,8 +40,9 @@ export const emptyProtocolStyles = `
     body { margin: 0; }
     .print-page { margin: 0; padding: 12mm; }
     .page-break { break-before: page; page-break-before: always; }
+    .protocol-table thead { display: table-header-group; }
+    .protocol-table tr { break-inside: avoid; page-break-inside: avoid; }
   }
-  @page { size: A4 landscape; margin: 0; }
   .protocol-table td, .protocol-table th {
     border: 1px solid #555;
     padding: 4px 6px;
@@ -56,6 +58,18 @@ export const emptyProtocolStyles = `
     max-width: 180px;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+  .protocol-table th.protocol-document-heading {
+    border: 0;
+    background: #fff;
+    padding: 0 0 4mm;
+  }
+  .protocol-table th.protocol-judge-heading {
+    border: 0;
+    background: #fff;
+    padding: 0 0 4mm;
+    text-align: left;
+    font-weight: 400;
   }
   .protocol-table td.fill {
     min-width: 60px;
@@ -86,54 +100,41 @@ export function EmptyProtocolSheet({
   const horsComp = teams.filter((team) => team.isHorsDeCompetition)
   const inputFields = element.fields.filter((field) => !field.formula)
   const isPlusMode = competition.scoringMode === "PLUS"
-  const dateStr = competition.date
-    ? competition.date.toLocaleDateString("et-EE")
-    : ""
-  const endDateStr =
-    competition.endDate &&
-    competition.endDate.toDateString() !== competition.date?.toDateString()
-      ? ` – ${competition.endDate.toLocaleDateString("et-EE")}`
-      : ""
+  const columnCount =
+    4 + inputFields.length + (element.exceptions.length > 0 ? 1 : 0) + 1
 
   return (
     <section className={`print-page p-6 max-w-none ${className}`}>
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900">{competition.name}</h1>
-          <p className="text-sm text-gray-600">
-            {dateStr}
-            {endDateStr}
-            {competition.location && ` · ${competition.location}`}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xl font-bold text-gray-900 font-mono">{element.code}</p>
-          <p className="text-sm text-gray-700 font-semibold">{element.name}</p>
-          {pageNumber !== undefined && pageCount !== undefined && (
-            <p className="text-xs text-gray-400">
-              {pageNumber} / {pageCount}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex gap-8 mb-5 text-sm">
-        <div>
-          <span className="text-gray-500">Kohtunik: </span>
-          <span className="inline-block border-b border-gray-400 w-48">&nbsp;</span>
-        </div>
-        <div>
-          <span className="text-gray-500">Allkiri: </span>
-          <span className="inline-block border-b border-gray-400 w-48">&nbsp;</span>
-        </div>
-        <div>
-          <span className="text-gray-500">Kuupäev: </span>
-          <span className="inline-block border-b border-gray-400 w-32">&nbsp;</span>
-        </div>
-      </div>
-
       <table className="protocol-table w-full border-collapse mb-6">
         <thead>
+          <tr>
+            <th colSpan={columnCount} className="protocol-document-heading">
+              <ProtocolDocumentHeading
+                competition={competition}
+                element={element}
+                pageNumber={pageNumber}
+                pageCount={pageCount}
+              />
+            </th>
+          </tr>
+          <tr>
+            <th colSpan={columnCount} className="protocol-judge-heading">
+              <div className="flex gap-8 text-sm">
+                <div>
+                  <span className="text-gray-500">Kohtunik: </span>
+                  <span className="inline-block border-b border-gray-400 w-48">&nbsp;</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Allkiri: </span>
+                  <span className="inline-block border-b border-gray-400 w-48">&nbsp;</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Kuupäev: </span>
+                  <span className="inline-block border-b border-gray-400 w-32">&nbsp;</span>
+                </div>
+              </div>
+            </th>
+          </tr>
           <tr>
             <th style={{ width: "40px" }}>Nr</th>
             <th style={{ width: "55px" }}>Tähis</th>
@@ -172,7 +173,7 @@ export function EmptyProtocolSheet({
             <>
               <tr>
                 <td
-                  colSpan={4 + inputFields.length + (element.exceptions.length > 0 ? 1 : 0) + 1}
+                  colSpan={columnCount}
                   style={{
                     background: "#fef3c7",
                     fontWeight: 600,

@@ -2,9 +2,9 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
-import Link from "next/link"
-import { PrintButton } from "@/components/PrintButton"
 import { computeFields } from "@/lib/calculators"
+import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentHeading"
+import { ProtocolPrintToolbar } from "@/components/protocol/ProtocolPrintToolbar"
 
 export default async function ElementResultsPrintPage({
   params,
@@ -31,12 +31,10 @@ export default async function ElementResultsPrintPage({
   })).sort((a, b) => naturalCompare(a.code, b.code))
 
   const comp = element.competition
-  const dateStr = comp.date ? comp.date.toLocaleDateString("et-EE") : ""
-  const endDateStr = comp.endDate && comp.endDate.toDateString() !== comp.date?.toDateString()
-    ? ` – ${comp.endDate.toLocaleDateString("et-EE")}` : ""
   const isPlusMode = comp.scoringMode === "PLUS"
 
   const inputFields = element.fields.filter((f) => !f.formula)
+  const columnCount = 4 + inputFields.length + 2
 
   const scoreMap = new Map(element.scores.map((s) => [s.teamId, s.penaltyPoints]))
 
@@ -69,39 +67,39 @@ export default async function ElementResultsPrintPage({
           body { margin: 0; font-size: 11px; }
           .print-page { padding: 10mm; }
           table { border-collapse: collapse; width: 100%; }
+          .results-table thead { display: table-header-group; }
+          .results-table tr { break-inside: avoid; page-break-inside: avoid; }
           th, td { border: 1px solid #666; padding: 3px 6px; }
           th { background: #e5e7eb; font-weight: 600; }
         }
-        @page { size: A4 landscape; margin: 0; }
         table { border-collapse: collapse; }
         th, td { border: 1px solid #999; padding: 4px 8px; font-size: 12px; }
         th { background: #f3f4f6; font-weight: 600; }
+        .results-table th.protocol-document-heading {
+          border: 0;
+          background: #fff;
+          padding: 0 0 4mm;
+        }
       `}</style>
 
+      <ProtocolPrintToolbar
+        backHref={`/dashboard/competitions/${competitionId}/elements/${elementId}`}
+        buttonLabel="Prindi / Salvesta PDF"
+        className="m-6 mb-0 rounded-lg"
+      />
+
       <div className="print-page p-6">
-        {/* Toolbar */}
-        <div className="no-print flex items-center gap-3 mb-6 p-3 bg-gray-50 rounded-lg border">
-          <Link href={`/dashboard/competitions/${competitionId}/elements/${elementId}`}
-            className="text-sm text-gray-500 hover:text-gray-700">← Tagasi</Link>
-          <span className="text-gray-300">|</span>
-          <PrintButton label="Prindi / Salvesta PDF" />
-        </div>
-
-        {/* Päis */}
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h1 className="text-lg font-bold">{comp.name}</h1>
-            <p className="text-sm text-gray-600">{dateStr}{endDateStr}{comp.location && ` · ${comp.location}`}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold font-mono">{element.code}</p>
-            <p className="text-sm font-semibold">{element.name}</p>
-            <p className="text-xs text-gray-500">{isPlusMode ? "Plusspunktid" : "Karistuspunktid"}</p>
-          </div>
-        </div>
-
-        <table className="w-full mb-6">
+        <table className="results-table w-full mb-6">
           <thead>
+            <tr>
+              <th colSpan={columnCount} className="protocol-document-heading">
+                <ProtocolDocumentHeading
+                  competition={comp}
+                  element={element}
+                  detail={isPlusMode ? "Plusspunktid" : "Karistuspunktid"}
+                />
+              </th>
+            </tr>
             <tr>
               <th style={{ width: 30 }}>#</th>
               <th style={{ width: 55 }}>Tähis</th>
