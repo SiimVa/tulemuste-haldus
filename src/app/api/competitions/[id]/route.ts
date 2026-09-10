@@ -2,6 +2,7 @@ import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { normalizeClassGroups, parseClassGroups } from "@/lib/classGroups"
 import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { parseTeamMemberRoles } from "@/lib/teamComposition"
@@ -125,6 +126,11 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
             body.defaultFixedRankingPoints
           )
             ? JSON.stringify(body.defaultFixedRankingPoints)
+            : undefined,
+          classGroups: Array.isArray(body.classGroups)
+            ? JSON.stringify(
+                normalizeClassGroups(parseClassGroups(JSON.stringify(body.classGroups)))
+              )
             : undefined,
         },
       })

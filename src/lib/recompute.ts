@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { calculateScores, withEffectiveHC } from "@/lib/calculators"
+import { parseClassGroups, scopeKeyFor, TEAM_COUNT_SCOPES } from "@/lib/classGroups"
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
@@ -38,16 +39,34 @@ export async function recomputeElementScores(elementId: string): Promise<number>
         orderBy: { order: "asc" },
       },
       competition: {
-        select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true },
+        select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true, classGroups: true },
       },
     },
   })
   if (!element) return 0
 
+  // Võistkondade arvust sõltuv fikseeritud pingerida vajab registreerunute arvu
+  // skoopide kaupa. Loeme kõik võistluse võistkonnad, mitte ainult need, kellel
+  // on selles elemendis tulemus — nii jääb punktiskaala kõigis elementides samaks.
+  const classGroups = parseClassGroups(element.competition.classGroups)
+  const allTeams = await prisma.team.findMany({
+    where: { competitionId: element.competitionId, isHorsDeCompetition: false },
+    select: { class: true },
+  })
+  const registeredCounts = new Map<string, number>()
+  for (const scope of TEAM_COUNT_SCOPES) {
+    for (const t of allTeams) {
+      const key = scopeKeyFor(scope, t.class, classGroups)
+      registeredCounts.set(key, (registeredCounts.get(key) ?? 0) + 1)
+    }
+  }
+
   const config = {
     scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
     defaultKPMaxValue: element.competition.defaultKPMaxValue,
     defaultPKMaxValue: element.competition.defaultPKMaxValue,
+    registeredCounts,
+    classGroups,
   }
   const isPlusMode = config.scoringMode === "PLUS"
 

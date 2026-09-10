@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { normalizeClassGroups, parseClassGroups, type ClassGroup } from "@/lib/classGroups"
 
 type CompetitionForm = {
   name: string
@@ -60,6 +61,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [error, setError] = useState("")
   const [saved, setSaved] = useState(false)
   const [fixedRankingPoints, setFixedRankingPoints] = useState<string[]>([])
+  const [classGroups, setClassGroups] = useState<ClassGroup[]>([])
   const [applying, setApplying] = useState(false)
   const [applyResult, setApplyResult] = useState<{ maxValues: number; exceptions: number; calcMethods: number } | null>(null)
   const [applyError, setApplyError] = useState("")
@@ -93,6 +95,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           const pts = JSON.parse(data.defaultFixedRankingPoints ?? "[]")
           setFixedRankingPoints(Array.isArray(pts) ? pts.map(String) : [])
         } catch { setFixedRankingPoints([]) }
+        setClassGroups(parseClassGroups(data.classGroups))
       })
   }, [competitionId])
 
@@ -120,6 +123,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         defaultHilinemineMaxPenalty: Number(form.defaultHilinemineMaxPenalty),
         defaultHigherIsBetter: form.defaultHigherIsBetter,
         defaultFixedRankingPoints: fixedRankingPoints.map(v => Number(v)),
+        classGroups: normalizeClassGroups(classGroups),
       }),
     })
     if (res.ok) {
@@ -257,6 +261,62 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               </label>
             ))}
           </div>
+        </Card>
+
+        {/* Klassigrupid */}
+        <Card className="p-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-gray-900">Klassigrupid</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Koonda mitu klassi ühte pingeritta. Kasutatakse ainult siis, kui elemendi
+              fikseeritud pingerida arvutab punktid võistkondade arvust ja skoop on
+              „Klassigrupid". Klass võib kuuluda ainult ühte gruppi.
+            </p>
+          </div>
+
+          {classGroups.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">Gruppe pole määratud.</p>
+          ) : (
+            <div className="space-y-2">
+              {classGroups.map((g, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    aria-label="Grupi nimi"
+                    value={g.name}
+                    placeholder="Nimi, nt Noored"
+                    onChange={e => {
+                      const upd = [...classGroups]
+                      upd[i] = { ...upd[i], name: e.target.value }
+                      setClassGroups(upd)
+                    }}
+                    className="w-40 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    aria-label="Klassid"
+                    value={g.classes.join(", ")}
+                    placeholder="Klassid komadega, nt N, S"
+                    onChange={e => {
+                      const upd = [...classGroups]
+                      upd[i] = { ...upd[i], classes: e.target.value.split(",").map(c => c.trim()).filter(Boolean) }
+                      setClassGroups(upd)
+                    }}
+                    className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button type="button"
+                    onClick={() => setClassGroups(classGroups.filter((_, idx) => idx !== i))}
+                    className="text-red-400 hover:text-red-600 text-sm px-2">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button type="button"
+            onClick={() => setClassGroups([...classGroups, { name: "", classes: [] }])}
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            + Lisa grupp
+          </button>
         </Card>
 
         {/* Arvutusmeetod */}
