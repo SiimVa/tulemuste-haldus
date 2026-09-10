@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import { canCreateCompetition } from "@/lib/permissions"
-import { isTeamCountScope, normalizeClassGroups, parseClassGroups } from "@/lib/classGroups"
+import { isTeamCountScope } from "@/lib/classGroups"
 import { isFixedRankingMode, nonNegativeFiniteNumber, parseFixedPointValues } from "@/lib/fixedRanking"
 
 async function handleGET() {
@@ -78,9 +78,8 @@ async function handlePOST(req: Request) {
         ? defaults.defaultTeamCountScope : "ALL",
       defaultTeamCountBase: nonNegativeFiniteNumber(defaults.defaultTeamCountBase, 0),
       defaultTeamCountStep: nonNegativeFiniteNumber(defaults.defaultTeamCountStep, 1),
-      classGroups: Array.isArray(defaults.classGroups)
-        ? JSON.stringify(normalizeClassGroups(parseClassGroups(JSON.stringify(defaults.classGroups))))
-        : "[]",
+      // Klassigrupid saab luua alles registreerimisseadetes määratud klassidest.
+      classGroups: "[]",
     },
   })
   setSecurityTargets({ competitionId: competition.id })

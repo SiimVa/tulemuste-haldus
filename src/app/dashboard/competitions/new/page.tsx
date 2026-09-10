@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
-import type { ClassGroup, TeamCountScope } from "@/lib/classGroups"
+import type { TeamCountScope } from "@/lib/classGroups"
 import { parseFixedPointValues, type FixedRankingMode } from "@/lib/fixedRanking"
 
 type Form = {
@@ -23,7 +23,6 @@ type Form = {
   defaultTeamCountScope: TeamCountScope
   defaultTeamCountBase: number
   defaultTeamCountStep: number
-  classGroups: ClassGroup[]
   defaultKPMaxValue: number
   defaultNotPassed: number
   defaultPassedNotDone: number
@@ -57,7 +56,6 @@ const DEFAULTS: Form = {
   defaultTeamCountScope: "ALL",
   defaultTeamCountBase: 0,
   defaultTeamCountStep: 1,
-  classGroups: [],
   defaultKPMaxValue: 30, defaultNotPassed: 40, defaultPassedNotDone: 35,
   defaultPKMaxValue: 15,
   defaultVastutegevusPenaltyPerLife: 5,
@@ -263,33 +261,11 @@ export default function NewCompetitionPage() {
                 teamCountStep={form.defaultTeamCountStep}
                 onTeamCountStepChange={value => set("defaultTeamCountStep", value)}
               />
-              <div className="space-y-3 border-t pt-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Klassigrupid</h3>
-                  <p className="text-xs text-gray-500 mt-1">Kasutatakse registreeritud võistkondade režiimis skoobiga „Klassigrupid".</p>
-                </div>
-                {form.classGroups.map((group, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input value={group.name} aria-label="Grupi nimi" placeholder="Nimi, nt Noored"
-                      onChange={event => {
-                        const next = [...form.classGroups]
-                        next[index] = { ...next[index], name: event.target.value }
-                        set("classGroups", next)
-                      }} className="w-36 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <input value={group.classes.join(", ")} aria-label="Klassid" placeholder="Klassid, nt N, S"
-                      onChange={event => {
-                        const next = [...form.classGroups]
-                        next[index] = { ...next[index], classes: event.target.value.split(",").map(value => value.trim()).filter(Boolean) }
-                        set("classGroups", next)
-                      }} className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <button type="button" aria-label="Eemalda klassigrupp"
-                      onClick={() => set("classGroups", form.classGroups.filter((_, itemIndex) => itemIndex !== index))}
-                      className="text-red-400 hover:text-red-600">✕</button>
-                  </div>
-                ))}
-                <button type="button" onClick={() => set("classGroups", [...form.classGroups, { name: "", classes: [] }])}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700">+ Lisa grupp</button>
-              </div>
+              {form.defaultTeamCountScope === "GROUP" && (
+                <p className="text-xs rounded-lg bg-blue-50 px-3 py-2 text-blue-700">
+                  Klassigrupid saad määrata pärast võistluse loomist. Gruppidesse saab valida ainult registreerimisseadetes lisatud klasse.
+                </p>
+              )}
             </div>
           )}
         </Card>
