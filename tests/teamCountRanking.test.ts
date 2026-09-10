@@ -6,6 +6,7 @@ import {
   normalizeClassGroups,
   parseClassGroups,
   scopeKeyFor,
+  syncClassGroupsWithRegistrationClasses,
 } from "../src/lib/classGroups"
 import { parseFixedPointValues, parseFixedRankingParams, registeredCountPoints } from "../src/lib/fixedRanking"
 
@@ -160,6 +161,28 @@ test("klass saab kuuluda ainult ühte gruppi", () => {
     { name: "A", classes: ["N", "S"] },
     { name: "B", classes: ["T"] },
   ])
+})
+
+test("klassigrupid järgivad registreerimisklasside ümbernimetamist ja eemaldamist", () => {
+  const groups = [{ name: "Noored", classes: ["N", "S", "Vigane"] }]
+  const synced = syncClassGroupsWithRegistrationClasses(
+    groups,
+    [{ id: "n", name: "N" }, { id: "s", name: "S" }],
+    [{ id: "n", name: "Noored N" }]
+  )
+  assert.deepEqual(synced, [{ name: "Noored", classes: ["Noored N"] }])
+})
+
+test("klassigruppi ei saa lisada registreerimisseadetes puuduvat klassi", () => {
+  const classes = [{ id: "n", name: "N" }]
+  assert.deepEqual(
+    syncClassGroupsWithRegistrationClasses(
+      [{ name: "Noored", classes: ["N", "S"] }],
+      classes,
+      classes
+    ),
+    [{ name: "Noored", classes: ["N"] }]
+  )
 })
 
 test("skoobivõti eristab üld-, klassi- ja grupipingeridu", () => {

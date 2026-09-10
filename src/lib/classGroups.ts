@@ -54,6 +54,36 @@ export function normalizeClassGroups(groups: ClassGroup[]): ClassGroup[] {
   return out
 }
 
+export function syncClassGroupsWithRegistrationClasses(
+  groups: ClassGroup[],
+  previousClasses: { id: string; name: string }[],
+  activeClasses: { id: string; name: string }[]
+): ClassGroup[] {
+  const previousIdByName = new Map(
+    previousClasses.map((item) => [item.name.toLocaleLowerCase("et"), item.id])
+  )
+  const activeById = new Map(activeClasses.map((item) => [item.id, item.name]))
+  const activeByName = new Map(
+    activeClasses.map((item) => [item.name.toLocaleLowerCase("et"), item.name])
+  )
+
+  return normalizeClassGroups(
+    groups.map((group) => ({
+      ...group,
+      classes: group.classes.flatMap((name) => {
+        const key = name.toLocaleLowerCase("et")
+        const previousId = previousIdByName.get(key)
+        if (previousId) {
+          const renamed = activeById.get(previousId)
+          return renamed ? [renamed] : []
+        }
+        const currentName = activeByName.get(key)
+        return currentName ? [currentName] : []
+      }),
+    }))
+  )
+}
+
 // Millisesse pingeritta võistkond kuulub. Grupita klass jääb omaette.
 // Võti kannab alati skoopi, sest sama klassi kohta hoitakse eraldi arvu iga
 // skoobi jaoks — muidu loeks GROUP-skoobi grupita klass CLASS-skoobi arvu üle.

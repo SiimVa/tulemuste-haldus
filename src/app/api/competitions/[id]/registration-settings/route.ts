@@ -10,6 +10,7 @@ import {
   validatePhaseWindow,
 } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { recomputeCompetitionScores } from "@/lib/recompute"
 import {
   deliverPendingNotificationsSafely,
   queueMandateOpenedNotifications,
@@ -49,6 +50,10 @@ import {
   requiresPersonalDataPurge,
   toFormFieldDefinition,
 } from "@/lib/registrationForm"
+import {
+  parseClassGroups,
+  syncClassGroupsWithRegistrationClasses,
+} from "@/lib/classGroups"
 
 const formFieldSelect = {
   id: true,
@@ -711,6 +716,12 @@ async function handlePATCH(
             where: { id: existing.id },
             data: { name: item.name, order: item.order, isActive: true },
           })
+          if (existing.name !== item.name) {
+            await tx.team.updateMany({
+              where: { competitionId: id, class: existing.name },
+              data: { class: item.name },
+            })
+          }
           retainedIds.push(saved.id)
         } else {
           const saved = await tx.competitionClass.create({
@@ -795,7 +806,7 @@ async function handlePATCH(
       const [activeClasses, activeFields] = await Promise.all([
         tx.competitionClass.findMany({
           where: { competitionId: id, isActive: true },
-          select: { id: true },
+          select: { id: true, name: true },
         }),
         tx.competitionFormField.findMany({
           where: { competitionId: id, isActive: true },
@@ -912,6 +923,13 @@ async function handlePATCH(
             teamMemberRoles === null
               ? current.teamMemberRoles
               : JSON.stringify(teamMemberRoles),
+          classGroups: JSON.stringify(
+            syncClassGroupsWithRegistrationClasses(
+              parseClassGroups(current.classGroups),
+              current.registrationClasses,
+              activeClasses
+            )
+          ),
         },
         include: {
           registrationClasses: {
@@ -995,6 +1013,7 @@ async function handlePATCH(
     })
 
     const { competition: updated, registrationLinkToken } = result
+    await recomputeCompetitionScores(id)
     await deliverPendingNotificationsSafely()
     const { registrationTokenHash, ...publicCompetition } = updated
     return NextResponse.json({
