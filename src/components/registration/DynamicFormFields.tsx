@@ -11,6 +11,7 @@ import {
   REPRESENTATIVE_FORM_FIELD_KEYS,
 } from "@/lib/registrationForm"
 import type { TeamCompositionSettings } from "@/lib/teamComposition"
+import { Input, Select, Textarea } from "@/components/ui/input"
 
 function valueFor(
   field: FormFieldDefinition,
@@ -77,27 +78,27 @@ export function DynamicFormFields({
             )}
 
             {field.type === "TEXT" && (
-              <input
+              <Input
                 id={inputId}
                 type="text"
                 value={typeof value === "string" ? value : ""}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.type === "TEXTAREA" && (
-              <textarea
+              <Textarea
                 id={inputId}
                 rows={4}
                 value={typeof value === "string" ? value : ""}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.type === "NUMBER" && (
-              <input
+              <Input
                 id={inputId}
                 type="number"
                 value={
@@ -107,46 +108,46 @@ export function DynamicFormFields({
                 }
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.type === "EMAIL" && (
-              <input
+              <Input
                 id={inputId}
                 type="email"
                 value={typeof value === "string" ? value : ""}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.type === "PHONE" && (
-              <input
+              <Input
                 id={inputId}
                 type="tel"
                 value={typeof value === "string" ? value : ""}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.type === "DATE" && (
-              <input
+              <Input
                 id={inputId}
                 type="date"
                 value={typeof value === "string" ? value : ""}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.type === "SELECT" && (
-              <select
+              <Select
                 id={inputId}
                 value={typeof value === "string" ? value : ""}
                 onChange={(event) => onChange(field.key, event.target.value)}
                 disabled={fieldDisabled}
-                className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               >
                 <option value="">Vali...</option>
                 {field.options.map((option) => (
@@ -154,7 +155,7 @@ export function DynamicFormFields({
                     {option}
                   </option>
                 ))}
-              </select>
+              </Select>
             )}
             {field.type === "MULTISELECT" && (
               <div className="space-y-2 border rounded-lg px-3 py-2">
@@ -303,17 +304,17 @@ function MemberListInput({
               </button>
             )}
           </div>
-          <input
+          <Input
             aria-label={`Liige ${index + 1} nimi`}
             placeholder="Ees- ja perekonnanimi"
             value={member.name}
             disabled={disabled}
             onChange={(event) => update(index, { name: event.target.value })}
-            className="w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+            className="disabled:bg-gray-50"
           />
           <div className="grid sm:grid-cols-2 gap-2">
             {field.memberFields.includes("email") && (
-              <input
+              <Input
                 type="email"
                 aria-label={`Liige ${index + 1} e-post`}
                 placeholder="E-post"
@@ -322,11 +323,11 @@ function MemberListInput({
                 onChange={(event) =>
                   update(index, { email: event.target.value })
                 }
-                className="px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.memberFields.includes("phone") && (
-              <input
+              <Input
                 type="tel"
                 aria-label={`Liige ${index + 1} telefon`}
                 placeholder="Telefon"
@@ -335,13 +336,13 @@ function MemberListInput({
                 onChange={(event) =>
                   update(index, { phone: event.target.value })
                 }
-                className="px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                className="disabled:bg-gray-50"
               />
             )}
             {field.memberFields.includes("birthDate") && (
               <label className="text-xs text-gray-500">
                 Sünniaeg
-                <input
+                <Input
                   type="date"
                   aria-label={`Liige ${index + 1} sünniaeg`}
                   value={member.birthDate ?? ""}
@@ -349,7 +350,7 @@ function MemberListInput({
                   onChange={(event) =>
                     update(index, { birthDate: event.target.value })
                   }
-                  className="mt-1 w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                  className="mt-1 disabled:bg-gray-50"
                 />
               </label>
             )}
@@ -374,7 +375,7 @@ function MemberListInput({
                 {teamComposition.memberRoles.length > 0 && (
                   <label className="text-xs text-gray-500">
                     Liikmeroll
-                    <select
+                    <Select
                       aria-label={`Liige ${index + 1} roll`}
                       value={member.assignmentRole ?? ""}
                       disabled={disabled}
@@ -383,7 +384,7 @@ function MemberListInput({
                           assignmentRole: event.target.value || undefined,
                         })
                       }
-                      className="mt-1 w-full px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                      className="mt-1 disabled:bg-gray-50"
                     >
                       <option value="">Roll puudub</option>
                       {teamComposition.memberRoles.map((role) => (
@@ -392,7 +393,7 @@ function MemberListInput({
                           {role.required ? " *" : ""}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                 )}
               </div>

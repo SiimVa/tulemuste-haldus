@@ -13,6 +13,7 @@ import {
 } from "@/lib/registrationForm"
 import type { TeamCompositionSettings } from "@/lib/teamComposition"
 import { isMandateEditableInPhase } from "@/lib/teamWorkflow"
+import { Input, Select } from "@/components/ui/input"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -400,21 +401,21 @@ export default function RepresentativeTeamPage({
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="text-sm text-gray-600">
             Võistkonna nimi
-            <input
+            <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={!registrationEditable}
-              className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
+              className="mt-1 disabled:bg-gray-50"
             />
           </label>
           {(team.class || !team.registrationApplication) && (
             <label className="text-sm text-gray-600">
               Klass
-              <input
+              <Input
                 value={teamClass}
                 onChange={(event) => setTeamClass(event.target.value)}
                 disabled={!registrationEditable}
-                className="mt-1 w-full px-3 py-2 border rounded-lg disabled:bg-gray-50"
+                className="mt-1 disabled:bg-gray-50"
               />
             </label>
           )}
@@ -521,16 +522,16 @@ export default function RepresentativeTeamPage({
               )}
               {members.map((member, index) => (
                 <div key={`${member.id ?? "new"}-${index}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center">
-                  <input
+                  <Input
                     value={member.name}
                     onChange={(event) =>
                       updateMember(index, { name: event.target.value })
                     }
                     disabled={!mandateEditable}
                     placeholder="Ees- ja perekonnanimi"
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                    className="flex-1 disabled:bg-gray-50"
                   />
-                  <select
+                  <Select
                     value={member.role}
                     onChange={(event) =>
                       updateMember(index, {
@@ -541,11 +542,11 @@ export default function RepresentativeTeamPage({
                       })
                     }
                     disabled={!mandateEditable}
-                    className="px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                    className="disabled:bg-gray-50"
                   >
                     <option value="COMPETITOR">Võistleja</option>
                     <option value="SUPPORT">Tugiliige</option>
-                  </select>
+                  </Select>
                   {team.composition.captainRequired && (
                     <label className="flex items-center gap-2 text-sm text-gray-600">
                       <input
@@ -560,7 +561,7 @@ export default function RepresentativeTeamPage({
                     </label>
                   )}
                   {team.composition.memberRoles.length > 0 && (
-                    <select
+                    <Select
                       aria-label={`Liige ${index + 1} roll`}
                       value={member.assignmentRole ?? ""}
                       disabled={!mandateEditable}
@@ -569,7 +570,7 @@ export default function RepresentativeTeamPage({
                           assignmentRole: event.target.value || null,
                         })
                       }
-                      className="px-3 py-2 border rounded-lg text-sm disabled:bg-gray-50"
+                      className="disabled:bg-gray-50"
                     >
                       <option value="">Roll puudub</option>
                       {team.composition.memberRoles.map((role) => (
@@ -578,7 +579,7 @@ export default function RepresentativeTeamPage({
                           {role.required ? " *" : ""}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   )}
                   {mandateEditable && (
                     <button

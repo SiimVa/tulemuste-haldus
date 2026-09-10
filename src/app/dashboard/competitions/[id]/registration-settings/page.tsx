@@ -510,7 +510,7 @@ export default function RegistrationSettingsPage({
             </div>
             <label className="block text-xs text-gray-600">
               Ligipääsu viis
-              <select
+              <Select
                 aria-label="Registreerimise ligipääs"
                 value={form.registrationAccessMode}
                 onChange={(event) =>
@@ -524,7 +524,7 @@ export default function RegistrationSettingsPage({
                         : null,
                   })
                 }
-                className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                
               >
                 <option value="PUBLIC">
                   Avalik – nimekirjas ja registreeritav
@@ -535,7 +535,7 @@ export default function RegistrationSettingsPage({
                 <option value="PRIVATE">
                   Privaatne – väline registreerimine keelatud
                 </option>
-              </select>
+              </Select>
             </label>
 
             {form.registrationAccessMode === "LINK_ONLY" && (
@@ -639,7 +639,7 @@ export default function RegistrationSettingsPage({
               <label className="text-xs text-gray-500 mb-1 block">
                 Võistkondade üldarvu piirang
               </label>
-              <input
+              <Input
                 type="number"
                 min={1}
                 step={1}
@@ -654,7 +654,7 @@ export default function RegistrationSettingsPage({
                   })
                 }
                 placeholder="Piirang puudub"
-                className="w-full sm:w-56 px-3 py-2 border rounded-lg text-sm"
+                className="sm:w-56"
               />
               <p className="text-xs text-gray-400 mt-1">
                 Kui piirang täitub, lähevad järgmised avaldused ootenimekirja.
@@ -682,7 +682,7 @@ export default function RegistrationSettingsPage({
             </div>
             <label className="text-xs text-gray-600 block">
               Säilitustähtaeg pärast võistluse lõppu (päeva)
-              <input
+              <Input
                 type="number"
                 min={1}
                 max={90}
@@ -695,7 +695,7 @@ export default function RegistrationSettingsPage({
                     personalDataRetentionDays: Number(event.target.value),
                   })
                 }
-                className="mt-1 w-full sm:w-56 px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
+                className="sm:w-56 disabled:bg-gray-100"
               />
               <span className="block text-xs text-gray-400 mt-1">
                 Maksimaalne tähtaeg on 90 päeva. Tähtaega arvestatakse

@@ -8,6 +8,7 @@ import {
   MEMBER_FIELD_TYPES,
   requiresPersonalDataPurge,
 } from "@/lib/registrationForm"
+import { Input, Select } from "@/components/ui/input"
 
 const TYPE_LABEL: Record<FormFieldType, string> = {
   TEXT: "Lühike tekst",
@@ -178,18 +179,18 @@ export function FormBuilder({
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="text-xs text-gray-600">
                   Välja nimetus *
-                  <input
+                  <Input
                     value={field.label}
                     disabled={isSystemField}
                     onChange={(event) =>
                       update(index, { label: event.target.value })
                     }
-                    className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                    className="mt-1"
                   />
                 </label>
                 <label className="text-xs text-gray-600">
                   Välja tüüp
-                  <select
+                  <Select
                     value={field.type}
                     disabled={isSystemField}
                     onChange={(event) => {
@@ -217,20 +218,20 @@ export function FormBuilder({
                               requiresPersonalDataPurge({ type, memberFields }),
                       })
                     }}
-                    className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                    
                   >
                     {Object.entries(TYPE_LABEL).map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               </div>
 
               <label className="text-xs text-gray-600 block">
                 Abitekst
-                <input
+                <Input
                   value={field.helpText ?? ""}
                   disabled={isSystemField}
                   onChange={(event) =>
@@ -239,7 +240,7 @@ export function FormBuilder({
                     })
                   }
                   placeholder="Selgita, mida siia sisestada"
-                  className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                  className="mt-1"
                 />
               </label>
 
@@ -249,7 +250,7 @@ export function FormBuilder({
                   <div className="space-y-2">
                     {field.options.map((option, optionIndex) => (
                       <div key={optionIndex} className="flex gap-2">
-                        <input
+                        <Input
                           value={option}
                           onChange={(event) =>
                             update(index, {
@@ -260,7 +261,7 @@ export function FormBuilder({
                               ),
                             })
                           }
-                          className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                          className="flex-1"
                         />
                         <button
                           type="button"
@@ -298,7 +299,7 @@ export function FormBuilder({
               {field.type === "SELECT" && (
                 <label className="text-xs text-gray-600 block">
                   Tähendus kohtade jaotamisel
-                  <select
+                  <Select
                     value={field.semanticKey ?? ""}
                     onChange={(event) =>
                       update(index, {
@@ -306,12 +307,12 @@ export function FormBuilder({
                           (event.target.value as FormSemanticKey) || null,
                       })
                     }
-                    className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                    className="mt-1"
                   >
                     <option value="">Ei mõjuta kohtade jaotamist</option>
                     <option value="COUNTY">Maakond</option>
                     <option value="TEAM_TYPE">Võistkonna liik</option>
-                  </select>
+                  </Select>
                 </label>
               )}
 
@@ -354,7 +355,7 @@ export function FormBuilder({
                   <div className="grid sm:grid-cols-2 gap-3">
                     <label className="text-xs text-gray-600">
                       Minimaalne liikmete arv
-                      <input
+                      <Input
                         type="number"
                         min={1}
                         max={500}
@@ -370,12 +371,12 @@ export function FormBuilder({
                                 : field.memberMaxCount,
                           })
                         }}
-                        className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                        
                       />
                     </label>
                     <label className="text-xs text-gray-600">
                       Maksimaalne liikmete arv
-                      <input
+                      <Input
                         type="number"
                         min={field.memberMinCount}
                         max={500}
@@ -388,7 +389,7 @@ export function FormBuilder({
                           })
                         }
                         placeholder="Piirang puudub"
-                        className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                        
                       />
                     </label>
                   </div>
@@ -480,7 +481,7 @@ export function FormBuilder({
                 <div className="border-t pt-4">
                 <label className="text-xs text-gray-600 block">
                   Tingimuslik kuvamine
-                  <select
+                  <Select
                     value={field.conditionFieldKey ?? ""}
                     onChange={(event) =>
                       update(index, {
@@ -491,7 +492,7 @@ export function FormBuilder({
                         conditionValue: null,
                       })
                     }
-                    className="mt-1 w-full px-3 py-2 border rounded-lg text-sm"
+                    className="mt-1"
                   >
                     <option value="">Kuva alati</option>
                     {previousFields.map((candidate) => (
@@ -499,12 +500,12 @@ export function FormBuilder({
                         Kuva vastavalt väljale „{candidate.label}”
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
 
                 {field.conditionFieldKey && conditionField && (
                   <div className="grid sm:grid-cols-2 gap-3 mt-3">
-                    <select
+                    <Select
                       value={field.conditionOperator ?? "EQUALS"}
                       onChange={(event) =>
                         update(index, {
@@ -514,25 +515,23 @@ export function FormBuilder({
                             | "CONTAINS",
                         })
                       }
-                      className="px-3 py-2 border rounded-lg text-sm"
                     >
                       <option value="EQUALS">on võrdne</option>
                       <option value="NOT_EQUALS">ei ole võrdne</option>
                       {conditionField.type === "MULTISELECT" && (
                         <option value="CONTAINS">sisaldab valikut</option>
                       )}
-                    </select>
+                    </Select>
                     {["SELECT", "MULTISELECT"].includes(
                       conditionField.type
                     ) ? (
-                      <select
+                      <Select
                         value={field.conditionValue ?? ""}
                         onChange={(event) =>
                           update(index, {
                             conditionValue: event.target.value,
                           })
                         }
-                        className="px-3 py-2 border rounded-lg text-sm"
                       >
                         <option value="">Vali väärtus...</option>
                         {conditionField.options.map((option) => (
@@ -540,23 +539,22 @@ export function FormBuilder({
                             {option}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     ) : conditionField.type === "CHECKBOX" ? (
-                      <select
+                      <Select
                         value={field.conditionValue ?? ""}
                         onChange={(event) =>
                           update(index, {
                             conditionValue: event.target.value,
                           })
                         }
-                        className="px-3 py-2 border rounded-lg text-sm"
                       >
                         <option value="">Vali väärtus...</option>
                         <option value="true">Märgitud</option>
                         <option value="false">Märkimata</option>
-                      </select>
+                      </Select>
                     ) : (
-                      <input
+                      <Input
                         value={field.conditionValue ?? ""}
                         onChange={(event) =>
                           update(index, {
@@ -564,7 +562,6 @@ export function FormBuilder({
                           })
                         }
                         placeholder="Oodatud väärtus"
-                        className="px-3 py-2 border rounded-lg text-sm"
                       />
                     )}
                   </div>

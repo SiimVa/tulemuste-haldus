@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { Input } from "@/components/ui/input"
 
 type ManagedRole = "ORGANIZER" | "JUDGE" | "REPRESENTATIVE"
 type CompetitionRole = ManagedRole | "OWNER" | "COMPETITOR" | "VIEWER"
@@ -477,10 +478,10 @@ export function CompetitionRoleManager({
             enam kuvada. Vajaduse korral loo uus link.
           </p>
           <div className="flex flex-col sm:flex-row gap-2 mt-3">
-            <input
+            <Input
               readOnly
               value={invitationLink}
-              className="flex-1 min-w-0 px-3 py-2 border border-green-200 bg-white rounded-lg text-xs"
+              className="flex-1 min-w-0 border-green-200 bg-white text-xs"
             />
             <button
               type="button"
