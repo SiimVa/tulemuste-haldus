@@ -2,7 +2,8 @@ import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { normalizeClassGroups, parseClassGroups } from "@/lib/classGroups"
+import { isTeamCountScope, normalizeClassGroups, parseClassGroups } from "@/lib/classGroups"
+import { isFixedRankingMode, nonNegativeFiniteNumber, parseFixedPointValues } from "@/lib/fixedRanking"
 import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { parseTeamMemberRoles } from "@/lib/teamComposition"
@@ -125,7 +126,19 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
           defaultFixedRankingPoints: Array.isArray(
             body.defaultFixedRankingPoints
           )
-            ? JSON.stringify(body.defaultFixedRankingPoints)
+            ? JSON.stringify(parseFixedPointValues(body.defaultFixedRankingPoints))
+            : undefined,
+          defaultFixedRankingMode: isFixedRankingMode(body.defaultFixedRankingMode)
+            ? body.defaultFixedRankingMode
+            : undefined,
+          defaultTeamCountScope: isTeamCountScope(body.defaultTeamCountScope)
+            ? body.defaultTeamCountScope
+            : undefined,
+          defaultTeamCountBase: body.defaultTeamCountBase != null
+            ? nonNegativeFiniteNumber(body.defaultTeamCountBase, 0)
+            : undefined,
+          defaultTeamCountStep: body.defaultTeamCountStep != null
+            ? nonNegativeFiniteNumber(body.defaultTeamCountStep, 1)
             : undefined,
           classGroups: Array.isArray(body.classGroups)
             ? JSON.stringify(

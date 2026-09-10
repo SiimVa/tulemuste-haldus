@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import { prisma } from "@/lib/prisma"
 import { recomputeCompetitionScores } from "@/lib/recompute"
+import { fixedRankingParamsForStorage, parseFixedRankingParams } from "@/lib/fixedRanking"
 
 // Elemendi tüüp → max väärtus seosed
 const MAX_VALUE_TYPES = ["CHECKPOINT", "PENALTY_BOX"] as const
@@ -86,9 +87,20 @@ async function handlePOST(_req: Request, { params }: { params: Promise<{ id: str
         paramsObj.higherIsBetter = competition.defaultHigherIsBetter
         paramsObj.minPoints = competition.defaultRankingMinPoints
       } else if (newType === "FIXED_RANKING") {
-        paramsObj.higherIsBetter = competition.defaultHigherIsBetter
-        paramsObj.minPoints = competition.defaultRankingMinPoints
-        try { paramsObj.fixedPoints = JSON.parse(competition.defaultFixedRankingPoints ?? "[]") } catch { paramsObj.fixedPoints = [] }
+        let fixedPoints: number[] = []
+        try {
+          const parsed = JSON.parse(competition.defaultFixedRankingPoints ?? "[]")
+          if (Array.isArray(parsed)) fixedPoints = parsed
+        } catch {}
+        Object.assign(paramsObj, fixedRankingParamsForStorage(parseFixedRankingParams({
+          higherIsBetter: competition.defaultHigherIsBetter,
+          fixedRankingMode: competition.defaultFixedRankingMode,
+          fixedPoints,
+          minPoints: competition.defaultRankingMinPoints,
+          teamCountScope: competition.defaultTeamCountScope,
+          teamCountBase: competition.defaultTeamCountBase,
+          teamCountStep: competition.defaultTeamCountStep,
+        })))
       }
 
       await prisma.calcMethod.update({

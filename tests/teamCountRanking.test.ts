@@ -7,6 +7,7 @@ import {
   parseClassGroups,
   scopeKeyFor,
 } from "../src/lib/classGroups"
+import { parseFixedPointValues, parseFixedRankingParams, registeredCountPoints } from "../src/lib/fixedRanking"
 
 const field = {
   id: "f1", name: "punktid", label: "Punktid", type: "NUMBER",
@@ -179,4 +180,84 @@ test("iga skoop hoiab oma arvu — grupita klass ei liida CLASS-skoobi arvu üle
   // ALL(1) + CLASS:T/N/S(3) + GROUP:Noored + GROUP:~T(2) = 6 eraldi võtit
   assert.equal(keys.size, 6)
   assert.equal(scopeKeyFor("CLASS", "T", groups) === scopeKeyFor("GROUP", "T", groups), false)
+})
+
+test("registreeritud võistkondade režiim kasutab plusspunktides algpunkti ja sammu", () => {
+  const scored = calculateScores(
+    element({
+      fixedRankingMode: "REGISTERED_COUNT",
+      teamCountScope: "ALL",
+      teamCountBase: 2,
+      teamCountStep: 1.5,
+      higherIsBetter: true,
+    }),
+    results([{ id: "a", pts: 50 }, { id: "b", pts: 30 }, { id: "c", pts: 10 }]),
+    {
+      scoringMode: "PLUS", defaultKPMaxValue: 30, defaultPKMaxValue: 30,
+      registeredCounts: new Map([["ALL", 5]]),
+    }
+  )
+  assert.deepEqual(pointsOf(scored), { a: 8, b: 6.5, c: 5 })
+})
+
+test("registreeritud võistkondade režiim pöörab karistuspunktides skaala suuna", () => {
+  const scored = calculateScores(
+    element({
+      fixedRankingMode: "REGISTERED_COUNT",
+      teamCountScope: "ALL",
+      teamCountBase: 0,
+      teamCountStep: 2,
+      higherIsBetter: true,
+    }),
+    results([{ id: "a", pts: 50 }, { id: "b", pts: 30 }, { id: "c", pts: 10 }]),
+    {
+      scoringMode: "PENALTY", defaultKPMaxValue: 30, defaultPKMaxValue: 30,
+      registeredCounts: new Map([["ALL", 5]]),
+    }
+  )
+  assert.deepEqual(pointsOf(scored), { a: 0, b: 2, c: 4 })
+})
+
+test("kõik kohad käsitsi režiim ei interpoleeri", () => {
+  const scored = calculateScores(
+    element({ fixedRankingMode: "MANUAL_ALL", fixedPoints: [20, 16], minPoints: 0, higherIsBetter: true }),
+    results([{ id: "a", pts: 50 }, { id: "b", pts: 30 }, { id: "c", pts: 10 }]),
+    { scoringMode: "PLUS", defaultKPMaxValue: 30, defaultPKMaxValue: 30 }
+  )
+  assert.deepEqual(pointsOf(scored), { a: 20, b: 16, c: 16 })
+})
+
+test("mõned kohad režiim interpoleerib viimase määratud ja halvima koha vahel", () => {
+  const scored = calculateScores(
+    element({ fixedRankingMode: "PARTIAL", fixedPoints: [20, 16], minPoints: 0, higherIsBetter: true }),
+    results([
+      { id: "a", pts: 50 }, { id: "b", pts: 40 }, { id: "c", pts: 30 },
+      { id: "d", pts: 20 }, { id: "e", pts: 10 },
+    ]),
+    { scoringMode: "PLUS", defaultKPMaxValue: 30, defaultPKMaxValue: 30 }
+  )
+  assert.deepEqual(pointsOf(scored), { a: 20, b: 16, c: 10.667, d: 5.333, e: 0 })
+})
+
+test("PR40 automaatne seadistus jääb tahaühilduvalt tööle", () => {
+  assert.deepEqual(parseFixedRankingParams({ pointsFromTeamCount: true, teamCountScope: "CLASS" }), {
+    higherIsBetter: false,
+    fixedRankingMode: "REGISTERED_COUNT",
+    fixedPoints: [],
+    minPoints: 0,
+    teamCountScope: "CLASS",
+    teamCountBase: 1,
+    teamCountStep: 1,
+  })
+})
+
+test("registreeritud arvu punktivalem piirab rangi ja töötab mõlemas süsteemis", () => {
+  assert.equal(registeredCountPoints(1, 4, "PLUS", 1, 1), 4)
+  assert.equal(registeredCountPoints(4, 4, "PLUS", 1, 1), 1)
+  assert.equal(registeredCountPoints(1, 4, "PENALTY", 1, 1), 1)
+  assert.equal(registeredCountPoints(9, 4, "PENALTY", 1, 1), 4)
+})
+
+test("tühi punktiväli ei muutu salvestamisel nulliks", () => {
+  assert.deepEqual(parseFixedPointValues(["20", "", "  ", "16", -1, "vigane"]), [20, 16])
 })

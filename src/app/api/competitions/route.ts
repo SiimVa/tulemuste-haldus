@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import { canCreateCompetition } from "@/lib/permissions"
+import { isTeamCountScope, normalizeClassGroups, parseClassGroups } from "@/lib/classGroups"
+import { isFixedRankingMode, nonNegativeFiniteNumber, parseFixedPointValues } from "@/lib/fixedRanking"
 
 async function handleGET() {
   const session = await auth()
@@ -69,7 +71,16 @@ async function handlePOST(req: Request) {
       defaultHigherIsBetter: defaults.defaultHigherIsBetter ?? false,
       defaultRankingMinPoints: defaults.defaultRankingMinPoints ?? 0,
       defaultFixedRankingPoints: defaults.defaultFixedRankingPoints
-        ? JSON.stringify(defaults.defaultFixedRankingPoints) : "[]",
+        ? JSON.stringify(parseFixedPointValues(defaults.defaultFixedRankingPoints)) : "[]",
+      defaultFixedRankingMode: isFixedRankingMode(defaults.defaultFixedRankingMode)
+        ? defaults.defaultFixedRankingMode : "PARTIAL",
+      defaultTeamCountScope: isTeamCountScope(defaults.defaultTeamCountScope)
+        ? defaults.defaultTeamCountScope : "ALL",
+      defaultTeamCountBase: nonNegativeFiniteNumber(defaults.defaultTeamCountBase, 0),
+      defaultTeamCountStep: nonNegativeFiniteNumber(defaults.defaultTeamCountStep, 1),
+      classGroups: Array.isArray(defaults.classGroups)
+        ? JSON.stringify(normalizeClassGroups(parseClassGroups(JSON.stringify(defaults.classGroups))))
+        : "[]",
     },
   })
   setSecurityTargets({ competitionId: competition.id })

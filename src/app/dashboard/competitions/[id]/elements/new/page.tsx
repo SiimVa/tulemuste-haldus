@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card"
 import { Input, Select } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import type { TeamCountScope } from "@/lib/classGroups"
+import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
+import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
 type FieldRow = { name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
 type ExceptionRow = { label: string; penalty: string }
@@ -21,6 +23,11 @@ type SectionRow = {
   calcType: string
   higherIsBetter: boolean | null
   minPoints: number
+  fixedRankingMode: FixedRankingMode
+  fixedPoints: string[]
+  teamCountScope: TeamCountScope
+  teamCountBase: number
+  teamCountStep: number
   totalElements: number
   customFormula: string
 }
@@ -41,6 +48,11 @@ type CompDefs = {
   defaultHigherIsBetter: boolean
   defaultRankingMinPoints: number
   defaultFixedRankingPoints: string[]
+  defaultFixedRankingMode: FixedRankingMode
+  defaultTeamCountScope: TeamCountScope
+  defaultTeamCountBase: number
+  defaultTeamCountStep: number
+  registeredTeamCount: number
 }
 
 const FIELD_TYPES = [
@@ -53,7 +65,7 @@ const FIELD_TYPES = [
 
 const CALC_TYPES = [
   { value: "RELATIVE_RANKING", label: "Pingerida valemiga", desc: "Parim saab 0p (PENALTY) või max (PLUS), halvim vastupidi. Rangi järgi lineaarne." },
-  { value: "FIXED_RANKING", label: "Fikseeritud pingerida", desc: "Igale kohale määrad täpse punktisumma. Ülejäänud kohad arvutatakse valemiga." },
+  { value: "FIXED_RANKING", label: "Fikseeritud pingerida", desc: "Määra osa või kõik kohad täpselt või loo punktiskaala registreerunute arvust." },
   { value: "VALUE_BASED", label: "Tulemuspõhine jaotus", desc: "Punktid jaotatakse parima ja halvima tulemuse vahe järgi proportsionaalselt." },
   { value: "PERFORMANCE_BASED", label: "Soorituspõhine", desc: "Tulemusväli = õigeid elemente. Iga element annab maxP / koguElementide arvu." },
   { value: "ABSOLUTE_TIME", label: "Absoluutne aeg", desc: "Karistuspunkt = tegelik aeg sekundites." },
@@ -172,8 +184,10 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
   const [customFormula, setCustomFormula] = useState("")
   const [minPoints, setMinPoints] = useState(0)
   const [fixedPoints, setFixedPoints] = useState<string[]>([])
-  const [pointsFromTeamCount, setPointsFromTeamCount] = useState(false)
+  const [fixedRankingMode, setFixedRankingMode] = useState<FixedRankingMode>("PARTIAL")
   const [teamCountScope, setTeamCountScope] = useState<TeamCountScope>("ALL")
+  const [teamCountBase, setTeamCountBase] = useState(0)
+  const [teamCountStep, setTeamCountStep] = useState(1)
   const [totalElements, setTotalElements] = useState(10)
   const [directHigherIsBetter, setDirectHigherIsBetter] = useState(false)
   const [customHigherIsBetter, setCustomHigherIsBetter] = useState(false)
@@ -183,7 +197,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState("")
 
   const [sections, setSections] = useState<SectionRow[]>([
-    { id: crypto.randomUUID(), name: "", maxValue: "", fields: [{ name: "", label: "", type: "NUMBER", rankingPriority: 1, formula: "", displayAsTime: false, validation: {}, fieldHigherIsBetter: null }], calcType: "RELATIVE_RANKING", higherIsBetter: null, minPoints: 0, totalElements: 10, customFormula: "" },
+    { id: crypto.randomUUID(), name: "", maxValue: "", fields: [{ name: "", label: "", type: "NUMBER", rankingPriority: 1, formula: "", displayAsTime: false, validation: {}, fieldHigherIsBetter: null }], calcType: "RELATIVE_RANKING", higherIsBetter: null, minPoints: 0, fixedRankingMode: "PARTIAL", fixedPoints: [], teamCountScope: "ALL", teamCountBase: 0, teamCountStep: 1, totalElements: 10, customFormula: "" },
   ])
 
   // Postkast-spetsiifiline olek
@@ -217,6 +231,13 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             try { const p = JSON.parse(data.defaultFixedRankingPoints ?? "[]"); return Array.isArray(p) ? p.map(String) : [] }
             catch { return [] }
           })(),
+          defaultFixedRankingMode: parseFixedRankingParams({ fixedRankingMode: data.defaultFixedRankingMode }).fixedRankingMode,
+          defaultTeamCountScope: parseFixedRankingParams({ teamCountScope: data.defaultTeamCountScope }).teamCountScope,
+          defaultTeamCountBase: Number(data.defaultTeamCountBase ?? 0),
+          defaultTeamCountStep: Number(data.defaultTeamCountStep ?? 1),
+          registeredTeamCount: Array.isArray(data.teams)
+            ? data.teams.filter((team: { isHorsDeCompetition?: boolean }) => !team.isHorsDeCompetition).length
+            : Number(data._count?.teams ?? 0),
         }
         setCompDefs(defs)
         setDirectHigherIsBetter(defs.scoringMode === "PLUS")
@@ -232,6 +253,12 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         setElementConfig(td.config)
         if (td.calcType === "FIXED_RANKING" && defs.defaultFixedRankingPoints.length > 0) {
           setFixedPoints(defs.defaultFixedRankingPoints)
+        }
+        if (td.calcType === "FIXED_RANKING") {
+          setFixedRankingMode(defs.defaultFixedRankingMode)
+          setTeamCountScope(defs.defaultTeamCountScope)
+          setTeamCountBase(defs.defaultTeamCountBase)
+          setTeamCountStep(defs.defaultTeamCountStep)
         }
 
         const copyFromId = new URLSearchParams(window.location.search).get('copyFrom')
@@ -262,8 +289,13 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 setCustomFormula(el.calcMethod.customFormula ?? "")
                 try {
                   const p = JSON.parse(el.calcMethod.params)
-                  setMinPoints(p.minPoints ?? 0)
-                  if (Array.isArray(p.fixedPoints)) setFixedPoints(p.fixedPoints.map(String))
+                  const fixed = parseFixedRankingParams(p)
+                  setMinPoints(fixed.minPoints)
+                  if (Array.isArray(p.fixedPoints)) setFixedPoints(fixed.fixedPoints.map(String))
+                  setFixedRankingMode(fixed.fixedRankingMode)
+                  setTeamCountScope(fixed.teamCountScope)
+                  setTeamCountBase(fixed.teamCountBase)
+                  setTeamCountStep(fixed.teamCountStep)
                   if (p.totalElements != null) setTotalElements(p.totalElements)
                   if (typeof p.higherIsBetter === "boolean") {
                     setFields(prev => prev.map(f =>
@@ -320,13 +352,18 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
   // Eeltäida fikseeritud pingerea punktid võistluse vaikeväärtusest (kui kasutaja pole veel ise sisestanud)
   function maybePrefillFixed(newCalc: string) {
     if (newCalc !== "FIXED_RANKING") return
-    const defaults = compDefs?.defaultFixedRankingPoints
-    if (!defaults || defaults.length === 0) return
-    setFixedPoints(prev => (prev.length === 0 ? defaults : prev))
+    if (!compDefs) return
+    setFixedRankingMode(compDefs.defaultFixedRankingMode)
+    setTeamCountScope(compDefs.defaultTeamCountScope)
+    setTeamCountBase(compDefs.defaultTeamCountBase)
+    setTeamCountStep(compDefs.defaultTeamCountStep)
+    if (compDefs.defaultFixedRankingPoints.length > 0) {
+      setFixedPoints(prev => (prev.length === 0 ? compDefs.defaultFixedRankingPoints : prev))
+    }
   }
 
   function addSection() {
-    setSections([...sections, { id: crypto.randomUUID(), name: "", maxValue: "", fields: [{ name: "", label: "", type: "NUMBER", rankingPriority: 1, formula: "", displayAsTime: false, validation: {}, fieldHigherIsBetter: null }], calcType: "RELATIVE_RANKING", higherIsBetter: null, minPoints: 0, totalElements: 10, customFormula: "" }])
+    setSections([...sections, { id: crypto.randomUUID(), name: "", maxValue: "", fields: [{ name: "", label: "", type: "NUMBER", rankingPriority: 1, formula: "", displayAsTime: false, validation: {}, fieldHigherIsBetter: null }], calcType: "RELATIVE_RANKING", higherIsBetter: null, minPoints: 0, fixedRankingMode: "PARTIAL", fixedPoints: [], teamCountScope: "ALL", teamCountBase: 0, teamCountStep: 1, totalElements: 10, customFormula: "" }])
   }
 
   function updateSection(si: number, key: keyof SectionRow, val: unknown) {
@@ -484,7 +521,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         type: calcType,
         params:
           calcType === "RELATIVE_RANKING" ? { higherIsBetter: primaryDir, minPoints } :
-          calcType === "FIXED_RANKING" ? { higherIsBetter: primaryDir, fixedPoints: pointsFromTeamCount ? [] : fixedPoints.map(Number), minPoints, pointsFromTeamCount, teamCountScope } :
+          calcType === "FIXED_RANKING" ? { higherIsBetter: primaryDir, fixedRankingMode, fixedPoints: fixedRankingMode === "REGISTERED_COUNT" ? [] : parseFixedPointValues(fixedPoints), minPoints, pointsFromTeamCount: fixedRankingMode === "REGISTERED_COUNT", teamCountScope, teamCountBase, teamCountStep } :
           calcType === "VALUE_BASED" ? { higherIsBetter: primaryDir, minPoints } :
           calcType === "PERFORMANCE_BASED" ? { totalElements } :
           calcType === "CUSTOM" ? { higherIsBetter: customHigherIsBetter } :
@@ -506,6 +543,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           params:
             s.calcType === "RELATIVE_RANKING" || s.calcType === "VALUE_BASED"
               ? { higherIsBetter: s.higherIsBetter ?? false, minPoints: s.minPoints }
+              : s.calcType === "FIXED_RANKING"
+              ? { higherIsBetter: s.higherIsBetter ?? false, fixedRankingMode: s.fixedRankingMode, fixedPoints: s.fixedRankingMode === "REGISTERED_COUNT" ? [] : parseFixedPointValues(s.fixedPoints), minPoints: s.minPoints, pointsFromTeamCount: s.fixedRankingMode === "REGISTERED_COUNT", teamCountScope: s.teamCountScope, teamCountBase: s.teamCountBase, teamCountStep: s.teamCountStep }
               : s.calcType === "ABSOLUTE_POINTS"
               ? { higherIsBetter: true }
               : s.calcType === "DIRECT_ENTRY"
@@ -1074,62 +1113,22 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               </div>
             )}
             {calcType === "FIXED_RANKING" && (
-              <div className="space-y-3 pt-1">
-                <label className="flex items-start gap-2 border-t pt-3 cursor-pointer">
-                  <input type="checkbox" className="mt-0.5"
-                    checked={pointsFromTeamCount}
-                    onChange={e => setPointsFromTeamCount(e.target.checked)} />
-                  <span>
-                    <span className="block text-xs font-medium text-gray-700">Punktid võistkondade arvust</span>
-                    <span className="block text-xs text-gray-400">
-                      N registreeritud võistkonda → parim saab N (plusspunktid) või 1 (karistuspunktid), halvim vastupidi.
-                    </span>
-                  </span>
-                </label>
-                {pointsFromTeamCount && (
-                  <div className="pl-6">
-                    <label className="text-xs text-gray-500 mb-1 block">Keda loetakse ühte pingeritta</label>
-                    <select value={teamCountScope}
-                      onChange={e => setTeamCountScope(e.target.value as TeamCountScope)}
-                      className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                      <option value="ALL">Kõik võistkonnad koos</option>
-                      <option value="CLASS">Iga klass eraldi</option>
-                      <option value="GROUP">Klassigrupid (võistluse seadetest)</option>
-                    </select>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Arvestusvälised ei suurenda skaalat. Klassigrupid määrad võistluse seadetes.
-                    </p>
-                  </div>
-                )}
-                {!pointsFromTeamCount && (
-                <div className="border-t pt-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-gray-500">Punktid kohade kaupa</label>
-                    <button type="button" onClick={() => setFixedPoints([...fixedPoints, ""])}
-                      className="text-xs text-blue-600 hover:text-blue-700">+ Lisa koht</button>
-                  </div>
-                  {fixedPoints.map((pts, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-400 w-12 shrink-0">{i + 1}. koht</span>
-                      <input type="number" step={0.5} value={pts}
-                        onChange={e => { const upd = [...fixedPoints]; upd[i] = e.target.value; setFixedPoints(upd) }}
-                        onFocus={e => e.target.select()}
-                        className="flex-1 px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                      <button type="button" onClick={() => setFixedPoints(fixedPoints.filter((_, idx) => idx !== i))}
-                        className="text-red-400 hover:text-red-600 text-sm">✕</button>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-2 border-t pt-2">
-                    <span className="text-xs text-gray-400 w-12 shrink-0">Viimane</span>
-                    <input type="number" min={0} step={0.5} value={minPoints}
-                      onChange={e => setMinPoints(Number(e.target.value))} onFocus={e => e.target.select()}
-                      className="flex-1 px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                    <span className="text-xs text-gray-400 w-4" />
-                  </div>
-                  <p className="text-xs text-gray-400">Kohad, millele punkti pole määratud, arvutatakse viimasest fikseeritud väärtusest "Viimane" suunas lineaarselt.</p>
-                </div>
-                )}
-              </div>
+              <FixedRankingSettings
+                scoringMode={compDefs?.scoringMode === "PLUS" ? "PLUS" : "PENALTY"}
+                mode={fixedRankingMode}
+                onModeChange={setFixedRankingMode}
+                fixedPoints={fixedPoints}
+                onFixedPointsChange={setFixedPoints}
+                minPoints={minPoints}
+                onMinPointsChange={setMinPoints}
+                teamCountScope={teamCountScope}
+                onTeamCountScopeChange={setTeamCountScope}
+                teamCountBase={teamCountBase}
+                onTeamCountBaseChange={setTeamCountBase}
+                teamCountStep={teamCountStep}
+                onTeamCountStepChange={setTeamCountStep}
+                registeredTeamCount={compDefs?.registeredTeamCount}
+              />
             )}
             {calcType === "PERFORMANCE_BASED" && (
               <div className="space-y-3 pt-1 border-t">
@@ -1274,6 +1273,24 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                             </div>
                           )}
                         </div>
+                      )}
+                      {s.calcType === "FIXED_RANKING" && (
+                        <FixedRankingSettings
+                          scoringMode={compDefs?.scoringMode === "PLUS" ? "PLUS" : "PENALTY"}
+                          mode={s.fixedRankingMode}
+                          onModeChange={value => updateSection(si, "fixedRankingMode", value)}
+                          fixedPoints={s.fixedPoints}
+                          onFixedPointsChange={value => updateSection(si, "fixedPoints", value)}
+                          minPoints={s.minPoints}
+                          onMinPointsChange={value => updateSection(si, "minPoints", value)}
+                          teamCountScope={s.teamCountScope}
+                          onTeamCountScopeChange={value => updateSection(si, "teamCountScope", value)}
+                          teamCountBase={s.teamCountBase}
+                          onTeamCountBaseChange={value => updateSection(si, "teamCountBase", value)}
+                          teamCountStep={s.teamCountStep}
+                          onTeamCountStepChange={value => updateSection(si, "teamCountStep", value)}
+                          registeredTeamCount={compDefs?.registeredTeamCount}
+                        />
                       )}
                       {s.calcType === "PERFORMANCE_BASED" && (
                         <div className="flex items-center gap-2">

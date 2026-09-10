@@ -2,6 +2,7 @@ import { CalcMethod, FieldDefinition } from "@prisma/client"
 import { evaluateFormula } from "../formula"
 
 import { scopeKeyFor, type ClassGroup, type TeamCountScope } from "../classGroups"
+import { parseFixedRankingParams, registeredCountPoints } from "../fixedRanking"
 
 // Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
 export type ScoreInput = {
@@ -403,6 +404,8 @@ function applyTeamCountRanking(
   scope: TeamCountScope,
   scoringMode: ScoringMode,
   higherIsBetter: boolean,
+  base: number,
+  step: number,
   fields: FieldDefinition[],
   ctx: FixedRankingContext
 ) {
@@ -418,12 +421,11 @@ function applyTeamCountRanking(
   for (const [key, bucket] of buckets) {
     // N tuleb registreerunute arvust, mitte selles elemendis tulemuse saanutest.
     // Kui arvu pole kaasa antud, taandub see kohalolijate arvule.
-    const n = ctx.registeredCounts?.get(key) ?? bucket.length
+    const n = Math.max(1, ctx.registeredCounts?.get(key) ?? bucket.length)
     const { rankMap } = sortByRankingFields(bucket, fields, higherIsBetter)
     for (const entry of bucket) {
       const r = rankMap.get(entry.teamId) ?? 1
-      const capped = Math.min(r, n)
-      entry.penaltyPoints = scoringMode === "PLUS" ? n - capped + 1 : capped
+      entry.penaltyPoints = registeredCountPoints(r, n, scoringMode, base, step)
     }
   }
 }
@@ -436,31 +438,25 @@ function applyFixedRanking(
   fields: FieldDefinition[] = [],
   ctx: FixedRankingContext = {}
 ) {
-  const params: {
-    higherIsBetter?: boolean
-    fixedPoints?: number[]
-    minPoints?: number
-    pointsFromTeamCount?: boolean
-    teamCountScope?: TeamCountScope
-  } = (() => {
-    try { return JSON.parse(paramsJson) } catch { return {} }
-  })()
+  const params = parseFixedRankingParams(paramsJson)
 
-  if (params.pointsFromTeamCount) {
+  if (params.fixedRankingMode === "REGISTERED_COUNT") {
     applyTeamCountRanking(
       entries,
-      params.teamCountScope ?? "ALL",
+      params.teamCountScope,
       scoringMode,
-      params.higherIsBetter ?? false,
+      params.higherIsBetter,
+      params.teamCountBase,
+      params.teamCountStep,
       fields,
       ctx
     )
     return
   }
 
-  const fixedPoints: number[] = params.fixedPoints ?? []
-  const minPoints = params.minPoints ?? 0
-  const higherIsBetter = params.higherIsBetter ?? false
+  const fixedPoints = params.fixedPoints
+  const minPoints = params.minPoints
+  const higherIsBetter = params.higherIsBetter
 
   const n = entries.length
   const { rankMap } = sortByRankingFields(entries, fields, higherIsBetter)
@@ -476,6 +472,10 @@ function applyFixedRanking(
       pts = scoringMode === "PLUS" ? maxValue - (r - 1) * step : minPoints + (r - 1) * step
     } else if (r <= fixedPoints.length) {
       pts = fixedPoints[r - 1]
+    } else if (params.fixedRankingMode === "MANUAL_ALL") {
+      // Käsitsi režiimis valemit ei kasutata. Kui registreerunuid on pärast
+      // seadistamist lisandunud, saab üleliigne koht viimase määratud väärtuse.
+      pts = fixedPoints[fixedPoints.length - 1]
     } else {
       // Valem: viimasest fikseeritud väärtusest → minPoints
       const lastFixed = fixedPoints[fixedPoints.length - 1]

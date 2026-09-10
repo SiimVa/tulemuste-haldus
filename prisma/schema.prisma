@@ -182,9 +182,13 @@ model Competition {
   defaultHigherIsBetter   Boolean @default(false)
   defaultRankingMinPoints Float   @default(0) // halvima soorituse punktid relatiivses rankingus
 
-  // Fikseeritud pingerida vaikeväärtused — JSON massiiv kohtade kaupa
-  // nt [{"place":1,"points":20},{"place":2,"points":18}]
+  // Fikseeritud pingerida vaikeväärtused — JSON punktimassiiv kohtade kaupa
+  // nt [20,18,16]
   defaultFixedRankingPoints String @default("[]")
+  defaultFixedRankingMode   String @default("PARTIAL") // "PARTIAL" | "MANUAL_ALL" | "REGISTERED_COUNT"
+  defaultTeamCountScope     String @default("ALL") // "ALL" | "CLASS" | "GROUP"
+  defaultTeamCountBase      Float  @default(0)
+  defaultTeamCountStep      Float  @default(1)
 
   // Klassigrupid võistkondade arvust sõltuva pingerea jaoks. JSON massiiv:
   // [{"name":"Noored","classes":["N","S"]}]. Klass võib kuuluda ainult ühte gruppi.

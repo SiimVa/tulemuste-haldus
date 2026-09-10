@@ -1,3 +1,5 @@
+import { parseFixedRankingParams } from "@/lib/fixedRanking"
+
 type CalcParams = {
   higherIsBetter?: boolean
   minPoints?: number
@@ -10,6 +12,7 @@ type Props = {
   params: string
   customFormula?: string | null
   maxValue?: number | null
+  scoringMode?: "PENALTY" | "PLUS"
 }
 
 function Var({ children }: { children: React.ReactNode }) {
@@ -25,7 +28,7 @@ function Note({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-gray-500 mt-1">{children}</p>
 }
 
-export function CalcFormulaDisplay({ type, params, customFormula, maxValue }: Props) {
+export function CalcFormulaDisplay({ type, params, customFormula, maxValue, scoringMode = "PENALTY" }: Props) {
   let p: CalcParams = {}
   try { p = JSON.parse(params) } catch {}
 
@@ -77,8 +80,29 @@ export function CalcFormulaDisplay({ type, params, customFormula, maxValue }: Pr
   }
 
   if (type === "FIXED_RANKING") {
-    const fixed: number[] = Array.isArray(p.fixedPoints) ? p.fixedPoints : []
+    const config = parseFixedRankingParams(params)
+    const fixed = config.fixedPoints
     const k = fixed.length
+    const fixedMinP = config.minPoints
+    if (config.fixedRankingMode === "REGISTERED_COUNT") {
+      const scope = config.teamCountScope === "ALL"
+        ? "kõik võistkonnad"
+        : config.teamCountScope === "CLASS"
+          ? "iga klass eraldi"
+          : "iga klassigrupp eraldi"
+      return (
+        <div>
+          <Eq>
+            <Kw>P</Kw>(<Var>r</Var>) = {String(config.teamCountBase)} + {scoringMode === "PLUS" ? "(n − r)" : "(r − 1)"} × {String(config.teamCountStep)}
+          </Eq>
+          <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+            <p><Var>r</Var> = koha number, <Var>n</Var> = registreeritud võistkondade arv</p>
+            <p>Skoop: {scope}.</p>
+            <p>{scoringMode === "PLUS" ? "Halvim" : "Parim"} saab {config.teamCountBase} punkti; iga koht muudab summat {config.teamCountStep} punkti võrra.</p>
+          </div>
+        </div>
+      )
+    }
     return (
       <div>
         {k > 0 && (
@@ -99,14 +123,18 @@ export function CalcFormulaDisplay({ type, params, customFormula, maxValue }: Pr
               <span className="text-gray-500">koht r ≤ {k}:</span>{" "}
               <Kw>P</Kw>(<Var>r</Var>) = <Var>P<sub>r</sub></Var> (fikseeritud)
             </Eq>
-            <Eq>
-              <span className="text-gray-500">koht r &gt; {k}:</span>{" "}
-              <Kw>P</Kw>(<Var>r</Var>) = <Var>{String(fixed[k - 1] ?? "P_k")}</Var> + (<Var>{String(minP)}</Var> − <Var>{String(fixed[k - 1] ?? "P_k")}</Var>) × (<Var>r</Var> − {k}) / (<Var>n</Var> − {k})
-            </Eq>
+            {config.fixedRankingMode === "PARTIAL" ? (
+              <Eq>
+                <span className="text-gray-500">koht r &gt; {k}:</span>{" "}
+                <Kw>P</Kw>(<Var>r</Var>) = <Var>{String(fixed[k - 1] ?? "P_k")}</Var> + (<Var>{String(fixedMinP)}</Var> − <Var>{String(fixed[k - 1] ?? "P_k")}</Var>) × (<Var>r</Var> − {k}) / (<Var>n</Var> − {k})
+              </Eq>
+            ) : (
+              <Note>Kõigi määratud kohtade väärtusi kasutatakse täpselt. Lisandunud üleliigsed kohad saavad viimase määratud väärtuse.</Note>
+            )}
             <div className="text-xs text-gray-500 mt-2 space-y-0.5">
               <p><Var>r</Var> = koha number</p>
               <p><Var>n</Var> = arvestatavate võistkondade arv</p>
-              <p><Var>{String(minP)}</Var> = viimase koha miinimumpunktid</p>
+              {config.fixedRankingMode === "PARTIAL" && <p><Var>{String(fixedMinP)}</Var> = viimase koha punktid</p>}
             </div>
           </>
         ) : (

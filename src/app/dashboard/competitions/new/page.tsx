@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
+import type { ClassGroup, TeamCountScope } from "@/lib/classGroups"
+import { parseFixedPointValues, type FixedRankingMode } from "@/lib/fixedRanking"
 
 type Form = {
   name: string
@@ -16,6 +19,11 @@ type Form = {
   defaultHigherIsBetter: boolean
   defaultRankingMinPoints: number
   defaultFixedRankingPoints: string[]
+  defaultFixedRankingMode: FixedRankingMode
+  defaultTeamCountScope: TeamCountScope
+  defaultTeamCountBase: number
+  defaultTeamCountStep: number
+  classGroups: ClassGroup[]
   defaultKPMaxValue: number
   defaultNotPassed: number
   defaultPassedNotDone: number
@@ -30,7 +38,7 @@ type Form = {
 
 const CALC_TYPES = [
   { value: "RELATIVE_RANKING", label: "Pingerida valemiga", desc: "Parim saab 0p (PENALTY) või max (PLUS), halvim vastupidi. Rangi järgi lineaarne." },
-  { value: "FIXED_RANKING", label: "Fikseeritud pingerida", desc: "Igale kohale määrad täpse punktisumma. Ülejäänud kohad arvutatakse valemiga." },
+  { value: "FIXED_RANKING", label: "Fikseeritud pingerida", desc: "Määra osa või kõik kohad täpselt või loo punktiskaala registreerunute arvust." },
   { value: "VALUE_BASED", label: "Tulemuspõhine jaotus", desc: "Punktid jaotatakse parima ja halvima tulemuse vahe järgi proportsionaalselt." },
   { value: "PERFORMANCE_BASED", label: "Soorituspõhine", desc: "Tulemusväli = õigeid elemente. Iga element annab maxP / koguElementide arvu." },
   { value: "ABSOLUTE_TIME", label: "Absoluutne aeg", desc: "Karistuspunkt = tegelik aeg sekundites." },
@@ -45,6 +53,11 @@ const DEFAULTS: Form = {
   defaultHigherIsBetter: false,
   defaultRankingMinPoints: 0,
   defaultFixedRankingPoints: [],
+  defaultFixedRankingMode: "PARTIAL",
+  defaultTeamCountScope: "ALL",
+  defaultTeamCountBase: 0,
+  defaultTeamCountStep: 1,
+  classGroups: [],
   defaultKPMaxValue: 30, defaultNotPassed: 40, defaultPassedNotDone: 35,
   defaultPKMaxValue: 15,
   defaultVastutegevusPenaltyPerLife: 5,
@@ -93,8 +106,7 @@ export default function NewCompetitionPage() {
         defaultHilinemineIntervalMinutes: Number(form.defaultHilinemineIntervalMinutes),
         defaultHilineminePenaltyPerInterval: Number(form.defaultHilineminePenaltyPerInterval),
         defaultHilinemineMaxPenalty: Number(form.defaultHilinemineMaxPenalty),
-        defaultFixedRankingPoints: form.defaultFixedRankingPoints
-          .map(v => Number(v)).filter(n => !isNaN(n)),
+        defaultFixedRankingPoints: parseFixedPointValues(form.defaultFixedRankingPoints),
       }),
     })
 
@@ -230,56 +242,54 @@ export default function NewCompetitionPage() {
             </div>
           )}
           {form.defaultCalcType === "FIXED_RANKING" && (
-            <div className="space-y-3 pt-1 border-t mt-1">
-              <p className="text-xs text-gray-500">
-                Määra mitu punkti iga koht annab. Kasutatakse elementides, mis kasutavad fikseeritud pingerida arvutusviisi.
-                Elemente luues saab neid vaikeväärtusi muuta.
-              </p>
-              {form.defaultFixedRankingPoints.length === 0 ? (
-                <p className="text-xs text-gray-400 italic">Kohad pole määratud — lisa esimene koht allpool.</p>
-              ) : (
-                <div className="space-y-2">
-                  {form.defaultFixedRankingPoints.map((pts, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-500 w-20 shrink-0">{i + 1}. koht</span>
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          type="number" min={0} step={0.5}
-                          value={pts}
-                          onChange={e => {
-                            const updated = [...form.defaultFixedRankingPoints]
-                            updated[i] = e.target.value
-                            set("defaultFixedRankingPoints", updated)
-                          }}
-                          onFocus={e => e.target.select()}
-                          className="w-28 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <span className="text-xs text-gray-400">{form.scoringMode === "PLUS" ? "plusspunkti" : "karistuspunkti"}</span>
-                      </div>
-                      <button type="button"
-                        onClick={() => set("defaultFixedRankingPoints", form.defaultFixedRankingPoints.filter((_, idx) => idx !== i))}
-                        className="text-red-400 hover:text-red-600 text-sm px-2">
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+            <div className="space-y-4 pt-3 border-t mt-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={form.defaultHigherIsBetter}
+                  onChange={event => set("defaultHigherIsBetter", event.target.checked)} className="accent-blue-600" />
+                Suurem sisestatud tulemus = parem koht
+              </label>
+              <FixedRankingSettings
+                scoringMode={form.scoringMode === "PLUS" ? "PLUS" : "PENALTY"}
+                mode={form.defaultFixedRankingMode}
+                onModeChange={value => set("defaultFixedRankingMode", value)}
+                fixedPoints={form.defaultFixedRankingPoints}
+                onFixedPointsChange={value => set("defaultFixedRankingPoints", value)}
+                minPoints={form.defaultRankingMinPoints}
+                onMinPointsChange={value => set("defaultRankingMinPoints", value)}
+                teamCountScope={form.defaultTeamCountScope}
+                onTeamCountScopeChange={value => set("defaultTeamCountScope", value)}
+                teamCountBase={form.defaultTeamCountBase}
+                onTeamCountBaseChange={value => set("defaultTeamCountBase", value)}
+                teamCountStep={form.defaultTeamCountStep}
+                onTeamCountStepChange={value => set("defaultTeamCountStep", value)}
+              />
+              <div className="space-y-3 border-t pt-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Klassigrupid</h3>
+                  <p className="text-xs text-gray-500 mt-1">Kasutatakse registreeritud võistkondade režiimis skoobiga „Klassigrupid".</p>
                 </div>
-              )}
-              <button type="button"
-                onClick={() => {
-                  const list = form.defaultFixedRankingPoints
-                  const last = list.length > 0 ? Number(list[list.length - 1]) : 20
-                  const next = Math.max(0, last - 2)
-                  set("defaultFixedRankingPoints", [...list, String(next)])
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                + Lisa koht
-              </button>
-              {form.defaultFixedRankingPoints.length > 0 && (
-                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-                  Kohad mis pole määratud saavad 0 punkti. Viigi korral saavad mõlemad kõrgema koha punktid.
-                </p>
-              )}
+                {form.classGroups.map((group, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input value={group.name} aria-label="Grupi nimi" placeholder="Nimi, nt Noored"
+                      onChange={event => {
+                        const next = [...form.classGroups]
+                        next[index] = { ...next[index], name: event.target.value }
+                        set("classGroups", next)
+                      }} className="w-36 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input value={group.classes.join(", ")} aria-label="Klassid" placeholder="Klassid, nt N, S"
+                      onChange={event => {
+                        const next = [...form.classGroups]
+                        next[index] = { ...next[index], classes: event.target.value.split(",").map(value => value.trim()).filter(Boolean) }
+                        set("classGroups", next)
+                      }} className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <button type="button" aria-label="Eemalda klassigrupp"
+                      onClick={() => set("classGroups", form.classGroups.filter((_, itemIndex) => itemIndex !== index))}
+                      className="text-red-400 hover:text-red-600">✕</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => set("classGroups", [...form.classGroups, { name: "", classes: [] }])}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700">+ Lisa grupp</button>
+              </div>
             </div>
           )}
         </Card>
