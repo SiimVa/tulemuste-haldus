@@ -1,5 +1,7 @@
 import { CalcMethod, FieldDefinition } from "@prisma/client"
-import { evaluateFormula } from "@/lib/formula"
+import { evaluateFormula } from "../formula"
+
+import { scopeKeyFor, type ClassGroup, type TeamCountScope } from "../classGroups"
 
 // Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
 export type ScoreInput = {
@@ -7,7 +9,7 @@ export type ScoreInput = {
   values: string
   exceptionLabel: string | null
   exceptionPenalty: number | null
-  team: { id: string; isHorsDeCompetition?: boolean }
+  team: { id: string; isHorsDeCompetition?: boolean; class?: string | null }
 }
 type CalcType = "RELATIVE_RANKING" | "ABSOLUTE_TIME" | "ABSOLUTE_POINTS" | "CUSTOM" | "ABSOLUTE_PENALTY" | "FIXED_RANKING" | "VALUE_BASED" | "PERFORMANCE_BASED" | "DIRECT_ENTRY"
 export type ScoringMode = "PENALTY" | "PLUS"
@@ -23,6 +25,7 @@ export interface ScoredEntry {
   // PLUS: positiivne = teenitud punktid, negatiivne = erandi karistus
   penaltyPoints: number
   isHorsDeCompetition?: boolean
+  teamClass?: string | null
 }
 
 interface ElementWithConfig {
@@ -37,6 +40,10 @@ interface CompetitionConfig {
   scoringMode: ScoringMode
   defaultKPMaxValue: number
   defaultPKMaxValue: number
+  // Võistkondade arvust sõltuva fikseeritud pingerea jaoks: kui palju
+  // võistkondi on registreeritud iga skoobi kohta (võti scopeKeyFor'ist).
+  registeredCounts?: Map<string, number>
+  classGroups?: ClassGroup[]
 }
 
 // ─── Arvestusväline alates elemendist X ──────────────────────────────────────
@@ -148,6 +155,7 @@ export function calculateScores(
         exceptionPenalty: magnitude,
         penaltyPoints: stored,
         isHorsDeCompetition: isHC,
+        teamClass: r.team.class ?? null,
       }
     }
 
@@ -157,7 +165,7 @@ export function calculateScores(
     // Kui ühtegi väärtust pole sisestatud (kõik lahtrid tühjad) → ei loeta sisestatuks
     const hasAnyValue = Object.values(rawValues).some((v) => String(v ?? "").trim() !== "")
     if (!hasAnyValue) {
-      return { teamId: r.teamId, rawValue: null, allValues: {}, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC }
+      return { teamId: r.teamId, rawValue: null, allValues: {}, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC, teamClass: r.team.class ?? null }
     }
 
     const computed = computeFields(rawValues, fields)
@@ -167,7 +175,7 @@ export function calculateScores(
           : parseFloat(String(computed[resultField.name] ?? 0)))
       : 0
 
-    return { teamId: r.teamId, rawValue, allValues: computed, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC }
+    return { teamId: r.teamId, rawValue, allValues: computed, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC, teamClass: r.team.class ?? null }
   })
 
   if (!calcMethod) return entries
@@ -210,15 +218,15 @@ export function calculateScores(
       const inComp = normal.filter((e) => !e.isHorsDeCompetition)
       const horsComp = normal.filter((e) => e.isHorsDeCompetition)
       if (horsComp.length > 0) {
-        if (inComp.length > 0) applyFixedRanking(inComp, calcMethod.params, maxValue, scoringMode, fields)
+        if (inComp.length > 0) applyFixedRanking(inComp, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups })
         const allCopy = normal.map((e) => ({ ...e }))
-        applyFixedRanking(allCopy, calcMethod.params, maxValue, scoringMode, fields)
+        applyFixedRanking(allCopy, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups })
         for (const hc of horsComp) {
           const scored = allCopy.find((e) => e.teamId === hc.teamId)
           if (scored) hc.penaltyPoints = scored.penaltyPoints
         }
       } else {
-        applyFixedRanking(normal, calcMethod.params, maxValue, scoringMode, fields)
+        applyFixedRanking(normal, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups })
       }
       break
     }
@@ -383,16 +391,72 @@ function applyAbsolutePenalty(
 // fixedPoints = punktid koha järgi [1.koht, 2.koht, ...].
 // Kui pingereas on rohkem tiime kui fixedPoints pikkus, arvutatakse ülejäänud
 // valemiga: viimasest fikseeritud väärtusest lineaarselt minPoints-ini.
+type FixedRankingContext = {
+  registeredCounts?: Map<string, number>
+  classGroups?: ClassGroup[]
+}
+
+// Punktid võistkondade arvust: N registreeritut → parim saab N (PLUS) või
+// 1 (PENALTY), halvim vastupidi. Skoop määrab, kelle hulgas järjestatakse.
+function applyTeamCountRanking(
+  entries: ScoredEntry[],
+  scope: TeamCountScope,
+  scoringMode: ScoringMode,
+  higherIsBetter: boolean,
+  fields: FieldDefinition[],
+  ctx: FixedRankingContext
+) {
+  const groups = ctx.classGroups ?? []
+  const buckets = new Map<string, ScoredEntry[]>()
+  for (const entry of entries) {
+    const key = scopeKeyFor(scope, entry.teamClass, groups)
+    const bucket = buckets.get(key)
+    if (bucket) bucket.push(entry)
+    else buckets.set(key, [entry])
+  }
+
+  for (const [key, bucket] of buckets) {
+    // N tuleb registreerunute arvust, mitte selles elemendis tulemuse saanutest.
+    // Kui arvu pole kaasa antud, taandub see kohalolijate arvule.
+    const n = ctx.registeredCounts?.get(key) ?? bucket.length
+    const { rankMap } = sortByRankingFields(bucket, fields, higherIsBetter)
+    for (const entry of bucket) {
+      const r = rankMap.get(entry.teamId) ?? 1
+      const capped = Math.min(r, n)
+      entry.penaltyPoints = scoringMode === "PLUS" ? n - capped + 1 : capped
+    }
+  }
+}
+
 function applyFixedRanking(
   entries: ScoredEntry[],
   paramsJson: string,
   maxValue: number,
   scoringMode: ScoringMode,
-  fields: FieldDefinition[] = []
+  fields: FieldDefinition[] = [],
+  ctx: FixedRankingContext = {}
 ) {
-  const params: { higherIsBetter?: boolean; fixedPoints?: number[]; minPoints?: number } = (() => {
+  const params: {
+    higherIsBetter?: boolean
+    fixedPoints?: number[]
+    minPoints?: number
+    pointsFromTeamCount?: boolean
+    teamCountScope?: TeamCountScope
+  } = (() => {
     try { return JSON.parse(paramsJson) } catch { return {} }
   })()
+
+  if (params.pointsFromTeamCount) {
+    applyTeamCountRanking(
+      entries,
+      params.teamCountScope ?? "ALL",
+      scoringMode,
+      params.higherIsBetter ?? false,
+      fields,
+      ctx
+    )
+    return
+  }
 
   const fixedPoints: number[] = params.fixedPoints ?? []
   const minPoints = params.minPoints ?? 0

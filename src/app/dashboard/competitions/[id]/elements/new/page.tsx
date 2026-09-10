@@ -9,6 +9,7 @@ import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
 import { Card } from "@/components/ui/card"
 import { Input, Select } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import type { TeamCountScope } from "@/lib/classGroups"
 
 type FieldRow = { name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
 type ExceptionRow = { label: string; penalty: string }
@@ -171,6 +172,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
   const [customFormula, setCustomFormula] = useState("")
   const [minPoints, setMinPoints] = useState(0)
   const [fixedPoints, setFixedPoints] = useState<string[]>([])
+  const [pointsFromTeamCount, setPointsFromTeamCount] = useState(false)
+  const [teamCountScope, setTeamCountScope] = useState<TeamCountScope>("ALL")
   const [totalElements, setTotalElements] = useState(10)
   const [directHigherIsBetter, setDirectHigherIsBetter] = useState(false)
   const [customHigherIsBetter, setCustomHigherIsBetter] = useState(false)
@@ -481,7 +484,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         type: calcType,
         params:
           calcType === "RELATIVE_RANKING" ? { higherIsBetter: primaryDir, minPoints } :
-          calcType === "FIXED_RANKING" ? { higherIsBetter: primaryDir, fixedPoints: fixedPoints.map(Number), minPoints } :
+          calcType === "FIXED_RANKING" ? { higherIsBetter: primaryDir, fixedPoints: pointsFromTeamCount ? [] : fixedPoints.map(Number), minPoints, pointsFromTeamCount, teamCountScope } :
           calcType === "VALUE_BASED" ? { higherIsBetter: primaryDir, minPoints } :
           calcType === "PERFORMANCE_BASED" ? { totalElements } :
           calcType === "CUSTOM" ? { higherIsBetter: customHigherIsBetter } :
@@ -1072,6 +1075,33 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
             )}
             {calcType === "FIXED_RANKING" && (
               <div className="space-y-3 pt-1">
+                <label className="flex items-start gap-2 border-t pt-3 cursor-pointer">
+                  <input type="checkbox" className="mt-0.5"
+                    checked={pointsFromTeamCount}
+                    onChange={e => setPointsFromTeamCount(e.target.checked)} />
+                  <span>
+                    <span className="block text-xs font-medium text-gray-700">Punktid võistkondade arvust</span>
+                    <span className="block text-xs text-gray-400">
+                      N registreeritud võistkonda → parim saab N (plusspunktid) või 1 (karistuspunktid), halvim vastupidi.
+                    </span>
+                  </span>
+                </label>
+                {pointsFromTeamCount && (
+                  <div className="pl-6">
+                    <label className="text-xs text-gray-500 mb-1 block">Keda loetakse ühte pingeritta</label>
+                    <select value={teamCountScope}
+                      onChange={e => setTeamCountScope(e.target.value as TeamCountScope)}
+                      className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                      <option value="ALL">Kõik võistkonnad koos</option>
+                      <option value="CLASS">Iga klass eraldi</option>
+                      <option value="GROUP">Klassigrupid (võistluse seadetest)</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Arvestusvälised ei suurenda skaalat. Klassigrupid määrad võistluse seadetes.
+                    </p>
+                  </div>
+                )}
+                {!pointsFromTeamCount && (
                 <div className="border-t pt-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs text-gray-500">Punktid kohade kaupa</label>
@@ -1098,6 +1128,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                   </div>
                   <p className="text-xs text-gray-400">Kohad, millele punkti pole määratud, arvutatakse viimasest fikseeritud väärtusest "Viimane" suunas lineaarselt.</p>
                 </div>
+                )}
               </div>
             )}
             {calcType === "PERFORMANCE_BASED" && (

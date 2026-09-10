@@ -8,7 +8,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/lib/formula.ts",
@@ -24,6 +26,8 @@
     "src/lib/registrationForm.ts",
     "src/lib/notifications.ts",
     "src/lib/teamWorkflow.ts",
+    "src/lib/classGroups.ts",
+    "src/lib/calculators/index.ts",
     "tests/**/*.test.ts"
   ]
 }
