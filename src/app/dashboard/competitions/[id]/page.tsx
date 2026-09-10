@@ -65,11 +65,17 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
           <ExportMenu groups={[
             {
               title: "Kõik KP-d",
-              options: [{
-                label: "Kõik elemendid",
-                href: `/api/competitions/${id}/export/elements?format=xlsx`,
-                printHref: `/dashboard/competitions/${id}/all-results-print`,
-              }],
+              options: [
+                {
+                  label: "Täidetud protokollid",
+                  href: `/api/competitions/${id}/export/elements?format=xlsx`,
+                  printHref: `/dashboard/competitions/${id}/all-results-print`,
+                },
+                {
+                  label: "Tühjad protokollid",
+                  printHref: `/dashboard/competitions/${id}/all-protocols-print`,
+                },
+              ],
             },
             {
               title: "Lõpuprotokoll",
