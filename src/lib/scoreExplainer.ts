@@ -1,4 +1,5 @@
-import { parseTimeToSeconds, computeFields } from "@/lib/calculators"
+import { calculateScores, parseTimeToSeconds, computeFields } from "@/lib/calculators"
+import { scopeKeyFor, TEAM_COUNT_SCOPES, type ClassGroup } from "@/lib/classGroups"
 
 export interface TeamBreakdown {
   teamId: string
@@ -68,6 +69,7 @@ interface TeamDef {
   name: string
   code: string
   isHorsDeCompetition?: boolean
+  class?: string | null
 }
 
 interface ScoreDef {
@@ -78,6 +80,8 @@ interface ScoreDef {
 interface Config {
   scoringMode: "PENALTY" | "PLUS"
   defaultKPMaxValue: number
+  defaultPKMaxValue?: number
+  classGroups?: ClassGroup[]
 }
 
 function fmt(v: number | string | undefined | null, type: string): string {
@@ -220,79 +224,38 @@ function computeSectionScores(
   results: ResultDef[],
   fields: FieldDef[],
   maxValue: number,
-  scoringMode: "PENALTY" | "PLUS"
+  teams: TeamDef[],
+  calculatorConfig: NonNullable<Parameters<typeof calculateScores>[2]>
 ): Map<string, number> {
-  const params: Record<string, unknown> = (() => { try { return JSON.parse(calcMethod.params) } catch { return {} } })()
-  const globalHigher = params.higherIsBetter as boolean ?? false
-  const primaryField = fields.find(f => f.isResultField || f.rankingPriority === 1)
-  let higherIsBetter = globalHigher
-  if (primaryField?.meta) {
-    try { const m = JSON.parse(primaryField.meta); if (typeof m.higherIsBetter === "boolean") higherIsBetter = m.higherIsBetter } catch {}
-  }
-  const minPoints = (params.minPoints as number) ?? 0
-  const scores = new Map<string, number>()
+  const teamMap = new Map(teams.map(team => [team.id, team]))
+  const scoreInputs = results.flatMap(result => {
+    const team = teamMap.get(result.teamId)
+    if (!team) return []
+    return [{
+      teamId: result.teamId,
+      values: result.values,
+      exceptionLabel: result.exceptionLabel ?? null,
+      exceptionPenalty: result.exceptionPenalty ?? null,
+      team: {
+        id: team.id,
+        isHorsDeCompetition: team.isHorsDeCompetition ?? false,
+        class: team.class ?? null,
+      },
+    }]
+  })
 
-  const normal = results
-    .filter(r => !r.exceptionLabel)
-    .map(r => {
-      const rv: Record<string, string | number> = (() => { try { return JSON.parse(r.values || "{}") } catch { return {} } })()
-      return { teamId: r.teamId, rawValue: getRawValue(rv, fields) }
-    })
-    .filter((e): e is { teamId: string; rawValue: number } => e.rawValue !== null)
-
-  const rawVals = normal.map(e => e.rawValue)
-  const n = normal.length
-  if (n === 0) return scores
-
-  switch (calcMethod.type) {
-    case "RELATIVE_RANKING":
-    case "FIXED_RANKING": {
-      const sorted = higherIsBetter ? [...rawVals].sort((a, b) => b - a) : [...rawVals].sort((a, b) => a - b)
-      const range = maxValue - minPoints
-      for (const e of normal) {
-        const rank = sorted.indexOf(e.rawValue) + 1
-        const step = n > 1 ? range / (n - 1) : 0
-        const pts = scoringMode === "PLUS" ? maxValue - (rank - 1) * step : minPoints + (rank - 1) * step
-        scores.set(e.teamId, Math.round(pts * 1000) / 1000)
-      }
-      break
-    }
-    case "VALUE_BASED": {
-      const bestVal = higherIsBetter ? Math.max(...rawVals) : Math.min(...rawVals)
-      const worstVal = higherIsBetter ? Math.min(...rawVals) : Math.max(...rawVals)
-      const range = Math.abs(worstVal - bestVal)
-      for (const e of normal) {
-        const proportion = range > 0 ? Math.abs(e.rawValue - bestVal) / range : 0
-        const raw = minPoints + proportion * (maxValue - minPoints)
-        const pts = scoringMode === "PLUS" ? maxValue - raw + minPoints : raw
-        scores.set(e.teamId, Math.round(pts * 1000) / 1000)
-      }
-      break
-    }
-    case "PERFORMANCE_BASED": {
-      const totalEl = Math.max(1, (params.totalElements as number) ?? 1)
-      const ev = maxValue / totalEl
-      for (const e of normal) {
-        const correct = Math.max(0, Math.min(totalEl, e.rawValue))
-        scores.set(e.teamId, Math.round((scoringMode === "PLUS" ? correct * ev : (totalEl - correct) * ev) * 1000) / 1000)
-      }
-      break
-    }
-    case "ABSOLUTE_POINTS": {
-      const maxV = Math.max(...rawVals)
-      for (const e of normal) scores.set(e.teamId, scoringMode === "PLUS" ? e.rawValue : maxV - e.rawValue)
-      break
-    }
-    case "ABSOLUTE_TIME": {
-      for (const e of normal) scores.set(e.teamId, scoringMode === "PLUS" ? -e.rawValue : e.rawValue)
-      break
-    }
-    case "DIRECT_ENTRY": {
-      for (const e of normal) scores.set(e.teamId, e.rawValue)
-      break
-    }
-  }
-  return scores
+  const calculated = calculateScores(
+    {
+      id: "section-score-explanation",
+      calcMethod: calcMethod as Parameters<typeof calculateScores>[0]["calcMethod"],
+      fields: fields as Parameters<typeof calculateScores>[0]["fields"],
+      exceptions: [],
+      maxValue,
+    },
+    scoreInputs,
+    calculatorConfig
+  )
+  return new Map(calculated.map(entry => [entry.teamId, entry.penaltyPoints]))
 }
 
 export function explainElementScores(
@@ -306,6 +269,21 @@ export function explainElementScores(
   const scoreMap = new Map(computedScores.map(s => [s.teamId, s.penaltyPoints]))
   const maxValue = element.maxValue ?? config.defaultKPMaxValue
   const scoringMode = config.scoringMode
+  const classGroups = config.classGroups ?? []
+  const registeredCounts = new Map<string, number>()
+  for (const scope of TEAM_COUNT_SCOPES) {
+    for (const team of teams.filter(item => !item.isHorsDeCompetition)) {
+      const key = scopeKeyFor(scope, team.class, classGroups)
+      registeredCounts.set(key, (registeredCounts.get(key) ?? 0) + 1)
+    }
+  }
+  const calculatorConfig = {
+    scoringMode,
+    defaultKPMaxValue: config.defaultKPMaxValue,
+    defaultPKMaxValue: config.defaultPKMaxValue ?? config.defaultKPMaxValue,
+    classGroups,
+    registeredCounts,
+  }
 
   const hasSections = (element.sections?.length ?? 0) > 0
 
@@ -335,7 +313,7 @@ export function explainElementScores(
   const sectionScoreMaps: Map<string, number>[] = hasSections && element.sections
     ? element.sections.map(section =>
         section.calcMethod && section.fields.length > 0
-          ? computeSectionScores(section.calcMethod, results.filter(r => !r.exceptionLabel), section.fields, section.maxValue ?? maxValue, scoringMode)
+          ? computeSectionScores(section.calcMethod, results.filter(r => !r.exceptionLabel), section.fields, section.maxValue ?? maxValue, teams, calculatorConfig)
           : new Map<string, number>()
       )
     : []

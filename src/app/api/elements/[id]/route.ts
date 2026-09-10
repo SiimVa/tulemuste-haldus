@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessElement } from "@/lib/competitionAccess"
+import { fixedRankingParamsForStorage, parseFixedRankingParams } from "@/lib/fixedRanking"
 
 async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -18,7 +19,12 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
       fields: { where: { sectionId: null }, orderBy: { order: "asc" } },
       exceptions: { orderBy: { order: "asc" } },
       calcMethod: true,
-      competition: { select: { scoringMode: true } },
+      competition: {
+        select: {
+          scoringMode: true,
+          _count: { select: { teams: { where: { isHorsDeCompetition: false } } } },
+        },
+      },
       sections: {
         include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
         orderBy: { order: "asc" },
@@ -41,6 +47,9 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
   const { name, code, type, order, maxValue, config, fields, exceptions, calcMethod, isCancelled, directPointsEntry } = body
 
   try {
+    const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
+      ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
+      : (calcMethod?.params ?? {})
     await prisma.$transaction(async (tx) => {
       await tx.scoringElement.update({
         where: { id },
@@ -90,12 +99,12 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
           create: {
             elementId: id,
             type: calcMethod.type,
-            params: JSON.stringify(calcMethod.params ?? {}),
+            params: JSON.stringify(storedCalcParams),
             customFormula: calcMethod.customFormula ?? null,
           },
           update: {
             type: calcMethod.type,
-            params: JSON.stringify(calcMethod.params ?? {}),
+            params: JSON.stringify(storedCalcParams),
             customFormula: calcMethod.customFormula ?? null,
           },
         })

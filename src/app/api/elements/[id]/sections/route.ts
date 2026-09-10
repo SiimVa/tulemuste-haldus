@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessElement } from "@/lib/competitionAccess"
+import { fixedRankingParamsForStorage, parseFixedRankingParams } from "@/lib/fixedRanking"
 
 async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -31,6 +32,9 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   const { name, maxValue, fields, calcMethod, order } = body
 
   const count = await prisma.elementSection.count({ where: { elementId } })
+  const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
+    ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
+    : (calcMethod?.params ?? {})
 
   const section = await prisma.elementSection.create({
     data: {
@@ -62,7 +66,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
         ? {
             create: {
               type: calcMethod.type ?? "RELATIVE_RANKING",
-              params: JSON.stringify(calcMethod.params ?? {}),
+              params: JSON.stringify(storedCalcParams),
               customFormula: calcMethod.customFormula ?? null,
             },
           }

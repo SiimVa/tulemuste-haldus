@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessSection } from "@/lib/competitionAccess"
+import { fixedRankingParamsForStorage, parseFixedRankingParams } from "@/lib/fixedRanking"
 
 async function handlePATCH(req: Request, { params }: { params: Promise<{ id: string; sectionId: string }> }) {
   const session = await auth()
@@ -14,6 +15,9 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
   }
   const body = await req.json()
   const { name, maxValue, calcMethod, fields } = body
+  const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
+    ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
+    : (calcMethod?.params ?? {})
 
   type FieldInput = { name: string; label: string; type: string; order?: number; isResultField?: boolean; rankingPriority?: number | null; formula?: string; meta?: string }
 
@@ -28,12 +32,12 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
             upsert: {
               create: {
                 type: calcMethod.type ?? "RELATIVE_RANKING",
-                params: JSON.stringify(calcMethod.params ?? {}),
+                params: JSON.stringify(storedCalcParams),
                 customFormula: calcMethod.customFormula ?? null,
               },
               update: {
                 type: calcMethod.type ?? "RELATIVE_RANKING",
-                params: JSON.stringify(calcMethod.params ?? {}),
+                params: JSON.stringify(storedCalcParams),
                 customFormula: calcMethod.customFormula ?? null,
               },
             },

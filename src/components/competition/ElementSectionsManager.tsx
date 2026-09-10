@@ -4,6 +4,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
+import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
+import type { TeamCountScope } from "@/lib/classGroups"
+import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; rankingPriority: number | null; formula?: string | null; validation?: string | null }
 type SectionCalcMethod = { id: string; type: string; params: string; customFormula?: string | null }
@@ -35,6 +38,8 @@ interface Props {
   elementId: string
   competitionId: string
   initialSections: Section[]
+  scoringMode: "PENALTY" | "PLUS"
+  registeredTeamCount?: number
 }
 
 type SectionForm = {
@@ -45,6 +50,11 @@ type SectionForm = {
   minPoints: number
   totalElements: number
   customFormula: string
+  fixedRankingMode: FixedRankingMode
+  fixedPoints: string[]
+  teamCountScope: TeamCountScope
+  teamCountBase: number
+  teamCountStep: number
   fields: FieldRow[]
 }
 
@@ -57,6 +67,11 @@ function emptyForm(): SectionForm {
     minPoints: 0,
     totalElements: 10,
     customFormula: "",
+    fixedRankingMode: "PARTIAL",
+    fixedPoints: [],
+    teamCountScope: "ALL",
+    teamCountBase: 0,
+    teamCountStep: 1,
     fields: [{ name: "", label: "", type: "NUMBER", rankingPriority: 1, validation: {} }],
   }
 }
@@ -64,6 +79,7 @@ function emptyForm(): SectionForm {
 function sectionToForm(s: Section): SectionForm {
   let params: Record<string, unknown> = {}
   try { params = JSON.parse(s.calcMethod?.params ?? "{}") } catch {}
+  const fixed = parseFixedRankingParams(params)
   return {
     name: s.name,
     maxValue: s.maxValue != null ? String(s.maxValue) : "",
@@ -72,6 +88,11 @@ function sectionToForm(s: Section): SectionForm {
     minPoints: (params.minPoints as number) ?? 0,
     totalElements: (params.totalElements as number) ?? 10,
     customFormula: s.calcMethod?.customFormula ?? "",
+    fixedRankingMode: fixed.fixedRankingMode,
+    fixedPoints: fixed.fixedPoints.map(String),
+    teamCountScope: fixed.teamCountScope,
+    teamCountBase: fixed.teamCountBase,
+    teamCountStep: fixed.teamCountStep,
     fields: s.fields.map(f => ({
       name: f.name,
       label: f.label,
@@ -100,7 +121,16 @@ function buildCalcMethodBody(form: SectionForm) {
       form.calcType === "RELATIVE_RANKING" || form.calcType === "VALUE_BASED"
         ? { higherIsBetter: form.higherIsBetter ?? false, minPoints: form.minPoints }
         : form.calcType === "FIXED_RANKING"
-        ? { higherIsBetter: form.higherIsBetter ?? false }
+        ? {
+            higherIsBetter: form.higherIsBetter ?? false,
+            fixedRankingMode: form.fixedRankingMode,
+            fixedPoints: form.fixedRankingMode === "REGISTERED_COUNT" ? [] : parseFixedPointValues(form.fixedPoints),
+            minPoints: form.minPoints,
+            pointsFromTeamCount: form.fixedRankingMode === "REGISTERED_COUNT",
+            teamCountScope: form.teamCountScope,
+            teamCountBase: form.teamCountBase,
+            teamCountStep: form.teamCountStep,
+          }
         : form.calcType === "ABSOLUTE_POINTS"
         ? { higherIsBetter: true }
         : form.calcType === "DIRECT_ENTRY"
@@ -120,6 +150,8 @@ function SectionFormUI({
   onCancel,
   saving,
   submitLabel,
+  scoringMode,
+  registeredTeamCount,
 }: {
   form: SectionForm
   setForm: (f: SectionForm) => void
@@ -127,6 +159,8 @@ function SectionFormUI({
   onCancel: () => void
   saving: boolean
   submitLabel: string
+  scoringMode: "PENALTY" | "PLUS"
+  registeredTeamCount?: number
 }) {
   function updateField(i: number, key: keyof FieldRow, val: string | number | null | FieldValidation) {
     const upd = [...form.fields]
@@ -239,6 +273,24 @@ function SectionFormUI({
                   className="w-16 px-2 py-1 border rounded text-xs bg-white" />
               </div>
             )}
+            {form.calcType === "FIXED_RANKING" && (
+              <FixedRankingSettings
+                scoringMode={scoringMode}
+                mode={form.fixedRankingMode}
+                onModeChange={value => setForm({ ...form, fixedRankingMode: value })}
+                fixedPoints={form.fixedPoints}
+                onFixedPointsChange={value => setForm({ ...form, fixedPoints: value })}
+                minPoints={form.minPoints}
+                onMinPointsChange={value => setForm({ ...form, minPoints: value })}
+                teamCountScope={form.teamCountScope}
+                onTeamCountScopeChange={value => setForm({ ...form, teamCountScope: value })}
+                teamCountBase={form.teamCountBase}
+                onTeamCountBaseChange={value => setForm({ ...form, teamCountBase: value })}
+                teamCountStep={form.teamCountStep}
+                onTeamCountStepChange={value => setForm({ ...form, teamCountStep: value })}
+                registeredTeamCount={registeredTeamCount}
+              />
+            )}
           </div>
         )}
         {form.calcType === "PERFORMANCE_BASED" && (
@@ -283,7 +335,7 @@ function SectionFormUI({
   )
 }
 
-export function ElementSectionsManager({ elementId, competitionId, initialSections }: Props) {
+export function ElementSectionsManager({ elementId, competitionId, initialSections, scoringMode, registeredTeamCount }: Props) {
   const [sections, setSections] = useState<Section[]>(initialSections)
   const [showAdd, setShowAdd] = useState(false)
   const [newForm, setNewForm] = useState<SectionForm>(emptyForm())
@@ -387,6 +439,8 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
               onCancel={() => setEditingId(null)}
               saving={saving}
               submitLabel="Salvesta muudatused"
+              scoringMode={scoringMode}
+              registeredTeamCount={registeredTeamCount}
             />
           )
         }
@@ -454,6 +508,8 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
           onCancel={() => { setShowAdd(false); setNewForm(emptyForm()) }}
           saving={saving}
           submitLabel="Lisa hindamisosa"
+          scoringMode={scoringMode}
+          registeredTeamCount={registeredTeamCount}
         />
       ) : (
         !editingId && (

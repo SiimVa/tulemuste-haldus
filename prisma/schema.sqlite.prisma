@@ -90,6 +90,11 @@ model Competition {
   // Fikseeritud pingerida vaikeväärtused — JSON massiiv kohtade kaupa
   // nt [{"place":1,"points":20},{"place":2,"points":18}]
   defaultFixedRankingPoints String @default("[]")
+  defaultFixedRankingMode   String @default("PARTIAL")
+  defaultTeamCountScope     String @default("ALL")
+  defaultTeamCountBase      Float  @default(0)
+  defaultTeamCountStep      Float  @default(1)
+  classGroups               String @default("[]")
 
   // Punktide nähtavus võistlejate vaates
   athletePointsMode   String  @default("HIDDEN") // "HIDDEN" | "EXACT" | "RANGE"

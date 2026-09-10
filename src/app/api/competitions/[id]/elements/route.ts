@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessCompetition } from "@/lib/competitionAccess"
+import { fixedRankingParamsForStorage, parseFixedRankingParams } from "@/lib/fixedRanking"
 
 async function handleGET(
   _req: Request,
@@ -51,6 +52,9 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   type SectionInput = { name: string; maxValue?: number | null; fields?: FieldInput[]; calcMethod?: { type: string; params?: Record<string, unknown>; customFormula?: string } }
 
   const hasSections = Array.isArray(sections) && sections.length > 0
+  const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
+    ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
+    : (calcMethod?.params ?? {})
 
   // Kui order pole antud, pane element olemasolevate lõppu (väldi order=0 kokkupõrget)
   let resolvedOrder = order
@@ -102,7 +106,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
           ? {
               create: {
                 type: calcMethod.type ?? "RELATIVE_RANKING",
-                params: JSON.stringify(calcMethod.params ?? {}),
+                params: JSON.stringify(storedCalcParams),
                 customFormula: calcMethod.customFormula ?? null,
               },
             }
@@ -139,7 +143,11 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
               ? {
                   create: {
                     type: s.calcMethod.type ?? "RELATIVE_RANKING",
-                    params: JSON.stringify(s.calcMethod.params ?? {}),
+                    params: JSON.stringify(
+                      s.calcMethod.type === "FIXED_RANKING"
+                        ? fixedRankingParamsForStorage(parseFixedRankingParams(s.calcMethod.params))
+                        : (s.calcMethod.params ?? {})
+                    ),
                     customFormula: s.calcMethod.customFormula ?? null,
                   },
                 }

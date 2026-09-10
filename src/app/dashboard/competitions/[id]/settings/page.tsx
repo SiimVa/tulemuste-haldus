@@ -7,6 +7,9 @@ import { Card } from "@/components/ui/card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { normalizeClassGroups, parseClassGroups, type ClassGroup } from "@/lib/classGroups"
+import type { TeamCountScope } from "@/lib/classGroups"
+import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
+import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
 type CompetitionForm = {
   name: string
@@ -18,6 +21,11 @@ type CompetitionForm = {
   defaultCalcType: string
   defaultHigherIsBetter: boolean
   defaultRankingMinPoints: number
+  defaultFixedRankingMode: FixedRankingMode
+  defaultTeamCountScope: TeamCountScope
+  defaultTeamCountBase: number
+  defaultTeamCountStep: number
+  registeredTeamCount: number
   defaultKPMaxValue: number
   defaultNotPassed: number
   defaultPassedNotDone: number
@@ -45,7 +53,7 @@ const SCORING_MODES = [
 
 const CALC_TYPES = [
   { value: "RELATIVE_RANKING", label: "Pingerida valemiga", desc: "Parim saab 0p (PENALTY) või max (PLUS), halvim vastupidi. Rangi järgi lineaarne." },
-  { value: "FIXED_RANKING", label: "Fikseeritud pingerida", desc: "Igale kohale määrad täpse punktisumma. Ülejäänud kohad arvutatakse valemiga." },
+  { value: "FIXED_RANKING", label: "Fikseeritud pingerida", desc: "Määra osa või kõik kohad täpselt või loo punktiskaala registreerunute arvust." },
   { value: "VALUE_BASED", label: "Tulemuspõhine jaotus", desc: "Punktid jaotatakse parima ja halvima tulemuse vahe järgi proportsionaalselt." },
   { value: "PERFORMANCE_BASED", label: "Soorituspõhine", desc: "Tulemusväli = õigeid elemente. Iga element annab maxP / koguElementide arvu." },
   { value: "ABSOLUTE_TIME", label: "Absoluutne aeg", desc: "Karistuspunkt = tegelik aeg sekundites." },
@@ -80,6 +88,13 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           defaultCalcType: data.defaultCalcType ?? "RELATIVE_RANKING",
           defaultHigherIsBetter: data.defaultHigherIsBetter ?? false,
           defaultRankingMinPoints: data.defaultRankingMinPoints ?? 0,
+          defaultFixedRankingMode: parseFixedRankingParams({ fixedRankingMode: data.defaultFixedRankingMode }).fixedRankingMode,
+          defaultTeamCountScope: parseFixedRankingParams({ teamCountScope: data.defaultTeamCountScope }).teamCountScope,
+          defaultTeamCountBase: Number(data.defaultTeamCountBase ?? 0),
+          defaultTeamCountStep: Number(data.defaultTeamCountStep ?? 1),
+          registeredTeamCount: Array.isArray(data.teams)
+            ? data.teams.filter((team: { isHorsDeCompetition?: boolean }) => !team.isHorsDeCompetition).length
+            : Number(data._count?.teams ?? 0),
           defaultKPMaxValue: data.defaultKPMaxValue ?? 30,
           defaultNotPassed: data.defaultNotPassed ?? 40,
           defaultPassedNotDone: data.defaultPassedNotDone ?? 35,
@@ -122,7 +137,11 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         defaultHilineminePenaltyPerInterval: Number(form.defaultHilineminePenaltyPerInterval),
         defaultHilinemineMaxPenalty: Number(form.defaultHilinemineMaxPenalty),
         defaultHigherIsBetter: form.defaultHigherIsBetter,
-        defaultFixedRankingPoints: fixedRankingPoints.map(v => Number(v)),
+        defaultFixedRankingPoints: parseFixedPointValues(fixedRankingPoints),
+        defaultFixedRankingMode: form.defaultFixedRankingMode,
+        defaultTeamCountScope: form.defaultTeamCountScope,
+        defaultTeamCountBase: Number(form.defaultTeamCountBase),
+        defaultTeamCountStep: Number(form.defaultTeamCountStep),
         classGroups: normalizeClassGroups(classGroups),
       }),
     })
@@ -263,62 +282,6 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           </div>
         </Card>
 
-        {/* Klassigrupid */}
-        <Card className="p-5 space-y-4">
-          <div>
-            <h2 className="font-semibold text-gray-900">Klassigrupid</h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Koonda mitu klassi ühte pingeritta. Kasutatakse ainult siis, kui elemendi
-              fikseeritud pingerida arvutab punktid võistkondade arvust ja skoop on
-              „Klassigrupid". Klass võib kuuluda ainult ühte gruppi.
-            </p>
-          </div>
-
-          {classGroups.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Gruppe pole määratud.</p>
-          ) : (
-            <div className="space-y-2">
-              {classGroups.map((g, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    aria-label="Grupi nimi"
-                    value={g.name}
-                    placeholder="Nimi, nt Noored"
-                    onChange={e => {
-                      const upd = [...classGroups]
-                      upd[i] = { ...upd[i], name: e.target.value }
-                      setClassGroups(upd)
-                    }}
-                    className="w-40 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    aria-label="Klassid"
-                    value={g.classes.join(", ")}
-                    placeholder="Klassid komadega, nt N, S"
-                    onChange={e => {
-                      const upd = [...classGroups]
-                      upd[i] = { ...upd[i], classes: e.target.value.split(",").map(c => c.trim()).filter(Boolean) }
-                      setClassGroups(upd)
-                    }}
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button type="button"
-                    onClick={() => setClassGroups(classGroups.filter((_, idx) => idx !== i))}
-                    className="text-red-400 hover:text-red-600 text-sm px-2">
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button type="button"
-            onClick={() => setClassGroups([...classGroups, { name: "", classes: [] }])}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            + Lisa grupp
-          </button>
-        </Card>
-
         {/* Arvutusmeetod */}
         <Card className="p-5 space-y-3">
           <h2 className="font-semibold text-gray-900">Arvutusmeetod — vaikimisi KP/PK elementidele</h2>
@@ -365,63 +328,70 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
         </Card>
 
         {/* Fikseeritud pingerida vaikeväärtused */}
-        <Card className="p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">PR</span>
-            <h2 className="font-semibold text-gray-900">Fikseeritud pingerida — vaikeväärtused</h2>
-          </div>
-          <p className="text-xs text-gray-500">
-            Määra mitu punkti iga koht annab. Kasutatakse elementides, mis kasutavad fikseeritud pingerida arvutusviisi.
-            Elemente luues saab neid vaikeväärtusi muuta.
-          </p>
-
-          {fixedRankingPoints.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Kohad pole määratud — lisa esimene koht allpool.</p>
-          ) : (
-            <div className="space-y-2">
-              {fixedRankingPoints.map((pts, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-sm text-gray-500 w-20 shrink-0">{i + 1}. koht</span>
-                  <div className="flex items-center gap-2 flex-1">
-                    <input
-                      type="number" min={0} step={0.5}
-                      value={pts}
-                      onChange={e => {
-                        const updated = [...fixedRankingPoints]
-                        updated[i] = e.target.value
-                        setFixedRankingPoints(updated)
-                      }}
-                      onFocus={e => e.target.select()}
-                      className="w-28 px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-xs text-gray-400">{form.scoringMode === "PLUS" ? "plusspunkti" : "karistuspunkti"}</span>
-                  </div>
-                  <button type="button"
-                    onClick={() => setFixedRankingPoints(fixedRankingPoints.filter((_, idx) => idx !== i))}
-                    className="text-red-400 hover:text-red-600 text-sm px-2">
-                    ✕
-                  </button>
-                </div>
-              ))}
+        {form.defaultCalcType === "FIXED_RANKING" && (
+          <Card className="p-5 space-y-5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">PR</span>
+              <h2 className="font-semibold text-gray-900">Fikseeritud pingerida — vaikeväärtused</h2>
             </div>
-          )}
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.defaultHigherIsBetter}
+                onChange={e => set("defaultHigherIsBetter", e.target.checked)} className="accent-blue-600" />
+              Suurem sisestatud tulemus = parem koht
+            </label>
+            <FixedRankingSettings
+              scoringMode={form.scoringMode === "PLUS" ? "PLUS" : "PENALTY"}
+              mode={form.defaultFixedRankingMode}
+              onModeChange={value => set("defaultFixedRankingMode", value)}
+              fixedPoints={fixedRankingPoints}
+              onFixedPointsChange={setFixedRankingPoints}
+              minPoints={form.defaultRankingMinPoints}
+              onMinPointsChange={value => set("defaultRankingMinPoints", value)}
+              teamCountScope={form.defaultTeamCountScope}
+              onTeamCountScopeChange={value => set("defaultTeamCountScope", value)}
+              teamCountBase={form.defaultTeamCountBase}
+              onTeamCountBaseChange={value => set("defaultTeamCountBase", value)}
+              teamCountStep={form.defaultTeamCountStep}
+              onTeamCountStepChange={value => set("defaultTeamCountStep", value)}
+              registeredTeamCount={form.registeredTeamCount}
+            />
 
-          <button type="button"
-            onClick={() => {
-              const last = fixedRankingPoints.length > 0 ? Number(fixedRankingPoints[fixedRankingPoints.length - 1]) : 20
-              const next = Math.max(0, last - 2)
-              setFixedRankingPoints([...fixedRankingPoints, String(next)])
-            }}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            + Lisa koht
-          </button>
-
-          {fixedRankingPoints.length > 0 && (
-            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-              Kohad mis pole määratud saavad 0 punkti. Viigi korral saavad mõlemad kõrgema koha punktid.
-            </p>
-          )}
-        </Card>
+            <div className="space-y-3 border-t pt-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Klassigrupid</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Neid kasutatakse registreeritud võistkondade režiimis, kui pingerea skoop on „Klassigrupid". Klass võib kuuluda ainult ühte gruppi.
+                </p>
+              </div>
+              {classGroups.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">Gruppe pole määratud.</p>
+              ) : (
+                <div className="space-y-2">
+                  {classGroups.map((group, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input aria-label="Grupi nimi" value={group.name} placeholder="Nimi, nt Noored"
+                        onChange={event => {
+                          const next = [...classGroups]
+                          next[index] = { ...next[index], name: event.target.value }
+                          setClassGroups(next)
+                        }} className="w-40 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input aria-label="Klassid" value={group.classes.join(", ")} placeholder="Klassid komadega, nt N, S"
+                        onChange={event => {
+                          const next = [...classGroups]
+                          next[index] = { ...next[index], classes: event.target.value.split(",").map(value => value.trim()).filter(Boolean) }
+                          setClassGroups(next)
+                        }} className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <button type="button" onClick={() => setClassGroups(classGroups.filter((_, itemIndex) => itemIndex !== index))}
+                        aria-label="Eemalda klassigrupp" className="text-red-400 hover:text-red-600 text-sm px-2">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button" onClick={() => setClassGroups([...classGroups, { name: "", classes: [] }])}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Lisa grupp</button>
+            </div>
+          </Card>
+        )}
 
         {/* KP vaikeväärtused */}
         <Card className="p-5 space-y-4">

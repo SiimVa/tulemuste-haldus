@@ -17,6 +17,7 @@ import { RecalcButton } from "@/components/competition/RecalcButton"
 import { explainElementScores } from "@/lib/scoreExplainer"
 import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
 import { Card } from "@/components/ui/card"
+import { parseClassGroups } from "@/lib/classGroups"
 
 export const dynamic = "force-dynamic"
 
@@ -34,7 +35,7 @@ export default async function ElementPage({
       fields: { orderBy: { order: "asc" } },
       exceptions: { orderBy: { order: "asc" } },
       calcMethod: true,
-      competition: { select: { scoringMode: true, defaultKPMaxValue: true } },
+      competition: { select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true, classGroups: true } },
       results: {
         include: { team: true },
         orderBy: { updatedAt: "desc" },
@@ -95,6 +96,8 @@ export default async function ElementPage({
     {
       scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
       defaultKPMaxValue: element.competition.defaultKPMaxValue ?? 30,
+      defaultPKMaxValue: element.competition.defaultPKMaxValue ?? 30,
+      classGroups: parseClassGroups(element.competition.classGroups),
     }
   )
 
@@ -183,6 +186,7 @@ export default async function ElementPage({
             params={element.calcMethod.params}
             customFormula={element.calcMethod.customFormula}
             maxValue={element.maxValue}
+            scoringMode={element.competition.scoringMode === "PLUS" ? "PLUS" : "PENALTY"}
           />
         </Card>
       )}
@@ -201,6 +205,8 @@ export default async function ElementPage({
           <ElementSectionsManager
             elementId={element.id}
             competitionId={competitionId}
+            scoringMode={element.competition.scoringMode === "PLUS" ? "PLUS" : "PENALTY"}
+            registeredTeamCount={teams.length}
             initialSections={element.sections.map(s => ({
               id: s.id,
               name: s.name,
