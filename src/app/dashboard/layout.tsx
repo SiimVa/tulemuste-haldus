@@ -17,8 +17,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       : "Kasutaja"
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white">
+    <div className="dashboard-shell min-h-screen bg-gray-50">
+      <header className="dashboard-shell-header border-b bg-white">
         <div className="mx-auto flex min-h-14 max-w-7xl items-center justify-between gap-3 px-4 py-2">
           <Link
             href="/dashboard"
@@ -57,7 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </nav>
         )}
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:py-8">{children}</main>
+      <main className="dashboard-shell-main mx-auto max-w-7xl px-4 py-6 sm:py-8">{children}</main>
     </div>
   )
 }

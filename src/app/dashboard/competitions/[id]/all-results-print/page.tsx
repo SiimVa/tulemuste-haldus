@@ -2,9 +2,9 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
-import Link from "next/link"
-import { PrintButton } from "@/components/PrintButton"
 import { computeFields } from "@/lib/calculators"
+import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentHeading"
+import { ProtocolPrintToolbar } from "@/components/protocol/ProtocolPrintToolbar"
 
 export default async function AllResultsPrintPage({ params }: { params: Promise<{ id: string }> }) {
   await auth()
@@ -29,39 +29,41 @@ export default async function AllResultsPrintPage({ params }: { params: Promise<
   const teams = await prisma.team.findMany({ where: { competitionId } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code)))
   const isPlusMode = competition.scoringMode === "PLUS"
 
-  const dateStr = competition.date ? competition.date.toLocaleDateString("et-EE") : ""
-  const endDateStr = competition.endDate && competition.endDate.toDateString() !== competition.date?.toDateString()
-    ? ` – ${competition.endDate.toLocaleDateString("et-EE")}` : ""
-
   return (
     <>
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          .page-break { page-break-before: always; }
+          .page-break { break-before: page; page-break-before: always; }
           body { margin: 0; font-size: 11px; }
           .section { padding: 10mm; }
           table { border-collapse: collapse; width: 100%; }
+          .results-table thead { display: table-header-group; }
+          .results-table tr { break-inside: avoid; page-break-inside: avoid; }
           th, td { border: 1px solid #666; padding: 3px 6px; }
           th { background: #e5e7eb; font-weight: 600; }
         }
-        @page { size: A4 landscape; margin: 0; }
         table { border-collapse: collapse; }
         th, td { border: 1px solid #999; padding: 4px 8px; font-size: 12px; }
         th { background: #f3f4f6; font-weight: 600; }
+        .results-table th.protocol-document-heading {
+          border: 0;
+          background: #fff;
+          padding: 0 0 4mm;
+        }
       `}</style>
 
       <div>
-        {/* Toolbar */}
-        <div className="no-print flex items-center gap-3 mb-6 p-4 bg-gray-50 border-b">
-          <Link href={`/dashboard/competitions/${competitionId}`} className="text-sm text-gray-500 hover:text-gray-700">← Tagasi</Link>
-          <span className="text-gray-300">|</span>
-          <PrintButton label="Prindi kõik / Salvesta PDF" />
-          <span className="text-xs text-gray-400 ml-2">{competition.elements.length} elementi · iga element eraldi lehel</span>
-        </div>
+        <ProtocolPrintToolbar
+          backHref={`/dashboard/competitions/${competitionId}`}
+          buttonLabel="Prindi kõik / Salvesta PDF"
+          info={`${competition.elements.length} elementi · iga element eraldi lehel`}
+          className="mb-6 border-x-0 border-t-0"
+        />
 
         {competition.elements.map((element, elIdx) => {
           const inputFields = element.fields.filter((f) => !f.formula)
+          const columnCount = 4 + inputFields.length + 2
           const scoreMap = new Map(element.scores.map((s) => [s.teamId, s.penaltyPoints]))
 
           const rows = teams.map((team) => {
@@ -84,20 +86,19 @@ export default async function AllResultsPrintPage({ params }: { params: Promise<
 
           return (
             <div key={element.id} className={`section p-6 ${elIdx > 0 ? "page-break" : ""}`}>
-              <div className="flex justify-between items-end mb-4">
-                <div>
-                  <h2 className="text-lg font-bold">{competition.name}</h2>
-                  <p className="text-sm text-gray-600">{dateStr}{endDateStr}{competition.location && ` · ${competition.location}`}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold font-mono">{element.code}</p>
-                  <p className="text-sm font-semibold">{element.name}</p>
-                  <p className="text-xs text-gray-400">{elIdx + 1} / {competition.elements.length}</p>
-                </div>
-              </div>
-
-              <table className="w-full">
+              <table className="results-table w-full">
                 <thead>
+                  <tr>
+                    <th colSpan={columnCount} className="protocol-document-heading">
+                      <ProtocolDocumentHeading
+                        competition={competition}
+                        element={element}
+                        detail={isPlusMode ? "Plusspunktid" : "Karistuspunktid"}
+                        pageNumber={elIdx + 1}
+                        pageCount={competition.elements.length}
+                      />
+                    </th>
+                  </tr>
                   <tr>
                     <th style={{ width: 30 }}>#</th>
                     <th style={{ width: 55 }}>Tähis</th>
