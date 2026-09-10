@@ -2,7 +2,11 @@ import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { isTeamCountScope, normalizeClassGroups, parseClassGroups } from "@/lib/classGroups"
+import {
+  isTeamCountScope,
+  parseClassGroups,
+  syncClassGroupsWithRegistrationClasses,
+} from "@/lib/classGroups"
 import { isFixedRankingMode, nonNegativeFiniteNumber, parseFixedPointValues } from "@/lib/fixedRanking"
 import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
@@ -41,6 +45,11 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
         orderBy: { code: "asc" },
         include: { members: true },
       },
+      registrationClasses: {
+        where: { isActive: true },
+        orderBy: [{ order: "asc" }, { name: "asc" }],
+        select: { id: true, name: true },
+      },
       _count: { select: { teams: true, elements: true } },
     },
   })
@@ -77,7 +86,13 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
     const updated = await prisma.$transaction(async (tx) => {
       const previous = await tx.competition.findUnique({
         where: { id },
-        select: { status: true },
+        select: {
+          status: true,
+          registrationClasses: {
+            where: { isActive: true },
+            select: { id: true, name: true },
+          },
+        },
       })
       const competition = await tx.competition.update({
         where: { id },
@@ -142,7 +157,11 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
             : undefined,
           classGroups: Array.isArray(body.classGroups)
             ? JSON.stringify(
-                normalizeClassGroups(parseClassGroups(JSON.stringify(body.classGroups)))
+                syncClassGroupsWithRegistrationClasses(
+                  parseClassGroups(JSON.stringify(body.classGroups)),
+                  previous?.registrationClasses ?? [],
+                  previous?.registrationClasses ?? []
+                )
               )
             : undefined,
         },

@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { normalizeClassGroups, parseClassGroups, type ClassGroup } from "@/lib/classGroups"
+import {
+  normalizeClassGroups,
+  parseClassGroups,
+  syncClassGroupsWithRegistrationClasses,
+  type ClassGroup,
+} from "@/lib/classGroups"
 import type { TeamCountScope } from "@/lib/classGroups"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
@@ -26,6 +32,7 @@ type CompetitionForm = {
   defaultTeamCountBase: number
   defaultTeamCountStep: number
   registeredTeamCount: number
+  registrationClasses: { id: string; name: string }[]
   defaultKPMaxValue: number
   defaultNotPassed: number
   defaultPassedNotDone: number
@@ -78,6 +85,8 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
     fetch(`/api/competitions/${competitionId}`)
       .then(r => r.json())
       .then(data => {
+        const registrationClasses: { id: string; name: string }[] =
+          Array.isArray(data.registrationClasses) ? data.registrationClasses : []
         setForm({
           name: data.name ?? "",
           date: data.date ? data.date.slice(0, 10) : "",
@@ -95,6 +104,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           registeredTeamCount: Array.isArray(data.teams)
             ? data.teams.filter((team: { isHorsDeCompetition?: boolean }) => !team.isHorsDeCompetition).length
             : Number(data._count?.teams ?? 0),
+          registrationClasses,
           defaultKPMaxValue: data.defaultKPMaxValue ?? 30,
           defaultNotPassed: data.defaultNotPassed ?? 40,
           defaultPassedNotDone: data.defaultPassedNotDone ?? 35,
@@ -110,7 +120,11 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           const pts = JSON.parse(data.defaultFixedRankingPoints ?? "[]")
           setFixedRankingPoints(Array.isArray(pts) ? pts.map(String) : [])
         } catch { setFixedRankingPoints([]) }
-        setClassGroups(parseClassGroups(data.classGroups))
+        setClassGroups(syncClassGroupsWithRegistrationClasses(
+          parseClassGroups(data.classGroups),
+          registrationClasses,
+          registrationClasses
+        ))
       })
   }, [competitionId])
 
@@ -360,35 +374,69 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Klassigrupid</h3>
                 <p className="text-xs text-gray-500 mt-1">
-                  Neid kasutatakse registreeritud võistkondade režiimis, kui pingerea skoop on „Klassigrupid". Klass võib kuuluda ainult ühte gruppi.
+                  Grupi nimi on vaba, kuid klassid tulevad registreerimisseadetest. Klass võib kuuluda ainult ühte gruppi.
                 </p>
               </div>
+              {form.registrationClasses.length === 0 && (
+                <p className="text-xs rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
+                  Lisa esmalt klassid <Link href={`/dashboard/competitions/${competitionId}/registration-settings`} className="font-medium underline">registreerimisseadetes</Link>.
+                </p>
+              )}
               {classGroups.length === 0 ? (
                 <p className="text-xs text-gray-400 italic">Gruppe pole määratud.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {classGroups.map((group, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input aria-label="Grupi nimi" value={group.name} placeholder="Nimi, nt Noored"
-                        onChange={event => {
-                          const next = [...classGroups]
-                          next[index] = { ...next[index], name: event.target.value }
-                          setClassGroups(next)
-                        }} className="w-40 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                      <input aria-label="Klassid" value={group.classes.join(", ")} placeholder="Klassid komadega, nt N, S"
-                        onChange={event => {
-                          const next = [...classGroups]
-                          next[index] = { ...next[index], classes: event.target.value.split(",").map(value => value.trim()).filter(Boolean) }
-                          setClassGroups(next)
-                        }} className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                      <button type="button" onClick={() => setClassGroups(classGroups.filter((_, itemIndex) => itemIndex !== index))}
-                        aria-label="Eemalda klassigrupp" className="text-red-400 hover:text-red-600 text-sm px-2">✕</button>
+                    <div key={index} className="space-y-3 rounded-lg border p-3">
+                      <div className="flex items-center gap-2">
+                        <Input aria-label="Grupi nimi" value={group.name} placeholder="Grupi nimi, nt Noored"
+                          onChange={event => {
+                            const next = [...classGroups]
+                            next[index] = { ...next[index], name: event.target.value }
+                            setClassGroups(next)
+                          }} className="flex-1" />
+                        <button type="button" onClick={() => setClassGroups(classGroups.filter((_, itemIndex) => itemIndex !== index))}
+                          aria-label="Eemalda klassigrupp" className="text-red-500 hover:text-red-700 text-sm px-2">✕</button>
+                      </div>
+                      {form.registrationClasses.length > 0 && (
+                        <fieldset>
+                          <legend className="mb-2 text-xs text-gray-500">Gruppi kuuluvad klassid</legend>
+                          <div className="flex flex-wrap gap-2">
+                            {form.registrationClasses.map(registrationClass => {
+                              const selected = group.classes.includes(registrationClass.name)
+                              const ownerIndex = classGroups.findIndex((item, itemIndex) =>
+                                itemIndex !== index && item.classes.includes(registrationClass.name)
+                              )
+                              const assignedElsewhere = ownerIndex >= 0
+                              return (
+                                <label key={registrationClass.id}
+                                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${assignedElsewhere ? "cursor-not-allowed bg-gray-50 text-gray-400" : "cursor-pointer"}`}>
+                                  <input type="checkbox" checked={selected} disabled={assignedElsewhere}
+                                    onChange={event => {
+                                      const next = [...classGroups]
+                                      next[index] = {
+                                        ...next[index],
+                                        classes: event.target.checked
+                                          ? [...next[index].classes, registrationClass.name]
+                                          : next[index].classes.filter(name => name !== registrationClass.name),
+                                      }
+                                      setClassGroups(next)
+                                    }} className="accent-blue-600" />
+                                  {registrationClass.name}
+                                  {assignedElsewhere && <span className="text-[10px]">({classGroups[ownerIndex].name || "teine grupp"})</span>}
+                                </label>
+                              )
+                            })}
+                          </div>
+                        </fieldset>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
               <button type="button" onClick={() => setClassGroups([...classGroups, { name: "", classes: [] }])}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Lisa grupp</button>
+                disabled={form.registrationClasses.length === 0}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:cursor-not-allowed disabled:text-gray-400">+ Lisa grupp</button>
             </div>
           </Card>
         )}
