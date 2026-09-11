@@ -57,7 +57,8 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
 
-  competitions             Competition[]
+  createdCompetitions      Competition[]                  @relation("CompetitionCreator")
+  organizedCompetitions    Competition[]                  @relation("CompetitionOrganizer")
   memberOf                 CompetitionMember[]
   enteredResults           Result[]
   accounts                 Account[]
@@ -149,8 +150,10 @@ model Competition {
   // Lingitunnusest säilitatakse ainult SHA-256 räsi.
   analysisAccessMode     String    @default("PUBLIC")
   analysisTokenHash      String?   @unique
-  organizerId            String
-  organizer              User      @relation(fields: [organizerId], references: [id])
+  createdById            String
+  createdBy              User      @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  organizerId            String?
+  organizer              User?     @relation("CompetitionOrganizer", fields: [organizerId], references: [id], onDelete: SetNull)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -239,6 +242,9 @@ model Competition {
   judgeAssignments            JudgeElementAssignment[]
   roleInvitations             CompetitionRoleInvitation[]
   notifications               Notification[]
+
+  @@index([createdById])
+  @@index([organizerId])
 }
 
 // Kasutaja teavitus on ühtlasi e-kirja outbox. Töövoo muudatus ja teavitus

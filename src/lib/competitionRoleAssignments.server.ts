@@ -276,3 +276,87 @@ export async function updateCompetitionMemberRoles({
     })
   })
 }
+
+export async function setCompetitionOwner({
+  competitionId,
+  userId,
+}: {
+  competitionId: string
+  userId: string | null
+}) {
+  return prisma.$transaction(async (tx) => {
+    const competition = await tx.competition.findUnique({
+      where: { id: competitionId },
+      select: { organizerId: true },
+    })
+    if (!competition) {
+      throw new CompetitionRoleAssignmentError("Võistlust ei leitud", 404)
+    }
+
+    if (userId) {
+      const userExists = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      })
+      if (!userExists) {
+        throw new CompetitionRoleAssignmentError("Kasutajat ei leitud", 404)
+      }
+    }
+
+    const previousOwnerRoles = await tx.competitionMemberRole.findMany({
+      where: {
+        role: "OWNER",
+        member: { competitionId },
+      },
+      select: { memberId: true },
+    })
+
+    await tx.competitionMemberRole.deleteMany({
+      where: {
+        role: "OWNER",
+        member: { competitionId },
+      },
+    })
+
+    await tx.competition.update({
+      where: { id: competitionId },
+      data: { organizerId: userId },
+    })
+
+    let owner = null
+    let ownerMemberId: string | null = null
+    if (userId) {
+      const membership = await tx.competitionMember.upsert({
+        where: {
+          competitionId_userId: { competitionId, userId },
+        },
+        create: { competitionId, userId },
+        update: {},
+      })
+      ownerMemberId = membership.id
+      await tx.competitionMemberRole.create({
+        data: { memberId: membership.id, role: "OWNER" },
+      })
+      owner = await tx.competitionMember.findUniqueOrThrow({
+        where: { id: membership.id },
+        include: competitionMemberRoleInclude,
+      })
+    }
+
+    const displacedMemberIds = previousOwnerRoles
+      .map(({ memberId }) => memberId)
+      .filter((memberId) => memberId !== ownerMemberId)
+    if (displacedMemberIds.length > 0) {
+      await tx.competitionMember.deleteMany({
+        where: {
+          id: { in: displacedMemberIds },
+          roles: { none: {} },
+          representedTeams: { none: {} },
+          judgedElements: { none: {} },
+        },
+      })
+    }
+
+    return owner
+  })
+}

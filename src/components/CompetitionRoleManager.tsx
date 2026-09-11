@@ -20,7 +20,8 @@ type CompetitionMember = {
 }
 type RoleData = {
   canManageOrganizers: boolean
-  owner: CompetitionMember
+  canClearOwner: boolean
+  owner: CompetitionMember | null
   members: CompetitionMember[]
 }
 type RoleInvitation = {
@@ -301,6 +302,34 @@ export function CompetitionRoleManager({
     resetForm()
   }
 
+  async function changeOwner(member: CompetitionMember | null) {
+    const question = member
+      ? `Määra ${member.user.name} võistluse peakorraldajaks?`
+      : "Jätta võistluse peakorraldaja määramata?"
+    if (!confirm(question)) return
+
+    setSaving(true)
+    setError("")
+    const response = await fetch(
+      `/api/competitions/${competitionId}/roles`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: member?.userId ?? null }),
+      }
+    )
+    const responseData = await response.json().catch(() => ({}))
+    setSaving(false)
+    if (!response.ok) {
+      setError(
+        responseData.error ?? "Peakorraldaja muutmine ebaõnnestus"
+      )
+      return
+    }
+    await loadRoles()
+    resetForm()
+  }
+
   if (loading) {
     return (
       <section className="bg-white border border-blue-200 rounded-xl p-5 mb-6">
@@ -322,82 +351,120 @@ export function CompetitionRoleManager({
       </div>
 
       {data && (
-        <div className="divide-y border rounded-lg">
-          {[data.owner, ...data.members].map((member) => {
-            const currentRoles = roleNames(member)
-            const isOwner = member.userId === data.owner.userId
-            const hasManagedRoles = currentRoles.some((role) =>
-              MANAGED_ROLES.some(({ role: managedRole }) =>
-                role === managedRole
+        <div className="space-y-3">
+          {!data.owner && (
+            <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  Peakorraldaja on määramata
+                </p>
+                <p className="text-xs text-amber-700">
+                  Lisa kasutajale korraldaja roll ja määra ta seejärel peakorraldajaks.
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="divide-y border rounded-lg">
+            {[...(data.owner ? [data.owner] : []), ...data.members].map((member) => {
+              const currentRoles = roleNames(member)
+              const isOwner = member.userId === data.owner?.userId
+              const visibleRoles = isOwner
+                ? currentRoles.filter((role) => role !== "ORGANIZER")
+                : currentRoles
+              const hasManagedRoles = currentRoles.some((role) =>
+                MANAGED_ROLES.some(({ role: managedRole }) =>
+                  role === managedRole
+                )
               )
-            )
-            const canRemove =
-              hasManagedRoles &&
-              (data.canManageOrganizers ||
-                !currentRoles.includes("ORGANIZER"))
+              const canRemove =
+                hasManagedRoles &&
+                (data.canManageOrganizers ||
+                  !currentRoles.includes("ORGANIZER"))
 
-            return (
-              <div
-                key={member.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {member.user.name}
-                  </p>
-                  <p className="text-xs text-gray-400">{member.user.email}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {currentRoles.map((role) => (
-                      <span
-                        key={role}
-                        className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5"
-                      >
-                        {ROLE_LABELS[role]}
-                      </span>
-                    ))}
-                  </div>
-                  {member.judgedElements.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1.5">
-                      Elemendid: {member.judgedElements
-                        .map(
-                          ({ element }) =>
-                            `${element.code} · ${element.name}`
-                        )
-                        .join(", ")}
+              return (
+                <div
+                  key={member.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {member.user.name}
                     </p>
-                  )}
-                  {member.representedTeams.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1.5">
-                      Võistkonnad: {member.representedTeams
-                        .map(({ team }) => `${team.code} · ${team.name}`)
-                        .join(", ")}
-                    </p>
-                  )}
-                </div>
-                {!isOwner && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => editMember(member)}
-                      className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1"
-                    >
-                      Muuda rolle
-                    </button>
-                    {canRemove && (
-                      <button
-                        type="button"
-                        onClick={() => removeManagedRoles(member)}
-                        disabled={saving}
-                        className="text-xs text-red-500 hover:text-red-600 px-2 py-1 disabled:opacity-50"
-                      >
-                        Eemalda õigused
-                      </button>
+                    <p className="text-xs text-gray-400">{member.user.email}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {visibleRoles.map((role) => (
+                        <span
+                          key={role}
+                          className="text-xs rounded-full bg-gray-100 text-gray-600 px-2 py-0.5"
+                        >
+                          {ROLE_LABELS[role]}
+                        </span>
+                      ))}
+                    </div>
+                    {member.judgedElements.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Elemendid: {member.judgedElements
+                          .map(
+                            ({ element }) =>
+                              `${element.code} · ${element.name}`
+                          )
+                          .join(", ")}
+                      </p>
+                    )}
+                    {member.representedTeams.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Võistkonnad: {member.representedTeams
+                          .map(({ team }) => `${team.code} · ${team.name}`)
+                          .join(", ")}
+                      </p>
                     )}
                   </div>
-                )}
-              </div>
-            )
-          })}
+                  {isOwner ? (
+                    data.canClearOwner && (
+                      <button
+                        type="button"
+                        onClick={() => changeOwner(null)}
+                        disabled={saving}
+                        className="shrink-0 px-2 py-1 text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
+                      >
+                        Jäta määramata
+                      </button>
+                    )
+                  ) : (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {data.canManageOrganizers && (
+                        <button
+                          type="button"
+                          onClick={() => changeOwner(member)}
+                          disabled={saving}
+                          className="px-2 py-1 text-xs font-medium text-amber-700 hover:text-amber-800 disabled:opacity-50"
+                        >
+                          Määra peakorraldajaks
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => editMember(member)}
+                        className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1"
+                      >
+                        Muuda rolle
+                      </button>
+                      {canRemove && (
+                        <button
+                          type="button"
+                          onClick={() => removeManagedRoles(member)}
+                          disabled={saving}
+                          className="text-xs text-red-500 hover:text-red-600 px-2 py-1 disabled:opacity-50"
+                        >
+                          Eemalda õigused
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

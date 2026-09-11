@@ -115,7 +115,7 @@ export async function queueRegistrationApplicationNotification(
     competitionId: application.competition.id,
     href: `/dashboard/registrations/${application.id}`,
     emailTo: application.submittedBy.email,
-    emailReplyTo: application.competition.organizer.email,
+    emailReplyTo: application.competition.organizer?.email ?? null,
     dedupeKey: options.dedupeKey,
     batchEmail: options.batchEmail,
   })
@@ -169,7 +169,7 @@ export async function queueTeamWorkflowNotification(
     competitionId: team.competition.id,
     href: `/dashboard/representative/teams/${team.id}`,
     emailTo: recipient.email,
-    emailReplyTo: team.competition.organizer.email,
+    emailReplyTo: team.competition.organizer?.email ?? null,
     dedupeKey: options.dedupeKey,
     batchEmail: options.batchEmail,
   })
@@ -216,7 +216,7 @@ export async function queueMandateOpenedNotifications(
       href: `/dashboard/representative/teams/${team.id}`,
       emailTo: recipient.email.trim().toLowerCase(),
       emailReplyTo:
-        team.competition.organizer.email.trim().toLowerCase() || null,
+        team.competition.organizer?.email.trim().toLowerCase() || null,
       dedupeKey: `mandate-opened:${competitionId}:${team.id}:${recipient.id}`,
       emailBatchId,
       emailNextAttemptAt: queuedAt,
@@ -316,7 +316,7 @@ export async function queueCompetitionStartedNotifications(
         href: `/dashboard/teams/${team.id}/results`,
         emailTo: recipient.email.trim().toLowerCase(),
         emailReplyTo:
-          team.competition.organizer.email.trim().toLowerCase() || null,
+          team.competition.organizer?.email.trim().toLowerCase() || null,
         dedupeKey: `competition-started:${competitionId}:${team.id}:${recipient.id}`,
       })
     }
