@@ -12,8 +12,10 @@ import {
 import {
   CompetitionRoleAssignmentError,
   competitionMemberRoleInclude,
+  setCompetitionOwner,
   updateCompetitionMemberRoles,
 } from "@/lib/competitionRoleAssignments.server"
+import { parseCompetitionOwnerRequest } from "@/lib/competitionOwnership"
 import { prisma } from "@/lib/prisma"
 
 function actorFromSession(session: {
@@ -65,27 +67,82 @@ async function handleGET(
     return NextResponse.json({ error: "Võistlust ei leitud" }, { status: 404 })
   }
 
-  const ownerMembership = competition.members.find(
-    ({ userId }) => userId === competition.organizerId
+  const ownerMembership = competition.organizerId
+    ? competition.members.find(
+        ({ userId }) => userId === competition.organizerId
+      )
+    : null
+  const owner = ownerMembership ?? (
+    competition.organizerId && competition.organizer
+      ? {
+          id: `owner:${competition.organizerId}`,
+          userId: competition.organizerId,
+          user: competition.organizer,
+          roles: [{ role: "OWNER", addedAt: new Date(0) }],
+          judgedElements: [],
+          representedTeams: [],
+          competitionId: id,
+          addedAt: new Date(0),
+        }
+      : null
   )
-  const owner = ownerMembership ?? {
-    id: `owner:${competition.organizerId}`,
-    userId: competition.organizerId,
-    user: competition.organizer,
-    roles: [{ role: "OWNER", addedAt: new Date(0) }],
-    judgedElements: [],
-    representedTeams: [],
-    competitionId: id,
-    addedAt: new Date(0),
-  }
 
   return NextResponse.json({
     canManageOrganizers,
+    canClearOwner: session.user.role === "ADMIN",
     owner,
     members: competition.members.filter(
       ({ userId }) => userId !== competition.organizerId
     ),
   })
+}
+
+async function handlePATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const { session, allowed, canManageOrganizers } =
+    await authorizeRoleManager(id)
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!allowed || !canManageOrganizers) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
+
+  const parsed = parseCompetitionOwnerRequest(
+    await req.json().catch(() => null)
+  )
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  if (parsed.userId === null && session.user.role !== "ADMIN") {
+    return NextResponse.json(
+      { error: "Ainult administraator saab jätta peakorraldaja määramata" },
+      { status: 403 }
+    )
+  }
+
+  setSecurityTargets({
+    competitionId: id,
+    ...(parsed.userId ? { userId: parsed.userId } : {}),
+  })
+  try {
+    const owner = await setCompetitionOwner({
+      competitionId: id,
+      userId: parsed.userId,
+    })
+    return NextResponse.json({ owner })
+  } catch (error) {
+    if (error instanceof CompetitionRoleAssignmentError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      )
+    }
+    throw error
+  }
 }
 
 async function handlePUT(
@@ -156,3 +213,4 @@ async function handlePUT(
 
 export const GET = withSecurityRoute("/api/competitions/[id]/roles", handleGET)
 export const PUT = withSecurityRoute("/api/competitions/[id]/roles", handlePUT)
+export const PATCH = withSecurityRoute("/api/competitions/[id]/roles", handlePATCH)

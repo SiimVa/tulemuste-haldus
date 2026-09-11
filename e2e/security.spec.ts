@@ -188,7 +188,13 @@ test.describe.serial("turvalogi ja päringupiirangud", () => {
 
   test("tokeniga kohtuniku tegutsejat ei omistata õigusteta sessioonile", async ({ page }) => {
     await login(page, member)
-    const competition = await prisma.competition.create({ data: { name: "Security token test", organizerId: adminId } })
+    const competition = await prisma.competition.create({
+      data: {
+        name: "Security token test",
+        createdById: adminId,
+        organizerId: adminId,
+      },
+    })
     const element = await prisma.scoringElement.create({ data: { competitionId: competition.id, name: "Token test", code: "T1" } })
     const team = await prisma.team.create({ data: { competitionId: competition.id, name: "Token team", code: "T1" } })
     const token = await prisma.accessToken.create({ data: { competitionId: competition.id, elementId: element.id, type: "JUDGE", name: "Security judge" } })

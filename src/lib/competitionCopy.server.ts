@@ -169,12 +169,12 @@ export async function copyScoringElementConfiguration(
 
 export async function copyCompetitionConfiguration({
   sourceCompetitionId,
-  organizerId,
+  createdById,
   name,
   includeElements = true,
 }: {
   sourceCompetitionId: string
-  organizerId: string
+  createdById: string
   name?: string
   includeElements?: boolean
 }) {
@@ -222,7 +222,8 @@ export async function copyCompetitionConfiguration({
           location: source.location,
           status: "SETUP",
           isPublic: false,
-          organizerId,
+          createdById,
+          organizerId: null,
           scoringMode: source.scoringMode,
           defaultKPMaxValue: source.defaultKPMaxValue,
           defaultNotPassed: source.defaultNotPassed,
@@ -269,12 +270,6 @@ export async function copyCompetitionConfiguration({
           representativeRequired: source.representativeRequired,
           captainRequired: source.captainRequired,
           teamMemberRoles: source.teamMemberRoles,
-          members: {
-            create: {
-              userId: organizerId,
-              roles: { create: { role: "OWNER" } },
-            },
-          },
         },
       })
 

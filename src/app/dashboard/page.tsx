@@ -673,7 +673,7 @@ export default async function DashboardPage() {
           <SectionHeading
             id="managed-competitions-title"
             title="Minu hallatavad võistlused"
-            description="Võistlused, kus oled peakorraldaja või sulle on antud haldusroll."
+            description="Võistlused, mida saad administraatori, peakorraldaja või korraldajana hallata."
           />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {competitions.map((competition) => (
@@ -706,7 +706,7 @@ export default async function DashboardPage() {
                   </div>
                   {currentUser.role === "ADMIN" && (
                     <p className="mt-2 text-xs text-gray-400">
-                      Korraldaja: {competition.organizer.name}
+                      Peakorraldaja: {competition.organizer?.name ?? "määramata"}
                     </p>
                   )}
                 </Link>

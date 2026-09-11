@@ -32,7 +32,9 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
   const members = await prisma.competitionMember.findMany({
     where: {
       competitionId: id,
-      userId: { not: competition.organizerId },
+      ...(competition.organizerId
+        ? { userId: { not: competition.organizerId } }
+        : {}),
       roles: { some: { role: "ORGANIZER" } },
     },
     include: {

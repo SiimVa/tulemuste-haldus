@@ -118,7 +118,13 @@ try {
           })
 
           if (rows.length > 0) {
-            await transaction[table].createMany({ data: rows })
+            const data = table === "competition"
+              ? rows.map((row) => ({
+                  ...row,
+                  createdById: row.organizerId,
+                }))
+              : rows
+            await transaction[table].createMany({ data })
           }
         }
 

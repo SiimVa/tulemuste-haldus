@@ -49,13 +49,8 @@ async function handlePOST(req: Request) {
       date: date ? new Date(date) : null,
       endDate: endDate ? new Date(endDate) : null,
       location,
-      organizerId: session.user.id,
-      members: {
-        create: {
-          userId: session.user.id,
-          roles: { create: { role: "OWNER" } },
-        },
-      },
+      createdById: session.user.id,
+      organizerId: null,
       scoringMode: defaults.scoringMode ?? "PENALTY",
       defaultKPMaxValue: defaults.defaultKPMaxValue ?? 30,
       defaultPKMaxValue: defaults.defaultPKMaxValue ?? 15,

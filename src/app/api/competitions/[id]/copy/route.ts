@@ -39,7 +39,7 @@ async function handlePOST(
   try {
     const competition = await copyCompetitionConfiguration({
       sourceCompetitionId: id,
-      organizerId: session.user.id,
+      createdById: session.user.id,
       name,
       includeElements,
     })
