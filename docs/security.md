@@ -142,7 +142,9 @@ Google’i callback’i vead salvestatakse samuti ebaõnnestunud sisselogimisten
 Google’ilt saadud koode, tokeneid ega päringu parameetreid logisse ei lisata.
 Vealeht suunab eestikeelse selgitusega tagasi sisselogimisele.
 
-Avalikud matkamang.ee / www.matkamang.ee aadressid suunatakse enne sisselogimist
-AUTH_URL / NEXTAUTH_URL määratud HTTPS-päritolule. Nii jääb hostipõhine PKCE
-küpsis samale domeenile kui Google’i callback. Google Cloudi callback peab
-vastama sellele aadressile. PKCE-kontroll jääb sisselülitatuks.
+Kõik matkamang.ee päringud suunatakse enne lehe avamist või sisselogimist
+püsiva HTTP 308 vastusega aadressile https://www.matkamang.ee, säilitades tee
+ja päringuparameetrid. Next.js-i redirects-reegel kontrollib avalikku Host-päist,
+mitte proksi taga oleva serveri sisemist URL-i. Nii jääb hostipõhine PKCE küpsis
+samale domeenile kui Google’i callback. AUTH_URL / NEXTAUTH_URL ja Google Cloudi
+callback peavad kasutama www.matkamang.ee aadressi. PKCE-kontroll jääb sisse.

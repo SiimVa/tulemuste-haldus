@@ -3,6 +3,16 @@ import type { NextConfig } from "next"
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@auth/core", "jose"],
   poweredByHeader: false,
+  async redirects() {
+    return [{
+      // Match the public Host header, not Next.js's internal server URL.
+      // Redirect before rendering pages or starting OAuth's host-only cookies.
+      source: "/:path*",
+      has: [{ type: "host", value: "matkamang\\.ee" }],
+      destination: "https://www.matkamang.ee/:path*",
+      permanent: true,
+    }]
+  },
   async headers() {
     return [
       {
