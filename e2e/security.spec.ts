@@ -96,6 +96,24 @@ test.describe.serial("turvalogi ja päringupiirangud", () => {
     await context.close()
   })
 
+  test("vale parool salvestab proovitud konto, kuid ei omista talle tegevust", async ({ page }) => {
+    await page.goto("/login")
+    await page.getByPlaceholder("admin@example.com").fill(member.email)
+    await page.locator('input[type="password"]').fill("incorrect-password")
+    await page.getByRole("button", { name: "Logi sisse" }).click()
+    await expect(page.getByRole("alert").filter({ hasText: "Vale e-post" })).toBeVisible()
+    const event = await prisma.securityEvent.findFirstOrThrow({
+      where: { action: "LOGIN", outcome: "DENIED", targetIds: { path: ["userId"], equals: memberId } },
+      orderBy: { createdAt: "desc" },
+    })
+    expect(event.actorUserId).toBeNull()
+    expect(JSON.stringify(event)).not.toContain(member.email)
+    await login(page, admin)
+    const response = await page.request.get("/api/security-events?outcome=DENIED&action=LOGIN")
+    const data = await response.json()
+    expect(data.events.find((row: { id: string }) => row.id === event.id).attemptedAccountName).toBe("Turvatesti kasutaja")
+  })
+
   test("API 429 ei muuda andmeid ja õiguse eemaldamine jõustub olemasolevas sessioonis", async ({ page }) => {
     await login(page, admin)
     const policy = apiRateLimitPolicy("/api/users", "POST", true)

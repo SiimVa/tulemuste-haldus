@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { linkPendingTeamMembersToUser } from "@/lib/teamMemberAccounts.server"
 import { LOGIN_ACCOUNT_POLICY, LOGIN_IP_POLICY } from "@/lib/security"
-import { consumeRateLimit, recordSecurityEvent, requestFingerprint } from "@/lib/security.server"
+import { consumeRateLimit, recordSecurityEvent, requestFingerprint, securityFingerprint } from "@/lib/security.server"
 
 // Constant-cost comparison for unknown accounts as well as incorrect passwords.
 const dummyPasswordHash = bcrypt.hashSync("not-a-real-account-password", 12)
@@ -34,18 +34,23 @@ const providers: NextAuthConfig["providers"] = [
         return null
       }
       const email = String(credentials.email).trim().toLowerCase()
+      // A claimed account is a target, never an authenticated actor.
+      const user = await prisma.user.findUnique({ where: { email } })
+      const attemptedEvent = { ...event, targetIds: {
+        ...(user ? { userId: user.id } : {}),
+        loginAccountHash: securityFingerprint("login-audit-account", email),
+      } }
       const accountLimit = await consumeRateLimit(LOGIN_ACCOUNT_POLICY, email)
       if (!accountLimit.allowed) {
-        if (accountLimit.firstBlocked) await recordSecurityEvent({ ...event, outcome: "RATE_LIMITED", status: 429 })
+        if (accountLimit.firstBlocked) await recordSecurityEvent({ ...attemptedEvent, outcome: "RATE_LIMITED", status: 429 })
         return null
       }
-      const user = await prisma.user.findUnique({ where: { email } })
       const valid = await bcrypt.compare(
         String(credentials.password),
         user?.passwordHash ?? dummyPasswordHash
       )
       if (!valid || !user?.passwordHash) {
-        await recordSecurityEvent({ ...event, outcome: "DENIED", status: 401 })
+        await recordSecurityEvent({ ...attemptedEvent, outcome: "DENIED", status: 401 })
         return null
       }
       return { id: user.id, email: user.email, name: user.name, role: user.role }
@@ -89,6 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   providers,
   events: {

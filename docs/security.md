@@ -128,3 +128,21 @@ Kontrollid: `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build` ja
 konkurentseid loendureid, aegumist, 429 vastuseid, õiguste eemaldamist,
 kustutatud konto sessiooni, logi privaatsust, administraatoripiiri, päiseid ja
 säilitustähtaja koristust. Need ei asenda sõltumatut turvaauditit.
+
+## Sisselogimise tõrgete uurimine
+
+Ebaõnnestunud paroolikatse salvestab olemasoleva proovitud konto sisemise ID
+sihtobjektina ja normaliseeritud e-posti HMAC-tunnuse. Administraator näeb konto
+praegust nime märgendiga „Proovitud konto (kinnitamata)”. See ei tõesta konto
+omaniku osalust; tegutseja jääb tuvastamata. Tundmatu e-postiga katseid saab
+seostada HMAC-tunnuse järgi. IP-piirangu või vigase sisendi korral konto infot
+veel ei otsita. Varem salvestamata infot tagasiulatuvalt taastada ei saa.
+
+Google’i callback’i vead salvestatakse samuti ebaõnnestunud sisselogimistena.
+Google’ilt saadud koode, tokeneid ega päringu parameetreid logisse ei lisata.
+Vealeht suunab eestikeelse selgitusega tagasi sisselogimisele.
+
+Avalikud matkamang.ee / www.matkamang.ee aadressid suunatakse enne sisselogimist
+AUTH_URL / NEXTAUTH_URL määratud HTTPS-päritolule. Nii jääb hostipõhine PKCE
+küpsis samale domeenile kui Google’i callback. Google Cloudi callback peab
+vastama sellele aadressile. PKCE-kontroll jääb sisselülitatuks.

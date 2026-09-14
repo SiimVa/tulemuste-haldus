@@ -49,6 +49,9 @@ export function securityTargetIds(params: Record<string, unknown>): Record<strin
     const value = params[key]
     if (typeof value === "string" && /^c[a-z0-9]{24}$/.test(value)) result[key] = value
   }
+  if (typeof params.loginAccountHash === "string" && /^[a-f0-9]{64}$/.test(params.loginAccountHash)) {
+    result.loginAccountHash = params.loginAccountHash
+  }
   return result
 }
 
