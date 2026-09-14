@@ -12,6 +12,9 @@ function LoginForm() {
   const [googleEnabled, setGoogleEnabled] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const authError = searchParams.has("error")
+    ? "Sisselogimine ei õnnestunud. Proovi Google’iga uuesti. Kui viga kordub, ava leht tavalises brauseris ja luba küpsised."
+    : ""
   const requestedCallback = searchParams.get("callbackUrl")
   const callbackUrl =
     requestedCallback?.startsWith("/") && !requestedCallback.startsWith("//")
@@ -78,8 +81,8 @@ function LoginForm() {
             />
           </div>
 
-          {error && (
-            <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</div>
+          {(error || authError) && (
+            <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg" role="alert">{error || authError}</div>
           )}
 
           <button

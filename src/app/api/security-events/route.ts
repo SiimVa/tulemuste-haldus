@@ -32,12 +32,12 @@ async function handleGET(request: Request) {
   ])
   const events = rows.slice(0, 50)
   const users = await prisma.user.findMany({
-    where: { id: { in: [...new Set(events.flatMap(event => event.actorUserId ? [event.actorUserId] : []))] } },
+    where: { id: { in: [...new Set(events.flatMap(event => [event.actorUserId, (event.targetIds as Record<string, string>).userId].filter((id): id is string => Boolean(id))))] } },
     select: { id: true, name: true },
   })
   const names = new Map(users.map(user => [user.id, user.name]))
   return Response.json({
-    events: events.map(event => ({ ...event, actorName: event.actorUserId ? names.get(event.actorUserId) ?? null : null })),
+    events: events.map(event => ({ ...event, actorName: event.actorUserId ? names.get(event.actorUserId) ?? null : null, attemptedAccountName: event.action === "LOGIN" ? names.get((event.targetIds as Record<string, string>).userId) ?? null : null })),
     nextCursor: rows.length > 50 ? events[events.length - 1].id : null,
     last24Hours: Object.fromEntries(counts.map(row => [row.outcome, row._count._all])),
   }, { headers: { "Cache-Control": "private, no-store" } })

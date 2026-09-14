@@ -7,6 +7,7 @@ type Event = {
   id: string; createdAt: string; action: string; outcome: SecurityOutcome
   route: string; method: string; status: number | null; durationMs: number | null
   actorUserId: string | null; actorTokenId: string | null; actorName: string | null
+  attemptedAccountName: string | null
   fingerprint: string | null; targetIds: Record<string, string>
 }
 type LogResponse = { events: Event[]; nextCursor: string | null; last24Hours: Partial<Record<SecurityOutcome, number>> }
@@ -93,8 +94,10 @@ export function SecurityLogView() {
               </p>
               <p className="mt-2 break-all">Tegutseja: {event.actorTokenId ? `ligipääsutoken ${event.actorTokenId}` : event.actorName ?? event.actorUserId ?? "Tuvastamata"}</p>
               {event.actorUserId && event.actorName && <p className="break-all text-xs text-gray-500">Kasutaja ID: {event.actorUserId}</p>}
+              {event.action === "LOGIN" && event.targetIds.userId && <p className="mt-2 break-all">Proovitud konto (kinnitamata): {event.attemptedAccountName ?? event.targetIds.userId}</p>}
+              {event.targetIds.loginAccountHash && <p className="mt-1 text-xs text-gray-500">Proovitud konto tunnus: {event.targetIds.loginAccountHash.slice(0, 12)}</p>}
               <p className="mt-2 break-all font-mono text-xs text-gray-600">{event.method} {event.route}</p>
-              {Object.entries(event.targetIds).map(([key, value]) => <p key={key} className="break-all text-xs text-gray-500">{key}: {value}</p>)}
+              {Object.entries(event.targetIds).filter(([key]) => key !== "loginAccountHash").map(([key, value]) => <p key={key} className="break-all text-xs text-gray-500">{key}: {value}</p>)}
               {event.fingerprint && <p className="mt-2 text-xs text-gray-500">Pseudonüümne allikas: {event.fingerprint.slice(0, 12)}</p>}
             </li>)}
           </ul>
