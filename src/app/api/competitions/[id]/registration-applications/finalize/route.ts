@@ -1,3 +1,4 @@
+import { archiveRegistrationStatistics } from "@/lib/registrationForecast.server"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -238,6 +239,7 @@ async function handlePOST(
         await queueMandateOpenedNotifications(tx, competitionId)
       }
 
+      await archiveRegistrationStatistics(tx, competitionId, finalizedAt, true)
       return { finalizedAt, createdTeams }
     })
 

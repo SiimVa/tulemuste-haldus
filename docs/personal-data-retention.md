@@ -37,3 +37,27 @@ curl --fail --silent --show-error \
 `APP_URL` on rakenduse HTTPS-aadress ilma lõpus oleva kaldkriipsuta. Endpoint
 tagastab kustutatud võistluste arvu ja ei töötle võistlusi enne nende
 säilitustähtaja saabumist.
+
+## Prognoosi jaoks säiliv registreerimisstatistika
+
+`Competition.registrationStatistics` sisaldab versiooniga päevakokkuvõtet:
+registreerimise algus ja lõpp, kohtade piir, andmete seis ning kumulatiivsed
+esitatud, aktiivsete, kinnitatud, loobunud ja tagasi lükatud avalduste arvud.
+Kokkuvõttes pole inimeste ega võistkondade nimesid, kontaktandmeid või
+kasutaja- ja avaldusetunnuseid.
+
+Kokkuvõte salvestatakse osalejate nimekirja kinnitamise tehingus ja enne
+isikuandmete puhastamist. Kui nimekiri kinnitatakse enne seadistatud tähtaega,
+kasutatakse kokkuvõttes lõpuna kinnitamise aega. Olemasolevate lõppenud
+registreerimiste puuduvaid kokkuvõtteid täidab sama igapäevane hooldustöö
+kuni 100 võistluse kaupa, ka juba puhastatud võistlustel. Enne tagantjärele
+salvestamist saab prognoosivaade olemasolevast sündmuste ajaloost kokkuvõtte
+lugemisel arvutada. Andmeteta ajalugu ei taastata oletuste abil.
+
+Kontaktandmete puhastamine ei kustuta avaldusi, sündmusi ega statistikat.
+Võistluse täielik kustutamine eemaldab ka kokkuvõtte. Kopeeritud võistlus
+alustab uue registreerimisajalooga.
+
+Kasutuselevõtt nõuab migratsiooni `20260915120000_registration_statistics`
+(`npm run db:deploy`) ja Prisma kliendi genereerimist. Igapäevane hooldustöö
+kasutab olemasolevat ülal kirjeldatud ajastajat; uut ajastajat pole vaja.
