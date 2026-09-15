@@ -115,3 +115,41 @@ ajaloo jaoks säilivad võistkonna nimi, liikmete nimed ja rollid.
 
 Automaatse kustutamise käivitamine on kirjeldatud failis
 [personal-data-retention.md](personal-data-retention.md).
+
+## Registreerimise prognoos
+
+Menüüs **Registreerimine → Prognoos** näeb korraldaja kahte hinnangut aktiivsete
+registreerimisavalduste arvule registreerimise tähtajal. Prognoos ei ennusta
+tegelikku kohaletulekut. Mustandeid ei arvestata, korduv esitamine ei lisa uut
+võistkonda. Kinnitatud, ootel ja parandamisel avaldused on aktiivsed;
+loobunud ja tagasi lükatud avaldused ei ole.
+
+- **Senine tempo:** viimase 7 täispäeva aktiivsete avalduste netokasvu kaal on
+  65% ja kuni 14 täispäeva kaal 35%. Prognoos vajab vähemalt 3 päeva ajalugu,
+  5 esitatud avaldust ning tulevast lõpptähtaega. Tänane poolik päev tempot ei
+  mõjuta. Loobumised ja tagasilükkamised võivad anda negatiivse netotempo.
+- **Ajalooline prognoos:** korraldaja valib kuni 20 enda hallatavat lõppenud
+  registreerimisega võistlust. Võrdlus joondatakse päevade arvu järgi tähtajani.
+  Iga võrdluse hinnang on praegune aktiivsete arv × võrdlusvõistluse aktiivsete
+  arv tähtajal / selle aktiivsete arv samal ajal enne tähtaega. Kuvatakse
+  sobivate võrdluste mediaan. Võrdluse vahepunktis peab olema vähemalt
+  3 aktiivset avaldust. Puuduliku ajalooga võistlusi ei kasutata.
+
+Vahemikud on stsenaariumihinnangud, mitte kalibreeritud statistilised
+usaldusvahemikud. Tempohinnangu hajuvus sõltub vaatlusperioodist ja kahe
+akna tempo erinevusest. Ajaloolise hinnangu vahemik lähtub võrdluste
+äärmustest koos varuga (ühe võrdluse puhul 25%, mitme puhul 10%, vähemalt
+2 võistkonda). Kohtade piir ei kärbi registreerimisnõudluse hinnangut;
+piiriga arvestav võimalik osalejate arv kuvatakse eraldi.
+
+Graafik ja päevakokkuvõtted kasutavad UTC kalendripäevi. Salvestatakse ainult
+muutustega päevad ning perioodi piirid; nende vahel jäävad arvud samaks.
+Käsitsi lisatud ja vana töövoo võistkondade puuduvat avalduse ajalugu ei
+asendata võistkonna loomise kuupäevaga. Vaates näidatakse nende väljajätmist.
+Puuduva sündmuste ajaloo korral näidatakse hoiatust; teadaolev lõppstaatus
+kajastatakse kokkuvõtte koostamise päeval, mitte oletuslikul varasemal ajal.
+
+Võrdlusvalik säilib brauseris võistluse kaupa. API kontrollib nii sihtvõistluse
+kui iga valitud võrdlusvõistluse haldusõigust ja väljastab ainult arvulised
+kokkuvõtted. Prognoos on saadaval ainult avatud registreerimise ajal;
+muudel juhtudel kuvatakse ajalugu.

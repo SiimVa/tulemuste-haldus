@@ -208,6 +208,8 @@ model Competition {
   registrationClosesAt         DateTime?
   registrationOverride         String    @default("AUTO")
   registrationFinalizedAt      DateTime?
+  // Versioned daily aggregate archive, without names or contact details.
+  registrationStatistics       String?
   registrationCapacity         Int?
   registrationClassBalanceMode String    @default("OFF")
   registrationApprovalMode     String    @default("AUTOMATIC")

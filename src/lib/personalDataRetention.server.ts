@@ -1,3 +1,4 @@
+import { archiveRegistrationStatistics } from "./registrationForecast.server"
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import {
@@ -60,6 +61,8 @@ export async function purgeCompetitionPersonalData(
       "Isikuandmete säilitustähtaeg ei ole veel saabunud"
     )
   }
+
+  await archiveRegistrationStatistics(tx, competitionId, now)
 
   const fields = await tx.competitionFormField.findMany({
     where: { competitionId },
@@ -180,6 +183,20 @@ export async function purgeCompetitionPersonalData(
 }
 
 export async function purgeExpiredPersonalData(now = new Date()) {
+  // Backfill aggregates for old competitions, including those already scrubbed.
+  const unarchived = await prisma.competition.findMany({
+    where: { registrationStatistics: null, OR: [
+      { registrationFinalizedAt: { not: null } },
+      { personalDataPurgedAt: { not: null } },
+      { registrationClosesAt: { lt: now }, registrationOverride: { not: "OPEN" } },
+    ] },
+    select: { id: true },
+    take: 100,
+    orderBy: { id: "asc" },
+  })
+  for (const competition of unarchived) {
+    await prisma.$transaction(tx => archiveRegistrationStatistics(tx, competition.id, now))
+  }
   const candidates = await prisma.competition.findMany({
     where: { endDate: { not: null }, personalDataPurgedAt: null },
     select: {
