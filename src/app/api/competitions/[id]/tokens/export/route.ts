@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import * as XLSX from "xlsx"
+import { parseQrOptions, renderAccessQrExport } from "@/lib/accessQrExport"
 
 async function handleGET(
   req: Request,
@@ -16,6 +17,13 @@ async function handleGET(
   const { id: competitionId } = await params
   if (!await canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role })) {
     return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
+
+  const searchParams = new URL(req.url).searchParams
+  const qrExport = searchParams.get("format") === "qr"
+  const qrOptions = parseQrOptions(searchParams)
+  if (qrExport && !qrOptions) {
+    return NextResponse.json({ error: "Vali sihtrühm ja 1–12 QR-koodi lehe kohta" }, { status: 400 })
   }
 
   const competition = await prisma.competition.findUnique({
@@ -56,6 +64,32 @@ async function handleGET(
     const bO = b.teamId ? (teamOrderMap.get(b.teamId) ?? 9999) : 9999
     return aO - bO
   })
+
+  if (qrExport && qrOptions) {
+    const entries = sorted
+      .filter(t => (t.type === "JUDGE" || t.type === "ATHLETE") &&
+        (qrOptions.audience === "ALL" || t.type === qrOptions.audience))
+      .map(t => ({
+        name: t.name,
+        role: t.type === "JUDGE" ? "Kohtunik" : "Võistkond",
+        subject: t.type === "JUDGE"
+          ? (t.element ? `[${t.element.code}] ${t.element.name}` : "Kõik KP-d")
+          : (t.team ? `${t.team.code} · ${t.team.name}` : ""),
+        link: `${baseUrl}/${t.type === "JUDGE" ? "judge" : "athlete"}/${t.token}`,
+      }))
+    if (entries.length === 0) {
+      return new NextResponse("Valitud sihtrühmale pole juurdepääsulinke loodud.", {
+        status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      })
+    }
+    return new NextResponse(await renderAccessQrExport(competition.name, entries, qrOptions.perPage), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+      },
+    })
+  }
 
   const rows = sorted.map(t => {
     const path = t.type === "JUDGE" ? `/judge/${t.token}` : `/athlete/${t.token}`

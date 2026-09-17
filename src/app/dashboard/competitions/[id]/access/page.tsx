@@ -19,6 +19,8 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
   const [saving, setSaving] = useState(false)
   const [bulkLoading, setBulkLoading] = useState(false)
   const [bulkMsg, setBulkMsg] = useState("")
+  const [qrAudience, setQrAudience] = useState("ALL")
+  const [qrPerPage, setQrPerPage] = useState(6)
   const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(() => {
@@ -105,6 +107,33 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
       <p className="text-xs text-gray-400 mb-6 -mt-4">
         "Loo kõik lingid" loob automaatselt kohtuniku lingid igale elemendile ja võistleja lingid igale võistkonnale (kui need juba pole olemas).
       </p>
+
+      <section className="bg-white border rounded-xl p-5 mb-6 space-y-3" aria-labelledby="qr-export-title">
+        <h2 id="qr-export-title" className="font-semibold text-gray-900">Ekspordi QR-koodid</h2>
+        <p className="text-sm text-gray-500">Prindi olemasolevad juurdepääsulingid või salvesta PDF-ina. Ühele A4 lehele mahub kuni 12 QR-koodi.</p>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="text-sm text-gray-700">
+            Sihtrühm
+            <select value={qrAudience} onChange={e => setQrAudience(e.target.value)} className="block mt-1 border rounded-lg px-3 py-2">
+              <option value="ALL">Võistkonnad ja kohtunikud</option>
+              <option value="ATHLETE">Võistkonnad</option>
+              <option value="JUDGE">Kohtunikud</option>
+            </select>
+          </label>
+          <label className="text-sm text-gray-700">
+            QR-koode lehel
+            <select value={qrPerPage} onChange={e => setQrPerPage(Number(e.target.value))} className="block mt-1 border rounded-lg px-3 py-2">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(count => <option key={count} value={count}>{count}</option>)}
+            </select>
+          </label>
+          {tokens.some(t => (t.type === "JUDGE" || t.type === "ATHLETE") && (qrAudience === "ALL" || t.type === qrAudience)) ? (
+            <a href={`/api/competitions/${competitionId}/tokens/export?format=qr&audience=${qrAudience}&perPage=${qrPerPage}`} target="_blank" rel="noopener noreferrer"
+              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200">
+              Ava prindivaade
+            </a>
+          ) : <p className="text-sm text-gray-500">Valitud sihtrühmale pole linke loodud.</p>}
+        </div>
+      </section>
 
       <CompetitionRoleManager
         competitionId={competitionId}
