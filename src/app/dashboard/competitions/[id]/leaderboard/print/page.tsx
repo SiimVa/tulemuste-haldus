@@ -1,3 +1,6 @@
+import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
+import { GapCells, GapHeadings, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
+import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
@@ -5,11 +8,11 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PrintButton } from "@/components/PrintButton"
 
-export default async function LeaderboardPrintPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeaderboardPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ class?: string | string[] }> }) {
   await auth()
   const { id } = await params
 
-  const competition = await prisma.competition.findUnique({ where: { id } })
+  const competition = await prisma.competition.findUnique({ where: { id }, include: { registrationClasses: { where: { isActive: true }, select: { name: true } } } })
   if (!competition) notFound()
 
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
@@ -32,9 +35,10 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
     return { team, total, manualTotal, byElement }
   })
 
-  const inComp = allRows.filter((r) => !r.team.isHorsDeCompetition)
+  const isRanked = (team: typeof teams[number]) => !team.isHorsDeCompetition && team.hcFromElementOrder == null && team.dnfFromElementOrder == null
+  const inComp = allRows.filter((r) => isRanked(r.team))
     .sort((a, b) => isPlusMode ? b.total - a.total : a.total - b.total)
-  const horsComp = allRows.filter((r) => r.team.isHorsDeCompetition)
+  const horsComp = allRows.filter((r) => !isRanked(r.team))
     .sort((a, b) => isPlusMode ? b.total - a.total : a.total - b.total)
 
   const classRank: Record<string, number> = {}
@@ -43,6 +47,14 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
     classRank[cls] = (classRank[cls] ?? 0) + 1
     return { ...r, rank: i + 1, classRank: classRank[cls], cls }
   })
+
+  const classes = [...new Set([...competition.registrationClasses.map(cls => cls.name), ...teams.map(team => team.class ?? "")])].sort(naturalCompare)
+  const showClasses = classes.some(Boolean)
+  const classParams = (await searchParams).class
+  const matchesClass = leaderboardClassFilter(classParams, classes)
+  const gaps = leaderboardGaps(ranked)
+  const visibleRanked = ranked.filter(row => matchesClass(row.team))
+  const visibleHorsComp = horsComp.filter(row => matchesClass(row.team))
 
   const dateStr = competition.date ? competition.date.toLocaleDateString("et-EE") : ""
   const endDateStr = competition.endDate && competition.endDate.toDateString() !== competition.date?.toDateString()
@@ -57,6 +69,7 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
           .print-page { padding: 10mm; }
           table { border-collapse: collapse; width: 100%; }
           th, td { border: 1px solid #666; padding: 3px 6px; }
+          [title="Kuld"], [title="Hõbe"], [title="Pronks"] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
           th { background: #e5e7eb; font-weight: 600; }
         }
         @page { size: A4 landscape; margin: 0; }
@@ -77,9 +90,11 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
             <h1 className="text-xl font-bold">{competition.name} — Lõpuprotokoll</h1>
             <p className="text-sm text-gray-600">{dateStr}{endDateStr}{competition.location && ` · ${competition.location}`}</p>
           </div>
-          <p className="text-xs text-gray-400">{isPlusMode ? "Plusspunktid" : "Karistuspunktid"} · {ranked.length} võistkonda</p>
+          <p className="text-xs text-gray-400">{isPlusMode ? "Plusspunktid" : "Karistuspunktid"} · {visibleRanked.length} võistkonda</p>
         </div>
 
+        <LeaderboardClassFilter classes={classes} />
+        {classParams !== undefined && <p className="text-sm mb-3">Klassid: {(Array.isArray(classParams) ? classParams : [classParams]).filter(cls => classes.includes(cls)).map(cls => cls || "Klassita").join(", ") || "Kõik"}</p>}
         <table className="w-full mb-6">
           <thead>
             <tr>
@@ -93,13 +108,14 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
               ))}
               <th style={{ width: 60 }}>Lisaär.</th>
               <th style={{ minWidth: 65, textAlign: "right" }}>KOKKU</th>
+              <GapHeadings showClasses={showClasses} />
             </tr>
           </thead>
           <tbody>
-            {ranked.map((row, i) => (
+            {visibleRanked.map((row, i) => (
               <tr key={row.team.id} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb" }}>
-                <td style={{ textAlign: "center", fontWeight: 700 }}>{row.rank}</td>
-                <td style={{ textAlign: "center", color: "#6b7280", fontSize: 10 }}>{row.classRank}</td>
+                <td style={{ textAlign: "center", fontWeight: 700 }}><RankBadge rank={row.rank} /></td>
+                <td style={{ textAlign: "center", color: "#6b7280", fontSize: 10 }}><RankBadge rank={row.team.class ? row.classRank : null} /></td>
                 <td style={{ textAlign: "center", fontFamily: "monospace", fontWeight: 600 }}>{row.team.code}</td>
                 <td>{row.team.name}</td>
                 <td style={{ textAlign: "center", fontSize: 10 }}>{row.cls}</td>
@@ -114,19 +130,20 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
                 <td style={{ textAlign: "right", fontWeight: 700, fontFamily: "monospace" }}>
                   {row.total.toFixed(2)}
                 </td>
+                <GapCells gap={gaps.get(row.team.id)} showClasses={showClasses} />
               </tr>
             ))}
-            {horsComp.length > 0 && (
+            {visibleHorsComp.length > 0 && (
               <>
                 <tr>
-                  <td colSpan={5 + elements.length + 2}
+                  <td colSpan={7 + elements.length + (showClasses ? 4 : 2)}
                     style={{ background: "#fef3c7", fontWeight: 600, fontSize: 10, padding: "3px 6px" }}>
-                    Arvestusvälised
+                    Arvestusvälised ja katkestanud
                   </td>
                 </tr>
-                {horsComp.map((row, i) => (
+                {visibleHorsComp.map((row, i) => (
                   <tr key={row.team.id} style={{ background: i % 2 === 0 ? "#fffbeb" : "#fef9e7" }}>
-                    <td style={{ textAlign: "center", color: "#b45309", fontSize: 10 }}>AV</td>
+                    <td style={{ textAlign: "center", color: "#b45309", fontSize: 10 }}>{row.team.dnfFromElementOrder != null ? "KAT" : "AV"}</td>
                     <td style={{ textAlign: "center", color: "#6b7280", fontSize: 10 }}>–</td>
                     <td style={{ textAlign: "center", fontFamily: "monospace", color: "#b45309" }}>{row.team.code}</td>
                     <td style={{ color: "#92400e" }}>{row.team.name}</td>
@@ -142,6 +159,7 @@ export default async function LeaderboardPrintPage({ params }: { params: Promise
                     <td style={{ textAlign: "right", fontWeight: 700, fontFamily: "monospace", color: "#92400e" }}>
                       {row.total.toFixed(2)}
                     </td>
+                    <GapCells showClasses={showClasses} />
                   </tr>
                 ))}
               </>
