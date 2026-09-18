@@ -1,3 +1,4 @@
+import { EmptyProtocolOptions, EmptyProtocolRowCountInput } from "@/components/protocol/EmptyProtocolOptions"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
@@ -40,14 +41,16 @@ export default async function ProtocolPage({
   ).sort((a, b) => naturalCompare(a.code, b.code))
 
   return (
-    <>
+    <EmptyProtocolOptions>
       <style>{emptyProtocolStyles}</style>
 
       <ProtocolPrintToolbar
         backHref={`/dashboard/competitions/${competitionId}/elements/${elementId}`}
         buttonLabel="Prindi protokoll"
         className="m-6 mb-0 rounded-lg"
-      />
+      >
+        <EmptyProtocolRowCountInput />
+      </ProtocolPrintToolbar>
 
       <EmptyProtocolSheet
         competition={element.competition}
@@ -58,6 +61,6 @@ export default async function ProtocolPage({
       <p className="text-xs text-gray-400 mx-6 mb-6 no-print">
         Vajuta &quot;Prindi protokoll&quot; et avada prindivaade
       </p>
-    </>
+    </EmptyProtocolOptions>
   )
 }

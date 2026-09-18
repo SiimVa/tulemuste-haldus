@@ -1,3 +1,4 @@
+import { EmptyProtocolAdditionalRows } from "@/components/protocol/EmptyProtocolOptions"
 import { protocolFieldHeading } from "@/lib/protocol"
 import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentHeading"
 
@@ -169,6 +170,7 @@ export function EmptyProtocolSheet({
               <td className="fill" />
             </tr>
           ))}
+          <EmptyProtocolAdditionalRows columnCount={columnCount} />
           {horsComp.length > 0 && (
             <>
               <tr>
