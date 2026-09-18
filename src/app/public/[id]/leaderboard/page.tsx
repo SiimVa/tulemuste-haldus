@@ -1,3 +1,6 @@
+import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
+import { GapCells, GapHeadings, GapSummary, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
+import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
@@ -17,10 +20,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: comp ? `${comp.name} – Pingerida` : "Pingerida" }
 }
 
-export default async function PublicLeaderboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PublicLeaderboardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ class?: string | string[] }> }) {
   const { id } = await params
 
-  const competition = await prisma.competition.findUnique({ where: { id } })
+  const competition = await prisma.competition.findUnique({ where: { id }, include: { registrationClasses: { where: { isActive: true }, select: { name: true } } } })
   if (!competition) notFound()
 
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
@@ -82,6 +85,14 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
     ...entry, rank: null, classRank: null, class: entry.team.class ?? "–",
   }))
 
+  const classes = [...new Set([...competition.registrationClasses.map(cls => cls.name), ...teams.map(team => team.class ?? "")])].sort(naturalCompare)
+  const showClasses = classes.some(Boolean)
+  const classParams = (await searchParams).class
+  const matchesClass = leaderboardClassFilter(classParams, classes)
+  const gaps = leaderboardGaps(inCompRows)
+  const visibleInCompRows = inCompRows.filter(row => matchesClass(row.team))
+  const visibleHorsCompRows = horsCompRows.filter(row => matchesClass(row.team))
+  const visibleDnfRows = dnfRows.filter(row => matchesClass(row.team))
   const isPlusMode = scoringMode === "PLUS"
   const updatedAt = new Date().toLocaleString("et-EE", { timeZone: "Europe/Tallinn", dateStyle: "medium", timeStyle: "short" })
 
@@ -94,8 +105,8 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{competition.name}</h1>
               <p className="text-gray-500 text-sm mt-1">
-                Pingerida · {inCompRows.length} võistkonda
-                {horsCompRows.length > 0 && ` + ${horsCompRows.length} arvestusvälised`}
+                Pingerida · {visibleInCompRows.length} võistkonda
+                {visibleHorsCompRows.length > 0 && ` + ${visibleHorsCompRows.length} arvestusvälised`}
               </p>
             </div>
             <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 sm:gap-1">
@@ -119,13 +130,15 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
           </div>
         </div>
 
+        <LeaderboardClassFilter classes={classes} />
+
         {/* Mobiilivaade: kompaktsed kaardid (vajuta → elementide punktid) */}
         <div className="md:hidden space-y-2">
           <p className="text-xs text-gray-400 px-1">Vajuta võistkonnale, et näha elementide punkte</p>
-          {inCompRows.map((row) => (
+          {visibleInCompRows.map((row) => (
             <details key={row.team.id} data-lb-team={row.team.id} className="group bg-white border rounded-xl shadow-sm">
               <summary className="px-3 py-2.5 flex items-center gap-3 cursor-pointer list-none">
-                <span className="text-lg font-bold text-gray-900 w-7 text-center shrink-0">{row.rank}</span>
+                <span className="text-lg font-bold text-gray-900 w-7 text-center shrink-0"><RankBadge rank={row.rank} /></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {!isAutomaticRegistrationCode(row.team.code) && (
@@ -134,7 +147,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <span className="font-medium text-gray-900 truncate">{row.team.name}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class} · {row.classRank}.</span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{row.class} · <RankBadge rank={row.team.class ? row.classRank : null} /></span>
                     {row.manualTotal > 0 && (
                       <span className="text-xs font-mono text-orange-600">Lisaär. {isPlusMode ? "-" : "+"}{row.manualTotal.toFixed(1)}</span>
                     )}
@@ -144,6 +157,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                 <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
               </summary>
               <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                <GapSummary gap={gaps.get(row.team.id)} showClasses={showClasses} />
                 {elements.map((el) => (
                   <div key={el.id} className="flex items-center justify-between text-xs gap-2">
                     <span className="text-gray-500 truncate">
@@ -162,10 +176,10 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               </div>
             </details>
           ))}
-          {horsCompRows.length > 0 && (
+          {visibleHorsCompRows.length > 0 && (
             <>
               <p className="px-1 pt-2 text-xs font-semibold text-amber-700 tracking-wide uppercase">Arvestusvälised</p>
-              {horsCompRows.map((row) => (
+              {visibleHorsCompRows.map((row) => (
                 <details key={row.team.id} data-lb-team={row.team.id} className="group bg-amber-50/60 border rounded-xl shadow-sm">
                   <summary className="px-3 py-2.5 flex items-center gap-3 cursor-pointer list-none">
                     <span className="text-xs text-amber-600 font-medium w-7 text-center shrink-0">AV</span>
@@ -182,6 +196,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
                   </summary>
                   <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                <GapSummary gap={gaps.get(row.team.id)} showClasses={showClasses} />
                     {elements.map((el) => (
                       <div key={el.id} className="flex items-center justify-between text-xs gap-2">
                         <span className="text-gray-500 truncate">
@@ -196,10 +211,10 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
               ))}
             </>
           )}
-          {dnfRows.length > 0 && (
+          {visibleDnfRows.length > 0 && (
             <>
               <p className="px-1 pt-2 text-xs font-semibold text-gray-500 tracking-wide uppercase">Katkestanud</p>
-              {dnfRows.map((row) => (
+              {visibleDnfRows.map((row) => (
                 <details key={row.team.id} data-lb-team={row.team.id} className="group bg-gray-50 border rounded-xl shadow-sm">
                   <summary className="px-3 py-2.5 flex items-center gap-3 cursor-pointer list-none">
                     <span className="text-xs text-gray-400 font-medium w-7 text-center shrink-0">KAT</span>
@@ -216,6 +231,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
                   </summary>
                   <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                <GapSummary gap={gaps.get(row.team.id)} showClasses={showClasses} />
                     {elements.map((el) => (
                       <div key={el.id} className="flex items-center justify-between text-xs gap-2">
                         <span className="text-gray-500 truncate">
@@ -253,13 +269,14 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                   ))}
                   <th className="sticky top-0 z-20 bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500 text-right">Lisaär.</th>
                   <th className="sticky right-0 top-0 z-30 bg-gray-50 border-l px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
+                  <GapHeadings showClasses={showClasses} />
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {inCompRows.map((row) => (
+                {visibleInCompRows.map((row) => (
                   <tr key={row.team.id} data-lb-team={row.team.id} className="hover:bg-gray-50">
-                    <td className="sticky left-0 z-10 bg-white w-12 px-2 py-3 font-bold text-gray-900 text-center">{row.rank}</td>
-                    <td className="sticky left-12 z-10 bg-white w-12 px-2 py-3 text-gray-400 text-xs text-center">{row.classRank}</td>
+                    <td className="sticky left-0 z-10 bg-white w-12 px-2 py-3 font-bold text-gray-900 text-center"><RankBadge rank={row.rank} /></td>
+                    <td className="sticky left-12 z-10 bg-white w-12 px-2 py-3 text-gray-400 text-xs text-center"><RankBadge rank={row.team.class ? row.classRank : null} /></td>
                     <td className="sticky left-24 z-10 bg-white border-r px-4 py-3 min-w-40">
                       {!isAutomaticRegistrationCode(row.team.code) && (
                         <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
@@ -297,16 +314,17 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                     <td className="sticky right-0 z-10 bg-white border-l px-4 py-3 text-right">
                       <span className="font-bold text-gray-900 font-mono">{row.total.toFixed(2)}</span>
                     </td>
+                    <GapCells gap={gaps.get(row.team.id)} showClasses={showClasses} />
                   </tr>
                 ))}
-                {horsCompRows.length > 0 && (
+                {visibleHorsCompRows.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={6 + elements.length} className="px-4 py-2 bg-amber-50 text-xs font-semibold text-amber-700 tracking-wide uppercase">
+                      <td colSpan={6 + elements.length + (showClasses ? 4 : 2)} className="px-4 py-2 bg-amber-50 text-xs font-semibold text-amber-700 tracking-wide uppercase">
                         Arvestusvälised
                       </td>
                     </tr>
-                    {horsCompRows.map((row) => (
+                    {visibleHorsCompRows.map((row) => (
                       <tr key={row.team.id} data-lb-team={row.team.id} className="hover:bg-gray-50 bg-amber-50/40">
                         <td className="sticky left-0 z-10 bg-amber-50 w-12 px-2 py-3 text-xs text-amber-600 font-medium text-center">AV</td>
                         <td className="sticky left-12 z-10 bg-amber-50 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
@@ -347,18 +365,19 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         <td className="sticky right-0 z-10 bg-amber-50 border-l px-4 py-3 text-right">
                           <span className="font-bold text-amber-700 font-mono">{row.total.toFixed(2)}</span>
                         </td>
+                    <GapCells gap={gaps.get(row.team.id)} showClasses={showClasses} />
                       </tr>
                     ))}
                   </>
                 )}
-                {dnfRows.length > 0 && (
+                {visibleDnfRows.length > 0 && (
                   <>
                     <tr>
-                      <td colSpan={6 + elements.length} className="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-500 tracking-wide uppercase">
+                      <td colSpan={6 + elements.length + (showClasses ? 4 : 2)} className="px-4 py-2 bg-gray-100 text-xs font-semibold text-gray-500 tracking-wide uppercase">
                         Katkestanud
                       </td>
                     </tr>
-                    {dnfRows.map((row) => (
+                    {visibleDnfRows.map((row) => (
                       <tr key={row.team.id} data-lb-team={row.team.id} className="hover:bg-gray-50 bg-gray-50/60">
                         <td className="sticky left-0 z-10 bg-gray-100 w-12 px-2 py-3 text-xs text-gray-400 font-medium text-center">KAT</td>
                         <td className="sticky left-12 z-10 bg-gray-100 w-12 px-2 py-3 text-gray-400 text-xs text-center">–</td>
@@ -394,6 +413,7 @@ export default async function PublicLeaderboardPage({ params }: { params: Promis
                         <td className="sticky right-0 z-10 bg-gray-100 border-l px-4 py-3 text-right">
                           <span className="font-bold text-gray-400 font-mono">KAT</span>
                         </td>
+                    <GapCells gap={gaps.get(row.team.id)} showClasses={showClasses} />
                       </tr>
                     ))}
                   </>

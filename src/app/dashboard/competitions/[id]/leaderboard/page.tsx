@@ -1,3 +1,6 @@
+import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
+import { GapCells, GapHeadings, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
+import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { naturalCompare } from "@/lib/utils"
@@ -10,10 +13,10 @@ import { Card } from "@/components/ui/card"
 
 export const dynamic = "force-dynamic"
 
-export default async function LeaderboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeaderboardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ class?: string | string[] }> }) {
   const { id } = await params
 
-  const competition = await prisma.competition.findUnique({ where: { id } })
+  const competition = await prisma.competition.findUnique({ where: { id }, include: { registrationClasses: { where: { isActive: true }, select: { name: true } } } })
   if (!competition) notFound()
 
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
@@ -85,6 +88,16 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
     return { ...entry, rank: null, classRank: null, class: cls }
   })
 
+  const classes = [...new Set([...competition.registrationClasses.map(cls => cls.name), ...teams.map(team => team.class ?? "")])].sort(naturalCompare)
+  const showClasses = classes.some(Boolean)
+  const classParams = (await searchParams).class
+  const matchesClass = leaderboardClassFilter(classParams, classes)
+  const printQuery = new URLSearchParams()
+  for (const cls of Array.isArray(classParams) ? classParams : classParams === undefined ? [] : [classParams]) printQuery.append("class", cls)
+  const gaps = leaderboardGaps(inCompRows)
+  const visibleInCompRows = inCompRows.filter(row => matchesClass(row.team))
+  const visibleHorsCompRows = horsCompRows.filter(row => matchesClass(row.team))
+  const visibleDnfRows = dnfRows.filter(row => matchesClass(row.team))
   const isPlusMode = scoringMode === "PLUS"
 
   const ScoreRow = ({
@@ -100,9 +113,9 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
     return (
     <tr className={`hover:bg-gray-50 ${isDnf ? "bg-red-50/50" : isHC ? "bg-amber-50/50" : ""}`}>
       <td className={`sticky left-0 z-10 ${stickyBg} w-12 px-2 py-3 font-bold text-gray-900 text-center`}>
-        {isDnf ? <span className="text-red-600 font-medium text-xs">KAT</span> : row.rank ?? <span className="text-amber-600 font-medium text-xs">AV</span>}
+        {isDnf ? <span className="text-red-600 font-medium text-xs">KAT</span> : (row.rank !== null ? <RankBadge rank={row.rank} /> : <span className="text-amber-600 font-medium text-xs">AV</span>)}
       </td>
-      <td className={`sticky left-12 z-10 ${stickyBg} w-12 px-2 py-3 text-gray-400 text-xs text-center`}>{row.classRank ?? "–"}</td>
+      <td className={`sticky left-12 z-10 ${stickyBg} w-12 px-2 py-3 text-gray-400 text-xs text-center`}><RankBadge rank={row.team.class ? row.classRank : null} /></td>
       <td className={`sticky left-24 z-10 ${stickyBg} border-r px-4 py-3 min-w-40`}>
         <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
         <span className={`font-medium ${isDnf ? "text-red-700" : isHC ? "text-amber-700" : "text-gray-900"}`}>{row.team.name}</span>
@@ -148,6 +161,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
           {isDnf ? "KAT" : row.total.toFixed(2)}
         </span>
       </td>
+      <GapCells gap={gaps.get(row.team.id)} showClasses={showClasses} />
     </tr>
     )
   }
@@ -203,7 +217,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
             options: [
               { label: "Excel (.xlsx)", href: `/api/competitions/${id}/export?format=xlsx` },
               { label: "CSV", href: `/api/competitions/${id}/export?format=csv` },
-              { label: "PDF (printimine)", printHref: `/dashboard/competitions/${id}/leaderboard/print` },
+              { label: "PDF (printimine)", printHref: `/dashboard/competitions/${id}/leaderboard/print?${printQuery}` },
             ],
           }]} />
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${isPlusMode ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}>
@@ -212,10 +226,11 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
         </div>
       </div>
       <p className="text-gray-500 text-sm mb-6">
-        Pingerida · {inCompRows.length} võistkonda
-        {horsCompRows.length > 0 && ` + ${horsCompRows.length} arvestusvälised`}
+        Pingerida · {visibleInCompRows.length} võistkonda
+        {visibleHorsCompRows.length > 0 && ` + ${visibleHorsCompRows.length} arvestusvälised`}
       </p>
 
+      <LeaderboardClassFilter classes={classes} />
       <Card className="overflow-hidden">
         <div className="overflow-auto max-h-[75vh]">
           <table className="w-full text-sm">
@@ -236,32 +251,33 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ id
                 ))}
                 <th className="sticky top-0 z-20 bg-gray-50 px-4 py-3 text-xs font-medium text-gray-500 text-right">Lisaär.</th>
                 <th className="sticky right-0 top-0 z-30 bg-gray-50 border-l px-4 py-3 text-xs font-semibold text-gray-700 text-right">KOKKU</th>
+                  <GapHeadings showClasses={showClasses} />
               </tr>
             </thead>
             <tbody className="divide-y">
-              {inCompRows.map((row) => (
+              {visibleInCompRows.map((row) => (
                 <ScoreRow key={row.team.id} row={row} />
               ))}
-              {horsCompRows.length > 0 && (
+              {visibleHorsCompRows.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={6 + elements.length} className="px-4 py-2 bg-amber-50 text-xs font-semibold text-amber-700 tracking-wide uppercase">
+                    <td colSpan={6 + elements.length + (showClasses ? 4 : 2)} className="px-4 py-2 bg-amber-50 text-xs font-semibold text-amber-700 tracking-wide uppercase">
                       Arvestusvälised
                     </td>
                   </tr>
-                  {horsCompRows.map((row) => (
+                  {visibleHorsCompRows.map((row) => (
                     <ScoreRow key={row.team.id} row={row} isHC />
                   ))}
                 </>
               )}
-              {dnfRows.length > 0 && (
+              {visibleDnfRows.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={6 + elements.length} className="px-4 py-2 bg-red-50 text-xs font-semibold text-red-700 tracking-wide uppercase">
+                    <td colSpan={6 + elements.length + (showClasses ? 4 : 2)} className="px-4 py-2 bg-red-50 text-xs font-semibold text-red-700 tracking-wide uppercase">
                       Katkestanud
                     </td>
                   </tr>
-                  {dnfRows.map((row) => (
+                  {visibleDnfRows.map((row) => (
                     <ScoreRow key={row.team.id} row={{ ...row, rank: null, classRank: null, class: row.team.class ?? "–" }} isDnf />
                   ))}
                 </>
