@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import Link from "next/link"
 
 type PrintOrientation = "landscape" | "portrait"
@@ -10,11 +10,13 @@ export function ProtocolPrintToolbar({
   buttonLabel,
   info,
   className = "",
+  children,
 }: {
   backHref: string
   buttonLabel: string
   info?: string
   className?: string
+  children?: ReactNode
 }) {
   const [orientation, setOrientation] = useState<PrintOrientation>("landscape")
 
@@ -39,6 +41,7 @@ export function ProtocolPrintToolbar({
             <option value="portrait">Vertikaalne</option>
           </select>
         </label>
+        {children}
         <button
           type="button"
           onClick={() => window.print()}

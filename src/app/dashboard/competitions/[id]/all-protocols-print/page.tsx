@@ -1,3 +1,4 @@
+import { EmptyProtocolOptions, EmptyProtocolRowCountInput } from "@/components/protocol/EmptyProtocolOptions"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
@@ -35,7 +36,7 @@ export default async function AllProtocolsPrintPage({
   ).sort((a, b) => naturalCompare(a.code, b.code))
 
   return (
-    <>
+    <EmptyProtocolOptions>
       <style>{emptyProtocolStyles}</style>
 
       <ProtocolPrintToolbar
@@ -43,7 +44,9 @@ export default async function AllProtocolsPrintPage({
         buttonLabel="Prindi kõik tühjad protokollid"
         info={`${competition.elements.length} elementi · iga element eraldi lehel`}
         className="m-6 mb-0 rounded-lg"
-      />
+      >
+        <EmptyProtocolRowCountInput />
+      </ProtocolPrintToolbar>
 
       {competition.elements.map((element, index) => (
         <EmptyProtocolSheet
@@ -60,6 +63,6 @@ export default async function AllProtocolsPrintPage({
       {competition.elements.length === 0 && (
         <p className="p-6 text-sm text-gray-500">Võistlusel pole prinditavaid elemente.</p>
       )}
-    </>
+    </EmptyProtocolOptions>
   )
 }
