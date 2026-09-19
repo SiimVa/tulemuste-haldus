@@ -1,5 +1,6 @@
 "use client"
 
+import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { useState } from "react"
 import { naturalCompare } from "@/lib/utils"
 import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
@@ -37,11 +38,12 @@ type Team = { id: string; name: string; code: string; isHorsDeCompetition?: bool
 
 // Arvestusväline = käsitsi VÕI teatud elemendist alates; katkestanud = DNF (nagu pingereas)
 const teamIsHC = (t: Team) => (t.isHorsDeCompetition ?? false) || t.hcFromElementOrder != null
-const teamIsDnf = (t: Team) => t.dnfFromElementOrder != null
+
 
 interface Props {
   element: {
     id: string
+    order: number
     name: string
     fields: Field[]
     exceptions: Exception[]
@@ -54,6 +56,7 @@ interface Props {
 }
 
 export function ElementResultsTable({ element, teams }: Props) {
+  const teamIsDnf = (team: Team) => isWithdrawnAtElement(team, element.order)
   const [results, setResults] = useState<ResultRow[]>(element.results)
   const [scores] = useState<Score[]>(element.scores)
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
@@ -88,7 +91,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   // Lisab kõigile sisestamata võistkondadele korraga sama tulemuse VÕI erandi.
   // Erand (kui valitud) võidab — väljaväärtused jäetakse siis kõrvale (nagu ühe rea vormis).
   async function bulkApply() {
-    const missing = teams.filter(t => !results.find(r => r.teamId === t.id))
+    const missing = teams.filter(t => !teamIsDnf(t) && !results.find(r => r.teamId === t.id))
     if (missing.length === 0) return
     const useException = !!bulkException
     if (!useException && !hasBulkValues) return
@@ -167,7 +170,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   const horsCompTeams = sortByScore(teams.filter(t => teamIsHC(t) && !teamIsDnf(t)))
   const totalCols = 2 + inputFields.length + computedFields.length + 3
 
-  const missingTeams = teams.filter(t => !results.find(r => r.teamId === t.id))
+  const missingTeams = teams.filter(t => !teamIsDnf(t) && !results.find(r => r.teamId === t.id))
   const bulkCls = "px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-300"
 
   // Üks bulk-vormi väljasisestus (sama loogika nagu rea muutmisel); keelatud kui erand valitud
@@ -375,7 +378,10 @@ export function ElementResultsTable({ element, teams }: Props) {
     <div className="bg-white border rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b flex items-center justify-between">
         <h2 className="font-semibold text-gray-900">Tulemused</h2>
-        <span className="text-sm text-gray-400">{results.length} / {teams.length} sisestatud</span>
+        <span className="text-sm text-gray-400">{(() => {
+          const progress = elementProgress(teams, element.order, results.map(result => result.teamId))
+          return <>{progress.entered} / {progress.total} sisestatud{progress.withdrawn > 0 && <span className="ml-2 text-red-600">{progress.withdrawn} KAT</span>}</>
+        })()}</span>
       </div>
       {missingTeams.length > 0 && (inputFields.length > 0 || element.exceptions.length > 0) && (
         <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-2 flex-wrap">

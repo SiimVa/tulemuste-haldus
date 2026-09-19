@@ -451,6 +451,7 @@ export default async function ElementPage({
           fields: element.fields,
           exceptions: element.exceptions,
           directPointsEntry: element.directPointsEntry,
+          order: element.order,
           scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
           results: element.results.map(r => {
             let rawValues: Record<string, unknown> = {}

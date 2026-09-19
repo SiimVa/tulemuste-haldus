@@ -62,7 +62,7 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
       <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle>Sooritused elementide kaupa</CardTitle>
-          <p className="text-xs text-ink-subtle mt-0.5">Mitu võistkonda on igas elemendis tulemuse saanud</p>
+          <p className="text-xs text-ink-subtle mt-0.5">Sisestatud tulemused / oodatavad tulemused. Katkestanud on näidatud eraldi.</p>
         </CardHeader>
         <div className="divide-y divide-line">
           {elements.length === 0 ? (
@@ -80,8 +80,9 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
                   <div className="flex-1 h-2 bg-sunken rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${done ? "bg-green-500" : "bg-blue-400"}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <span className={`text-sm font-mono shrink-0 w-16 text-right ${done ? "text-green-700 font-semibold" : "text-ink-soft"}`}>
+                  <span className={`text-sm font-mono shrink-0 text-right ${done ? "text-green-700 font-semibold" : "text-ink-soft"}`}>
                     {el.entered}/{el.total}
+                    {el.withdrawn > 0 && <span className="ml-2 text-xs text-red-600">{el.withdrawn} KAT</span>}
                   </span>
                 </div>
               )

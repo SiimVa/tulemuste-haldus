@@ -107,6 +107,7 @@ export default async function AccountJudgePage({
             id: element.id,
             name: element.name,
             code: element.code,
+            order: element.order,
             fields: element.fields,
             exceptions: element.exceptions,
           }))}
@@ -115,6 +116,7 @@ export default async function AccountJudgePage({
             name: team.name,
             code: team.code,
             class: team.class,
+            dnfFromElementOrder: team.dnfFromElementOrder,
           }))}
           existingResults={results}
         />

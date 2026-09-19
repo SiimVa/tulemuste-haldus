@@ -11,7 +11,7 @@ type Element = {
   type: string
   order: number
   isCancelled: boolean
-  _count: { results: number }
+  progress: { entered: number; total: number; withdrawn: number }
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -27,11 +27,9 @@ const TYPE_LABEL: Record<string, string> = {
 export function ElementList({
   competitionId,
   initialElements,
-  teamCount,
 }: {
   competitionId: string
   initialElements: Element[]
-  teamCount: number
 }) {
   // Normalise: sort by order, then assign clean 0,1,2,... indices
   const normalize = (els: Element[]) =>
@@ -188,12 +186,13 @@ export function ElementList({
 
           {/* Tulemuste arv */}
           {(() => {
-            const entered = el._count.results
-            const done = entered >= teamCount
+            const { entered, total, withdrawn } = initialElements.find(item => item.id === el.id)?.progress ?? el.progress
+            const done = entered >= total
             const none = entered === 0
             return (
               <span className={`text-sm font-medium shrink-0 ${done ? "text-green-600" : none ? "text-gray-300" : "text-amber-500"}`}>
-                {entered}/{teamCount}
+                {entered}/{total}
+                {withdrawn > 0 && <span className="ml-2 text-xs text-red-600">{withdrawn} KAT</span>}
               </span>
             )
           })()}

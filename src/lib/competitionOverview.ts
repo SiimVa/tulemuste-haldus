@@ -1,3 +1,4 @@
+import { elementProgress } from "@/lib/elementProgress"
 import { prisma } from "@/lib/prisma"
 
 export type ElementProgress = {
@@ -8,6 +9,7 @@ export type ElementProgress = {
   isCancelled: boolean
   entered: number
   total: number
+  withdrawn: number
 }
 
 export type CompetitionOverview = {
@@ -31,11 +33,11 @@ export async function getCompetitionOverview(id: string): Promise<CompetitionOve
   if (!competition) return null
 
   const [teams, elements, results, miscEntries] = await Promise.all([
-    prisma.team.findMany({ where: { competitionId: id }, select: { id: true, class: true, isHorsDeCompetition: true } }),
+    prisma.team.findMany({ where: { competitionId: id }, select: { id: true, class: true, isHorsDeCompetition: true, dnfFromElementOrder: true } }),
     prisma.scoringElement.findMany({
       where: { competitionId: id },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, code: true, type: true, isCancelled: true },
+      select: { id: true, name: true, code: true, type: true, order: true, isCancelled: true },
     }),
     prisma.result.findMany({ where: { element: { competitionId: id } }, select: { elementId: true, teamId: true } }),
     prisma.miscEntry.findMany({ where: { element: { competitionId: id } }, select: { elementId: true, teamId: true } }),
@@ -55,19 +57,18 @@ export async function getCompetitionOverview(id: string): Promise<CompetitionOve
   for (const r of results) add(r.elementId, r.teamId)
   for (const m of miscEntries) add(m.elementId, m.teamId)
 
-  const elementProgress: ElementProgress[] = elements.map((el) => ({
+  const progressRows: ElementProgress[] = elements.map((el) => ({
     id: el.id,
     name: el.name,
     code: el.code,
     type: el.type,
     isCancelled: el.isCancelled,
-    entered: enteredByElement.get(el.id)?.size ?? 0,
-    total: teamCount,
+    ...elementProgress(teams, el.order, enteredByElement.get(el.id) ?? []),
   }))
 
-  const activeElements = elements.filter((e) => !e.isCancelled)
-  const totalSlots = activeElements.length * teamCount
-  const totalEntered = activeElements.reduce((s, el) => s + (enteredByElement.get(el.id)?.size ?? 0), 0)
+  const activeElements = progressRows.filter((e) => !e.isCancelled)
+  const totalSlots = activeElements.reduce((sum, el) => sum + el.total, 0)
+  const totalEntered = activeElements.reduce((s, el) => s + el.entered, 0)
   const progressPct = totalSlots > 0 ? Math.round((totalEntered / totalSlots) * 100) : 0
 
   return {
@@ -77,7 +78,7 @@ export async function getCompetitionOverview(id: string): Promise<CompetitionOve
     classCount,
     elementCount: elements.length,
     activeElementCount: activeElements.length,
-    elements: elementProgress,
+    elements: progressRows,
     totalEntered,
     totalSlots,
     progressPct,
