@@ -1,3 +1,4 @@
+import { elementProgress } from "@/lib/elementProgress"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
@@ -33,8 +34,9 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
     include: {
       elements: {
         orderBy: { order: "asc" },
-        include: { _count: { select: { results: true } } },
+        include: { results: { select: { teamId: true } }, miscEntries: { select: { teamId: true } } },
       },
+      teams: { select: { id: true, dnfFromElementOrder: true } },
       _count: { select: { teams: true, elements: true, accessTokens: true } },
     },
   })
@@ -132,9 +134,8 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
             type: el.type,
             order: el.order,
             isCancelled: el.isCancelled,
-            _count: { results: el._count.results },
+            progress: elementProgress(competition.teams, el.order, [...el.results, ...el.miscEntries].map(result => result.teamId)),
           }))}
-          teamCount={competition._count.teams}
         />
       </Card>
     </div>

@@ -79,10 +79,11 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
             id: el.id,
             name: el.name,
             code: el.code,
+            order: el.order,
             fields: el.fields,
             exceptions: el.exceptions,
           }))}
-          teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, class: t.class }))}
+          teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, class: t.class, dnfFromElementOrder: t.dnfFromElementOrder }))}
           existingResults={results}
         />
       </main>

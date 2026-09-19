@@ -1,5 +1,7 @@
 "use client"
 
+import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
+import { AutoRefresh } from "@/components/AutoRefresh"
 import { useState, useEffect } from "react"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { naturalCompare } from "@/lib/utils"
@@ -7,8 +9,8 @@ import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; validation?: string | null }
 type Exception = { id: string; label: string; penalty: number }
-type Element = { id: string; name: string; code: string; fields: Field[]; exceptions: Exception[] }
-type Team = { id: string; name: string; code: string; class?: string | null }
+type Element = { id: string; name: string; code: string; order: number; fields: Field[]; exceptions: Exception[] }
+type Team = { id: string; name: string; code: string; class?: string | null; dnfFromElementOrder: number | null }
 type ExistingResult = { elementId: string; teamId: string; values: string; exceptionLabel?: string | null; updatedAt: Date }
 
 interface Props {
@@ -221,6 +223,13 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                 [{selectedElement.code}] {selectedElement.name}
               </h3>
               <p className="text-xs text-gray-400 mt-0.5">Vali võistkond ja sisesta tulemus</p>
+              <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-500">
+                {(() => {
+                  const progress = elementProgress(teams, selectedElement.order, results.filter(result => result.elementId === selectedElement.id).map(result => result.teamId))
+                  return <span>{progress.entered}/{progress.total} sisestatud{progress.withdrawn > 0 && <span className="ml-2 text-red-600">{progress.withdrawn} KAT</span>}</span>
+                })()}
+                <AutoRefresh />
+              </div>
             </div>
 
             {/* Stardiaegade abivahendid (ainult TIME_RANGE elementidel) */}
@@ -305,15 +314,19 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
               {teams.map(team => {
                 const existing = getExisting(selectedElement.id, team.id)
                 const isSelected = selectedTeamId === team.id
+                const withdrawn = isWithdrawnAtElement(team, selectedElement.order)
                 return (
                   <button key={team.id} onClick={() => selectTeam(team)}
                     className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""}`}>
                     <div>
                       <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>
                       <span className="text-sm font-medium text-gray-900">{team.name}</span>
+                      {team.dnfFromElementOrder != null && !withdrawn && <span className="ml-2 text-xs text-red-600">KAT hilisemas elemendis</span>}
                       {team.class && <span className="text-xs text-gray-400 ml-1">({team.class})</span>}
                     </div>
-                    {existing ? (
+                    {withdrawn ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">KAT · tulemust ei oodata</span>
+                    ) : existing ? (
                       <span className={`text-xs px-2 py-0.5 rounded-full ${existing.exceptionLabel ? "bg-red-100 text-red-600" : "bg-green-100 text-green-700"}`}>
                         {existing.exceptionLabel ?? "✓ Sisestatud"}
                       </span>
@@ -336,6 +349,10 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                 <button type="button" onClick={() => setSelectedTeamId(null)}
                   className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
               </div>
+
+              {teams.some(team => team.id === selectedTeamId && isWithdrawnAtElement(team, selectedElement.order)) && (
+                <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">KAT — võistkond on selleks elemendiks katkestanud. Tulemust ei oodata; varasemad sisestused säilivad.</p>
+              )}
 
               {/* Erand */}
               <div>
