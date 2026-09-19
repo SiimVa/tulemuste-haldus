@@ -1,3 +1,4 @@
+import { parseTieBreakConfig } from "@/lib/tieBreak"
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import {
@@ -336,14 +337,24 @@ export async function copyCompetitionConfiguration({
         })
       }
 
+      const elementIdMap = new Map<string, string>()
       if (includeElements) {
         for (const element of source.elements) {
-          await copyScoringElementConfiguration(tx, {
+          const copied = await copyScoringElementConfiguration(tx, {
             sourceElementId: element.id,
             targetCompetitionId: created.id,
           })
+          elementIdMap.set(element.id, copied.id)
         }
       }
+      const tieBreak = parseTieBreakConfig(source.tieBreakConfig)
+      tieBreak.elementIds = tieBreak.elementIds === null ? null : tieBreak.elementIds.flatMap(id => elementIdMap.has(id) ? [elementIdMap.get(id)!] : [])
+      tieBreak.rules = tieBreak.rules.map(rule => rule.kind === "MANUAL"
+        ? { kind: rule.kind, enabled: false }
+        : rule.kind === "PREFERRED_ELEMENT"
+          ? { ...rule, elementId: elementIdMap.get(rule.elementId ?? ""), enabled: rule.enabled && elementIdMap.has(rule.elementId ?? "") }
+          : rule)
+      await tx.competition.update({ where: { id: created.id }, data: { tieBreakConfig: JSON.stringify(tieBreak) } })
 
       return tx.competition.findUniqueOrThrow({
         where: { id: created.id },

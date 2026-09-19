@@ -1,3 +1,4 @@
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -40,26 +41,21 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
     return { team, total, manualTotal, byElement }
   })
 
-  const inComp = allRows.filter((r) => !r.team.isHorsDeCompetition)
+  const inComp = allRows.filter((r) => !r.team.isHorsDeCompetition && r.team.hcFromElementOrder == null && r.team.dnfFromElementOrder == null)
     .sort((a, b) => isPlusMode ? b.total - a.total : a.total - b.total)
-  const horsComp = allRows.filter((r) => r.team.isHorsDeCompetition)
+  const horsComp = allRows.filter((r) => r.team.isHorsDeCompetition || r.team.hcFromElementOrder != null || r.team.dnfFromElementOrder != null)
     .sort((a, b) => isPlusMode ? b.total - a.total : a.total - b.total)
 
-  const classRank: Record<string, number> = {}
-  const ranked = inComp.map((r, i) => {
-    const cls = r.team.class ?? ""
-    classRank[cls] = (classRank[cls] ?? 0) + 1
-    return { ...r, rank: i + 1, classRank: classRank[cls], hc: false }
-  })
-  const hcRows = horsComp.map((r) => ({ ...r, rank: null, classRank: null, hc: true }))
+  const ranked = rankLeaderboard(inComp, elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig)).map(row => ({ ...row, hc: false }))
+  const hcRows = horsComp.map((r) => ({ ...r, rank: null, classRank: null, hc: true, tieBreakReason: null, classTieBreakReason: null }))
   const baseName = competition.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")
 
   if (format === "xlsx") {
     const headers = ["Üldkoht", "Klassist", "Tähis", "Võistkond", "Klass",
-      ...elements.map((el) => el.code), "Lisaärid", "Kokku", "AV"]
+      ...elements.map((el) => el.code), "Lisaärid", "Kokku", "Staatus", "Viigilahutus (üld)", "Viigilahutus (klass)"]
 
     const toRow = (r: typeof ranked[0] | typeof hcRows[0]) => [
-      r.rank ?? "AV",
+      r.rank ?? (r.team.dnfFromElementOrder != null ? "KAT" : "AV"),
       r.classRank ?? "",
       r.team.code,
       r.team.name,
@@ -67,7 +63,8 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
       ...elements.map((el) => r.byElement[el.id] ?? ""),
       r.manualTotal > 0 ? r.manualTotal : "",
       r.total,
-      r.hc ? "AV" : "",
+      r.team.dnfFromElementOrder != null ? "KAT" : r.hc ? "AV" : "",
+      r.tieBreakReason ?? "", r.classTieBreakReason ?? "",
     ]
 
     const wsData = [
@@ -75,7 +72,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
       [],
       headers,
       ...ranked.map(toRow),
-      ...(hcRows.length > 0 ? [["Arvestusvälised"], ...hcRows.map(toRow)] : []),
+      ...(hcRows.length > 0 ? [["Arvestusvälised ja katkestanud"], ...hcRows.map(toRow)] : []),
     ]
 
     const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -84,7 +81,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
     ws["!cols"] = [
       { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 24 }, { wch: 10 },
       ...elements.map(() => ({ wch: 10 })),
-      { wch: 8 }, { wch: 10 }, { wch: 5 },
+      { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 60 }, { wch: 60 },
     ]
 
     const wb = XLSX.utils.book_new()
@@ -101,18 +98,18 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
 
   // CSV (vaikimisi)
   const headers = ["Üldkoht", "Klassist", "Tähis", "Võistkond", "Klass",
-    ...elements.map((el) => el.code), "Lisaärid", "Kokku", "AV"]
+    ...elements.map((el) => el.code), "Lisaärid", "Kokku", "Staatus", "Viigilahutus (üld)", "Viigilahutus (klass)"]
 
   const toCsv = (r: typeof ranked[0] | typeof hcRows[0]) =>
     [r.rank ?? "", r.classRank ?? "", r.team.code, r.team.name, r.team.class ?? "",
       ...elements.map((el) => { const v = r.byElement[el.id]; return v !== undefined ? v.toFixed(2) : "" }),
-      r.manualTotal > 0 ? r.manualTotal.toFixed(2) : "", r.total.toFixed(2), r.hc ? "AV" : ""]
+      r.manualTotal > 0 ? r.manualTotal.toFixed(2) : "", r.total.toFixed(2), r.team.dnfFromElementOrder != null ? "KAT" : r.hc ? "AV" : "", r.tieBreakReason ?? "", r.classTieBreakReason ?? ""]
       .map((v) => `"${String(v).replace(/"/g, '""')}"`)
       .join(",")
 
   const lines = [`"${competition.name}"`, "", headers.map((h) => `"${h}"`).join(","),
     ...ranked.map(toCsv),
-    ...(hcRows.length > 0 ? ["", '"Arvestusvälised"', ...hcRows.map(toCsv)] : []),
+    ...(hcRows.length > 0 ? ["", '"Arvestusvälised ja katkestanud"', ...hcRows.map(toCsv)] : []),
   ]
 
   return new NextResponse(lines.join("\r\n"), {

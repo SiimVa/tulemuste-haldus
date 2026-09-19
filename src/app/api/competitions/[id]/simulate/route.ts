@@ -1,3 +1,4 @@
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -15,7 +16,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
 
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },
-    select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true },
+    select: { tieBreakConfig: true, scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true },
   })
   if (!competition) return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
 
@@ -37,7 +38,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
         team: { select: { id: true, isHorsDeCompetition: true, hcFromElementOrder: true, dnfFromElementOrder: true } },
       },
     }),
-    prisma.team.findMany({ where: { competitionId }, select: { id: true, class: true, isHorsDeCompetition: true, hcFromElementOrder: true, dnfFromElementOrder: true } }),
+    prisma.team.findMany({ where: { competitionId }, select: { id: true, name: true, code: true, class: true, isHorsDeCompetition: true, hcFromElementOrder: true, dnfFromElementOrder: true } }),
     prisma.manualPenalty.findMany({ where: { competitionId }, select: { teamId: true, points: true } }),
   ])
 
@@ -77,10 +78,12 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   for (const [, scores] of byElement) for (const [tid, sc] of scores) totalByTeam.set(tid, (totalByTeam.get(tid) ?? 0) + sc)
   for (const p of penalties) totalByTeam.set(p.teamId, (totalByTeam.get(p.teamId) ?? 0) + (isPlus ? -p.points : p.points))
 
-  const inComp = teams.filter((t) => !t.isHorsDeCompetition && t.hcFromElementOrder == null)
-  const ranked = inComp
-    .map((t) => ({ id: t.id, class: t.class ?? "–", total: round3(totalByTeam.get(t.id) ?? 0) }))
-    .sort((a, b) => (isPlus ? b.total - a.total : a.total - b.total))
+  const inComp = teams.filter(t => !t.isHorsDeCompetition && t.hcFromElementOrder == null && t.dnfFromElementOrder == null)
+  const ranked = rankLeaderboard(inComp.map(team => ({
+    team, id: team.id, class: team.class ?? "–", total: round3(totalByTeam.get(team.id) ?? 0),
+    manualTotal: penalties.filter(penalty => penalty.teamId === team.id).reduce((sum, penalty) => sum + penalty.points, 0),
+    byElement: Object.fromEntries([...byElement].flatMap(([id, scores]) => scores.has(team.id) ? [[id, scores.get(team.id)!]] : [])),
+  })), elements, competition.scoringMode, parseTieBreakConfig(competition.tieBreakConfig))
   const myTotal = round3(totalByTeam.get(teamId) ?? 0)
   const rankIdx = ranked.findIndex((r) => r.id === teamId)
   const myClass = teamMeta?.class ?? "–"
@@ -107,9 +110,11 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
 
   return NextResponse.json({
     total: myTotal,
-    rank: rankIdx >= 0 ? rankIdx + 1 : null,
+    tieBreakReason: ranked[rankIdx]?.tieBreakReason ?? null,
+    classTieBreakReason: ranked[rankIdx]?.classTieBreakReason ?? null,
+    rank: rankIdx >= 0 ? ranked[rankIdx].rank : null,
     totalTeams: ranked.length,
-    classRank: classIdx >= 0 ? classIdx + 1 : null,
+    classRank: classIdx >= 0 ? classRanked[classIdx].classRank : null,
     classTotal: classRanked.length,
     avgPercentile,
     elementScores,

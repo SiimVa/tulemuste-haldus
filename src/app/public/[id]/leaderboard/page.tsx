@@ -1,3 +1,5 @@
+import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
 import { GapCells, GapHeadings, GapSummary, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
 import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
@@ -65,7 +67,7 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
   const dnfRows = allRows
     .filter((r) => r.team.dnfFromElementOrder != null)
     .sort((a, b) => a.team.name.localeCompare(b.team.name))
-    .map((entry) => ({ ...entry, rank: null, classRank: null, class: entry.team.class ?? "–" }))
+    .map((entry) => ({ ...entry, rank: null, classRank: null, tieBreakReason: null, classTieBreakReason: null, class: entry.team.class ?? "–" }))
 
   const inComp = allRows
     .filter((r) => !isHC(r.team) && r.team.dnfFromElementOrder == null)
@@ -75,14 +77,9 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
     .filter((r) => isHC(r.team) && r.team.dnfFromElementOrder == null)
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
-  const classRank: Record<string, number> = {}
-  const inCompRows = inComp.map((entry, idx) => {
-    const cls = entry.team.class ?? "–"
-    classRank[cls] = (classRank[cls] ?? 0) + 1
-    return { ...entry, rank: idx + 1, classRank: classRank[cls], class: cls }
-  })
+  const inCompRows = rankLeaderboard(inComp, elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig)).map(row => ({ ...row, class: row.team.class ?? "–" }))
   const horsCompRows = horsComp.map((entry) => ({
-    ...entry, rank: null, classRank: null, class: entry.team.class ?? "–",
+    ...entry, rank: null, classRank: null, tieBreakReason: null, classTieBreakReason: null, class: entry.team.class ?? "–",
   }))
 
   const classes = [...new Set([...competition.registrationClasses.map(cls => cls.name), ...teams.map(team => team.class ?? "")])].sort(naturalCompare)
@@ -157,6 +154,7 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
                 <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
               </summary>
               <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                <TieBreakReason overall={row.tieBreakReason} withinClass={row.classTieBreakReason} />
                 <GapSummary gap={gaps.get(row.team.id)} showClasses={showClasses} />
                 {elements.map((el) => (
                   <div key={el.id} className="flex items-center justify-between text-xs gap-2">
@@ -196,6 +194,7 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
                     <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
                   </summary>
                   <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                <TieBreakReason overall={row.tieBreakReason} withinClass={row.classTieBreakReason} />
                 <GapSummary gap={gaps.get(row.team.id)} showClasses={showClasses} />
                     {elements.map((el) => (
                       <div key={el.id} className="flex items-center justify-between text-xs gap-2">
@@ -231,6 +230,7 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
                     <span className="text-gray-300 text-xs shrink-0 transition-transform group-open:rotate-180">▾</span>
                   </summary>
                   <div className="px-3 pb-3 pt-2 border-t space-y-1">
+                <TieBreakReason overall={row.tieBreakReason} withinClass={row.classTieBreakReason} />
                 <GapSummary gap={gaps.get(row.team.id)} showClasses={showClasses} />
                     {elements.map((el) => (
                       <div key={el.id} className="flex items-center justify-between text-xs gap-2">
@@ -282,6 +282,7 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
                         <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
                       )}
                       <span className="font-medium text-gray-900">{row.team.name}</span>
+                      <TieBreakReason overall={row.tieBreakReason} withinClass={row.classTieBreakReason} />
                       {row.team.dqFromElementOrder != null && (
                         <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">DQ</span>
                       )}

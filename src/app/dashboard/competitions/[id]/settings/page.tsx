@@ -14,6 +14,7 @@ import {
   type ClassGroup,
 } from "@/lib/classGroups"
 import type { TeamCountScope } from "@/lib/classGroups"
+import { TieBreakSettings } from "@/components/competition/TieBreakSettings"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
@@ -566,6 +567,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
           {saved && <span className="text-green-600 text-sm">✓ Salvestatud</span>}
         </div>
       </form>
+      <TieBreakSettings competitionId={competitionId} />
 
       {/* Massuuendus */}
       <Card className="mt-6 p-5">

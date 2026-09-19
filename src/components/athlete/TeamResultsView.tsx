@@ -1,3 +1,4 @@
+import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
 import { AthleteResultCards } from "@/components/athlete/AthleteResultCards"
 import type { TeamResultData } from "@/lib/teamResults.server"
 
@@ -80,6 +81,7 @@ export function TeamResultsView({ data }: { data: TeamResultData }) {
                       </span>
                     </p>
                   )}
+                <TieBreakReason overall={totalBlock.tieBreakReason} withinClass={totalBlock.classTieBreakReason} />
                 {totalBlock.notional && (
                   <p className="text-[10px] text-blue-200 mt-0.5">
                     mitteametlik koht

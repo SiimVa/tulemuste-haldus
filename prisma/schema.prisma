@@ -158,6 +158,7 @@ model Competition {
   updatedAt              DateTime  @updatedAt
 
   // Hindamissüsteem
+  tieBreakConfig String @default("{}")
   scoringMode String @default("PENALTY") // "PENALTY" | "PLUS"
 
   // KP vaikeväärtused

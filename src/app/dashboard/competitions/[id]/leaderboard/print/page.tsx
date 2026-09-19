@@ -1,3 +1,5 @@
+import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
 import { GapCells, GapHeadings, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
 import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
@@ -41,12 +43,7 @@ export default async function LeaderboardPrintPage({ params, searchParams }: { p
   const horsComp = allRows.filter((r) => !isRanked(r.team))
     .sort((a, b) => isPlusMode ? b.total - a.total : a.total - b.total)
 
-  const classRank: Record<string, number> = {}
-  const ranked = inComp.map((r, i) => {
-    const cls = r.team.class ?? "–"
-    classRank[cls] = (classRank[cls] ?? 0) + 1
-    return { ...r, rank: i + 1, classRank: classRank[cls], cls }
-  })
+  const ranked = rankLeaderboard(inComp, elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig)).map(row => ({ ...row, cls: row.team.class ?? "–" }))
 
   const classes = [...new Set([...competition.registrationClasses.map(cls => cls.name), ...teams.map(team => team.class ?? "")])].sort(naturalCompare)
   const showClasses = classes.some(Boolean)
@@ -117,7 +114,7 @@ export default async function LeaderboardPrintPage({ params, searchParams }: { p
                 <td style={{ textAlign: "center", fontWeight: 700 }}><RankBadge rank={row.rank} /></td>
                 <td style={{ textAlign: "center", color: "#6b7280", fontSize: 10 }}><RankBadge rank={row.team.class ? row.classRank : null} /></td>
                 <td style={{ textAlign: "center", fontFamily: "monospace", fontWeight: 600 }}>{row.team.code}</td>
-                <td>{row.team.name}</td>
+                <td>{row.team.name}<TieBreakReason overall={row.tieBreakReason} withinClass={row.classTieBreakReason} /></td>
                 <td style={{ textAlign: "center", fontSize: 10 }}>{row.cls}</td>
                 {elements.map((el) => (
                   <td key={el.id} style={{ textAlign: "right", fontFamily: "monospace", fontSize: 11 }}>
