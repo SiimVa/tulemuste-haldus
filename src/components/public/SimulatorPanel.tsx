@@ -1,5 +1,6 @@
 "use client"
 
+import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
 import { useEffect, useRef, useState } from "react"
 
 export type SimEl = {
@@ -16,6 +17,8 @@ export type SimEl = {
 }
 
 export type Standing = {
+  tieBreakReason?: string | null
+  classTieBreakReason?: string | null
   total: number
   rank: number | null
   totalTeams: number
@@ -112,6 +115,7 @@ export function SimulatorPanel({ competitionId, teamId, teamName, teamCode, team
         </div>
       </div>
 
+      <TieBreakReason overall={standing.tieBreakReason} withinClass={standing.classTieBreakReason} />
       {hasOverrides && (
         <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5">
           <p className="text-xs text-purple-800"><strong>SIMULATSIOON</strong> — ei ole ametlik tulemus.</p>

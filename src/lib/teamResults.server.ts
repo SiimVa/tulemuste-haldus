@@ -1,4 +1,5 @@
 import "server-only"
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 
 import type { ResultCard } from "@/components/athlete/AthleteResultCards"
 import {
@@ -10,6 +11,8 @@ import {
 import { prisma } from "@/lib/prisma"
 
 export type TeamResultTotalBlock = {
+  tieBreakReason: string | null
+  classTieBreakReason: string | null
   totalLabel: string
   rank: number | null
   totalTeams: number
@@ -59,6 +62,7 @@ export async function getTeamResultData(
           id: true,
           name: true,
           scoringMode: true,
+          tieBreakConfig: true,
           defaultKPMaxValue: true,
           athletePointsMode: true,
           athletePointsRanges: true,
@@ -143,7 +147,7 @@ export async function getTeamResultData(
     const [allScores, allPenalties, allTeams] = await Promise.all([
       prisma.computedScore.findMany({
         where: { element: { competitionId } },
-        select: { teamId: true, penaltyPoints: true },
+        select: { teamId: true, elementId: true, penaltyPoints: true },
       }),
       prisma.manualPenalty.findMany({
         where: { competitionId },
@@ -154,6 +158,9 @@ export async function getTeamResultData(
         select: {
           id: true,
           class: true,
+          code: true,
+          name: true,
+          dnfFromElementOrder: true,
           isHorsDeCompetition: true,
           hcFromElementOrder: true,
         },
@@ -175,21 +182,14 @@ export async function getTeamResultData(
       )
     }
 
-    const ranked = allTeams
-      .filter(
-        (candidate) =>
-          !candidate.isHorsDeCompetition &&
-          candidate.hcFromElementOrder == null
-      )
-      .map((candidate) => ({
-        id: candidate.id,
-        class: candidate.class ?? "–",
-        total:
-          Math.round((totalByTeam.get(candidate.id) ?? 0) * 1000) / 1000,
-      }))
-      .sort((a, b) =>
-        scoringMode === "PLUS" ? b.total - a.total : a.total - b.total
-      )
+    const ranked = rankLeaderboard(allTeams.filter(candidate => !candidate.isHorsDeCompetition && candidate.hcFromElementOrder == null && candidate.dnfFromElementOrder == null).map(candidate => ({
+      team: candidate,
+      id: candidate.id,
+      class: candidate.class ?? "–",
+      total: Math.round((totalByTeam.get(candidate.id) ?? 0) * 1000) / 1000,
+      manualTotal: allPenalties.filter(penalty => penalty.teamId === candidate.id).reduce((sum, penalty) => sum + penalty.points, 0),
+      byElement: Object.fromEntries(allScores.filter(score => score.teamId === candidate.id).map(score => [score.elementId, score.penaltyPoints])),
+    })), elements, scoringMode, parseTieBreakConfig(team.competition.tieBreakConfig))
     const myTotal =
       Math.round((totalByTeam.get(team.id) ?? 0) * 1000) / 1000
     const myClass = team.class ?? "–"
@@ -211,6 +211,9 @@ export async function getTeamResultData(
       ).length
 
     totalBlock = {
+      // Match existing score visibility: numeric explanations require exact points.
+      tieBreakReason: showRank && pointsMode === "EXACT" ? ranked[rankIndex]?.tieBreakReason ?? null : null,
+      classTieBreakReason: showRank && pointsMode === "EXACT" ? ranked[rankIndex]?.classTieBreakReason ?? null : null,
       totalLabel:
         formatAthletePoints(
           myTotal,
@@ -221,14 +224,14 @@ export async function getTeamResultData(
         ) ?? `${myTotal}p`,
       rank:
         rankIndex >= 0
-          ? rankIndex + 1
+          ? ranked[rankIndex].rank
           : isNotional
             ? betterThan(ranked) + 1
             : null,
       totalTeams: ranked.length + (isNotional ? 1 : 0),
       classRank:
         classIndex >= 0
-          ? classIndex + 1
+          ? classRanked[classIndex].classRank
           : isNotional
             ? betterThan(classRanked) + 1
             : null,

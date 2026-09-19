@@ -6,7 +6,7 @@ export type LeaderboardGap = {
 }
 
 // Rows must already be sorted in scoring order and contain only ranked teams.
-export function leaderboardGaps<T extends { team: { id: string; class: string | null }; total: number }>(rows: T[]): Map<string, LeaderboardGap> {
+export function leaderboardGaps<T extends { team: { id: string; class: string | null }; total: number; classRank?: number | null }>(rows: T[]): Map<string, LeaderboardGap> {
   const firstByClass = new Map<string, number>()
   const previousByClass = new Map<string, number>()
   const gaps = new Map<string, LeaderboardGap>()
@@ -23,6 +23,17 @@ export function leaderboardGaps<T extends { team: { id: string; class: string | 
     })
     if (cls) previousByClass.set(cls, row.total)
   })
+  // Class tie-break order can differ from overall order.
+  for (const cls of new Set(rows.map(row => row.team.class))) {
+    if (!cls) continue
+    const classRows = rows.filter(row => row.team.class === cls)
+      .sort((a, b) => (a.classRank ?? 0) - (b.classRank ?? 0))
+    classRows.forEach((row, index) => {
+      const gap = gaps.get(row.team.id)!
+      gap.classFirst = difference(row.total, classRows[0]?.total)
+      gap.classPrevious = difference(row.total, classRows[index - 1]?.total)
+    })
+  }
   return gaps
 }
 

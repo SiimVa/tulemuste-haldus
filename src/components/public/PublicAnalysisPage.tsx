@@ -1,3 +1,4 @@
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
@@ -129,27 +130,20 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
     return { teamId: team.id, total, isHC: isHCteam(team) }
   })
 
-  // Overall rank (in-competition only)
-  const inCompTotals = teamTotals
-    .filter((t) => !t.isHC)
-    .sort((a, b) => (isPlusMode ? b.total - a.total : a.total - b.total))
-  const overallRankMap = new Map<string, number>()
-  inCompTotals.forEach((t, i) => overallRankMap.set(t.teamId, i + 1))
-  const totalInComp = inCompTotals.length
-
-  // Class rank (in-competition only)
-  const classRankMap = new Map<string, number>()
-  const classCountMap = new Map<string, number>()  // teamId → how many in their class
-  const classCounts: Record<string, number> = {}
-  inCompTotals.forEach((t) => {
-    const cls = teams.find((x) => x.id === t.teamId)?.class ?? "–"
-    classCounts[cls] = (classCounts[cls] ?? 0) + 1
-    classRankMap.set(t.teamId, classCounts[cls])
-  })
+  const rankedTotals = rankLeaderboard(teams.filter(team => !isHCteam(team) && team.dnfFromElementOrder == null).map(team => ({
+    team,
+    total: teamTotals.find(entry => entry.teamId === team.id)?.total ?? 0,
+    manualTotal: penalties.filter(penalty => penalty.teamId === team.id).reduce((sum, penalty) => sum + penalty.points, 0),
+    byElement: Object.fromEntries(allScores.filter(score => score.teamId === team.id).map(score => [score.elementId, score.penaltyPoints])),
+  })), elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig))
+  const overallRankMap = new Map(rankedTotals.map(row => [row.team.id, row.rank]))
+  const classRankMap = new Map(rankedTotals.map(row => [row.team.id, row.classRank]))
+  const totalInComp = rankedTotals.length
+  const classCountMap = new Map<string, number>()
   // Count total per class
   const classTotals: Record<string, number> = {}
   teams.forEach((t) => {
-    if (isHCteam(t)) return
+    if (isHCteam(t) || t.dnfFromElementOrder != null) return
     const cls = t.class ?? "–"
     classTotals[cls] = (classTotals[cls] ?? 0) + 1
   })
@@ -328,6 +322,8 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       isDnf: team.dnfFromElementOrder != null,
       totalScore: total,
       overallRank: overallRankMap.get(team.id) ?? null,
+      tieBreakReason: rankedTotals.find(row => row.team.id === team.id)?.tieBreakReason ?? null,
+      classTieBreakReason: rankedTotals.find(row => row.team.id === team.id)?.classTieBreakReason ?? null,
       totalInComp,
       classRank: classRankMap.get(team.id) ?? null,
       classTotal: classCountMap.get(team.id) ?? 0,

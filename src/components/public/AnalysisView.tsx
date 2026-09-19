@@ -1,5 +1,6 @@
 "use client"
 
+import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
 import { useState, useEffect, Fragment } from "react"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
@@ -23,6 +24,8 @@ export type SimElementConfig = {
 }
 
 export type AnalysisTeam = {
+  tieBreakReason?: string | null
+  classTieBreakReason?: string | null
   id: string
   name: string
   code: string
@@ -235,6 +238,8 @@ export default function AnalysisView({
   const simTeam = teams.find((t) => t.id === selectedTeamId)
   const simInitial: Standing = {
     total: simTeam?.totalScore ?? 0,
+    tieBreakReason: simTeam?.tieBreakReason,
+    classTieBreakReason: simTeam?.classTieBreakReason,
     rank: simTeam?.overallRank ?? null,
     totalTeams: simTeam?.totalInComp ?? 0,
     classRank: simTeam?.classRank ?? null,
@@ -357,6 +362,7 @@ export default function AnalysisView({
                   </div>
                 </Card>
 
+                <TieBreakReason overall={selectedTeam.tieBreakReason} withinClass={selectedTeam.classTieBreakReason} />
                 {/* Strengths & weaknesses */}
                 {(strengths.length > 0 || weaknesses.length > 0) && (
                   <div className="grid md:grid-cols-2 gap-4 mb-5">

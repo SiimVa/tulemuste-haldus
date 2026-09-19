@@ -1,3 +1,5 @@
+import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
 import { GapCells, GapHeadings, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
 import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
@@ -76,16 +78,10 @@ export default async function LeaderboardPage({ params, searchParams }: { params
     .filter((r) => isHC(r.team) && r.team.dnfFromElementOrder == null)
     .sort((a, b) => (scoringMode === "PLUS" ? b.total - a.total : a.total - b.total))
 
-  const classRank: Record<string, number> = {}
-  const inCompRows = inComp.map((entry, idx) => {
-    const cls = entry.team.class ?? "–"
-    classRank[cls] = (classRank[cls] ?? 0) + 1
-    return { ...entry, rank: idx + 1, classRank: classRank[cls], class: cls }
-  })
-
+  const inCompRows = rankLeaderboard(inComp, elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig)).map(row => ({ ...row, class: row.team.class ?? "–" }))
   const horsCompRows = horsComp.map((entry) => {
     const cls = entry.team.class ?? "–"
-    return { ...entry, rank: null, classRank: null, class: cls }
+    return { ...entry, rank: null, classRank: null, tieBreakReason: null, classTieBreakReason: null, class: cls }
   })
 
   const classes = [...new Set([...competition.registrationClasses.map(cls => cls.name), ...teams.map(team => team.class ?? "")])].sort(naturalCompare)
@@ -119,6 +115,7 @@ export default async function LeaderboardPage({ params, searchParams }: { params
       <td className={`sticky left-24 z-10 ${stickyBg} border-r px-4 py-3 min-w-40`}>
         <span className="font-mono text-xs text-gray-400 mr-1">{row.team.code}</span>
         <span className={`font-medium ${isDnf ? "text-red-700" : isHC ? "text-amber-700" : "text-gray-900"}`}>{row.team.name}</span>
+        <TieBreakReason overall={row.tieBreakReason} withinClass={row.classTieBreakReason} />
         {isDnf && row.team.dnfReason && (
           <span className="ml-2 text-xs text-red-400">{row.team.dnfReason}</span>
         )}
@@ -278,7 +275,7 @@ export default async function LeaderboardPage({ params, searchParams }: { params
                     </td>
                   </tr>
                   {visibleDnfRows.map((row) => (
-                    <ScoreRow key={row.team.id} row={{ ...row, rank: null, classRank: null, class: row.team.class ?? "–" }} isDnf />
+                    <ScoreRow key={row.team.id} row={{ ...row, rank: null, classRank: null, tieBreakReason: null, classTieBreakReason: null, class: row.team.class ?? "–" }} isDnf />
                   ))}
                 </>
               )}

@@ -1,3 +1,4 @@
+import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -9,7 +10,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
   const [competition, teams, scores, penalties, elements] = await Promise.all([
     prisma.competition.findUnique({
       where: { id: competitionId },
-      select: { scoringMode: true },
+      select: { scoringMode: true, tieBreakConfig: true },
     }),
     prisma.team.findMany({ where: { competitionId } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
     prisma.computedScore.findMany({
@@ -20,7 +21,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
     prisma.scoringElement.findMany({
       where: { competitionId },
       orderBy: { order: "asc" },
-      select: { id: true, name: true, code: true },
+      select: { id: true, name: true, code: true, type: true, isCancelled: true },
     }),
   ])
 
@@ -58,12 +59,11 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
     scoringMode === "PLUS" ? b.total - a.total : a.total - b.total
   )
 
-  const classCounts: Record<string, number> = {}
-  const result = leaderboard.map((entry, idx) => {
-    const cls = entry.team.class ?? ""
-    classCounts[cls] = (classCounts[cls] ?? 0) + 1
-    return { ...entry, rank: idx + 1, classRank: classCounts[cls] }
-  })
+  const eligible = (row: typeof leaderboard[number]) => !row.team.isHorsDeCompetition && row.team.hcFromElementOrder == null && row.team.dnfFromElementOrder == null
+  const result = [
+    ...rankLeaderboard(leaderboard.filter(eligible), elements, scoringMode, parseTieBreakConfig(competition?.tieBreakConfig)),
+    ...leaderboard.filter(row => !eligible(row)).map(row => ({ ...row, rank: null, classRank: null, tieBreakReason: null, classTieBreakReason: null })),
+  ]
 
   return NextResponse.json({ leaderboard: result, elements, scoringMode })
 }
