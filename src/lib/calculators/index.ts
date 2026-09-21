@@ -1,4 +1,4 @@
-import { pointFieldValue } from "../pointFields"
+import { pointFieldValue, compareElementTimes, readPointMeta } from "../pointFields"
 import { CalcMethod, FieldDefinition } from "@prisma/client"
 import { evaluateFormula } from "../formula"
 
@@ -21,6 +21,7 @@ export type FieldValues = Record<string, string | number>
 export interface ScoredEntry {
   teamId: string
   rawValue: number | null
+  rawValues?: FieldValues // algne kestus ajapunktidest eraldi
   allValues: FieldValues   // kõik arvutatud välja väärtused (tiebreakerite jaoks)
   exceptionPenalty: number | null
   // PENALTY: positiivne arv (väiksem = parem)
@@ -179,7 +180,7 @@ export function calculateScores(
           : parseFloat(String(computed[resultField.name] ?? 0)))
       : 0
 
-    return { teamId: r.teamId, rawValue, allValues: computed, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC, teamClass: r.team.class ?? null }
+    return { teamId: r.teamId, rawValue, rawValues, allValues: computed, exceptionPenalty: null, penaltyPoints: 0, isHorsDeCompetition: isHC, teamClass: r.team.class ?? null }
   })
 
   if (!calcMethod) return entries
@@ -294,15 +295,22 @@ function sortByRankingFields(
   function compareEntries(a: ScoredEntry, b: ScoredEntry): number {
     if (rankFields.length === 0) {
       // Fallback: kui ühtegi rankingPriority välja pole, kasuta rawValue
-      return defaultHigherIsBetter ? (b.rawValue ?? 0) - (a.rawValue ?? 0) : (a.rawValue ?? 0) - (b.rawValue ?? 0)
+      const diff = defaultHigherIsBetter ? (b.rawValue ?? 0) - (a.rawValue ?? 0) : (a.rawValue ?? 0) - (b.rawValue ?? 0)
+      return diff || compareElementTimes(fields, a.rawValues ?? {}, b.rawValues ?? {})
     }
     for (const f of rankFields) {
+      // Ajatabeli esmane tulemus on punktid, aga viigilahutaja on algne aeg.
+      if (f.type === "TIME_POINTS" && (f.rankingPriority ?? 0) > 1) {
+        const diff = compareElementTimes([{ ...f, meta: '{"timeTieBreak":true}' }], a.rawValues ?? {}, b.rawValues ?? {})
+        if (diff !== 0) return diff
+        continue
+      }
       const av = getVal(a, f)
       const bv = getVal(b, f)
       const diff = getFieldDir(f) ? bv - av : av - bv
       if (diff !== 0) return diff
     }
-    return 0
+    return compareElementTimes(fields, a.rawValues ?? {}, b.rawValues ?? {})
   }
 
   const sorted = [...entries].sort(compareEntries)
@@ -539,7 +547,7 @@ function applyValueBased(
     return scoringMode === "PLUS" ? maxValue - pts + minPoints : pts
   }
 
-  const hasTiebreakers = fields.some((f) => f.rankingPriority != null && (f.rankingPriority ?? 0) > 1)
+  const hasTiebreakers = fields.some((f) => (f.rankingPriority ?? 0) > 1 || (f.type === "TIME_POINTS" && readPointMeta(f.meta).timeTieBreak))
 
   if (!hasTiebreakers) {
     for (const entry of entries) {
@@ -600,9 +608,14 @@ function applyValueBased(
     }
 
     // Sorteeri grupp tiebreakeri järgi: idx=0 = parim tiebreaker
-    const { sorted } = sortByRankingFields(group, fields, higherIsBetter)
+    const { sorted, rankMap } = sortByRankingFields(group, fields, higherIsBetter)
+    if (new Set(rankMap.values()).size === 1) {
+      group.forEach(e => { e.penaltyPoints = Math.round(H * 10000) / 10000 })
+      return
+    }
 
-    sorted.forEach((entry, idx) => {
+    sorted.forEach((entry) => {
+      const idx = (rankMap.get(entry.teamId) ?? 1) - 1
       // Halvima grupi korral: parim tiebreaker (idx=0) saab kõige suurema korrektsioon suunas M
       // Teiste gruppide korral: parim tiebreaker (idx=0) jääb H juurde, halvim liigub M suunas
       const j = isWorstGroup ? (K - 1 - idx) : idx
