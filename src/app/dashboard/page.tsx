@@ -19,6 +19,15 @@ const competitionStatusLabel: Record<string, string> = {
   ARCHIVED: "Arhiveeritud",
 }
 
+// Sama staatuse sees säilib päringu järjestus: uuemad loodud võistlused ees.
+const competitionStatusOrder: Record<string, number> = {
+  SETUP: 0,
+  ACTIVE: 1,
+  FINISHED: 2,
+  CANCELLED: 3,
+  ARCHIVED: 4,
+}
+
 const competitionStatusColor: Record<string, string> = {
   SETUP: "bg-gray-100 text-gray-600",
   ACTIVE: "bg-green-100 text-green-700",
@@ -676,7 +685,9 @@ export default async function DashboardPage() {
             description="Võistlused, mida saad administraatori, peakorraldaja või korraldajana hallata."
           />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {competitions.map((competition) => (
+            {[...competitions].sort((a, b) =>
+              (competitionStatusOrder[a.status] ?? 5) - (competitionStatusOrder[b.status] ?? 5)
+            ).map((competition) => (
               <div
                 key={competition.id}
                 className="overflow-hidden rounded-xl border bg-white transition-shadow hover:shadow-md"
