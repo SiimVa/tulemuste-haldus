@@ -34,6 +34,10 @@ export function validateFieldValue(
 
   if (isEmpty) return null
 
+  if (fieldType === "ESTIMATION" && pointFieldValue({ name: fieldName, type: fieldType, meta }, value) === undefined) {
+    return { field: fieldName, label: fieldLabel, message: `${fieldLabel}: sisesta kõik pakkumised mittenegatiivsete arvudena` }
+  }
+
   if ((fieldType === "POINTS_SELECT" || fieldType === "TIME_POINTS") && pointFieldValue({ name: fieldName, type: fieldType, meta }, value) === undefined) {
     return { field: fieldName, label: fieldLabel, message: `${fieldLabel}: vali lubatud vastus või sisesta korrektne aeg` }
   }

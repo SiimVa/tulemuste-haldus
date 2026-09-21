@@ -296,7 +296,7 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       if (!resultEntry?.exceptionLabel && Object.keys(rawValues).length > 0) {
         const computedAll = computeFields(rawValues as Record<string, string | number>, el.fields as Parameters<typeof computeFields>[1])
         for (const f of el.fields) {
-          fieldDisplay[f.name] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? pointFieldLabel(f, rawValues[f.name]) : fmtFieldValue(computedAll[f.name], f.type)
+          fieldDisplay[f.name] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION" ? pointFieldLabel(f, rawValues[f.name]) : fmtFieldValue(computedAll[f.name], f.type)
         }
       }
 

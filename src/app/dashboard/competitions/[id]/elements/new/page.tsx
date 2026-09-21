@@ -58,6 +58,7 @@ type CompDefs = {
 }
 
 const FIELD_TYPES = [
+  { value: "ESTIMATION", label: "Kauguste hindamine (veaprotsent)" },
   { value: "POINTS_SELECT", label: "Valik punktidega" },
   { value: "TIME_POINTS", label: "Aeg → punktitabel" },
   { value: "TIME", label: "Aeg (h:mm:ss)" },

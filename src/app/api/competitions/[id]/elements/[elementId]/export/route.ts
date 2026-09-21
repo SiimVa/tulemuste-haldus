@@ -1,3 +1,4 @@
+import { calculateEstimation, parseEstimates, readEstimation } from "@/lib/estimation"
 import { pointFieldLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -56,7 +57,16 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
       team.code,
       team.name,
       team.class ?? "",
-      ...inputFields.map((f) => (exceptionLabel ? "" : (f.type === "TIME_POINTS" ? rawValues[f.name] ?? "" : f.type === "POINTS_SELECT" ? pointFieldLabel(f, rawValues[f.name]) : (fieldValues[f.name] !== undefined ? fieldValues[f.name] : "")))),
+      ...inputFields.flatMap((f) => {
+        if (f.type === "ESTIMATION") {
+          const config = readEstimation(f.meta)
+          if (exceptionLabel) return config.targets.map(() => "").concat(["", "", ""])
+          const guesses = parseEstimates(rawValues[f.name])
+          const summary = calculateEstimation(config, rawValues[f.name])
+          return [...config.targets.map(t => guesses[t.id] ?? ""), ...(summary.complete ? [summary.points, summary.error, summary.errorPercent] : ["", "", ""])]
+        }
+        return [exceptionLabel ? "" : f.type === "TIME_POINTS" ? rawValues[f.name] ?? "" : f.type === "POINTS_SELECT" ? pointFieldLabel(f, rawValues[f.name]) : fieldValues[f.name] ?? ""]
+      }),
       exceptionLabel,
       score !== undefined ? score : "",
     ]
@@ -65,7 +75,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
   const inComp = teams.filter((t) => !t.isHorsDeCompetition)
   const horsComp = teams.filter((t) => t.isHorsDeCompetition)
   const headers = ["#", "Tähis", "Võistkond", "Klass",
-    ...inputFields.map((f) => f.label),
+    ...inputFields.flatMap(f => f.type === "ESTIMATION" ? [...readEstimation(f.meta).targets.map(t => `${f.label} (${t.label})`), `${f.label}: punkte`, `${f.label}: eksimus (${readEstimation(f.meta).unit})`, `${f.label}: protsendivigade summa (%)`] : [f.label]),
     "Erand", isPlusMode ? "Punktid" : "Karistus"]
 
   const baseName = element.competition.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")

@@ -197,7 +197,7 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
                 return (
                   <div key={field.name} className="flex items-center justify-between text-sm py-1 border-t first:border-t-0 gap-3">
                     <span className="text-gray-500 shrink-0">{field.label}</span>
-                    {editing ? (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" ? <PointFieldInput field={field} value={cur[field.name] ?? ""} onChange={v => setVal(card.id, field.name, v)} className="w-48 px-2 py-1 border rounded" /> :
+                    {editing ? (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" || field.type === "ESTIMATION" ? <PointFieldInput field={field} value={cur[field.name] ?? ""} onChange={v => setVal(card.id, field.name, v)} className="w-48 px-2 py-1 border rounded" /> :
                       <input
                         value={cur[field.name] ?? ""}
                         onChange={(e) => setVal(card.id, field.name, e.target.value)}

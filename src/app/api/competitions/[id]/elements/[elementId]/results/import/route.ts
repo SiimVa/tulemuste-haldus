@@ -1,3 +1,4 @@
+import { parseEstimates, readEstimation } from "@/lib/estimation"
 import { readPointMeta } from "@/lib/pointFields"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
@@ -152,9 +153,19 @@ async function handlePOST(
     s.fields.filter((f) => f.type !== "COMPUTED" && !f.formula)
   )
   const inputFields = [...directInputFields, ...sectionInputFields]
-  const fieldColMap: { field: typeof inputFields[0]; colIdx: number; storeAs?: string }[] = []
+  const fieldColMap: { field: typeof inputFields[0]; colIdx: number; storeAs?: string; estimateTargetId?: string }[] = []
   for (const field of inputFields) {
-    if (field.type === "TIME_RANGE") {
+    if (field.type === "ESTIMATION") {
+      for (const target of readEstimation(field.meta).targets) {
+        const idx = headerRow.findIndex(h => h.toLowerCase() === `${field.label} (${target.label})`.toLowerCase())
+        if (idx >= 0) fieldColMap.push({ field, colIdx: idx, estimateTargetId: target.id })
+      }
+      // Also accept a previously exported JSON value in one column.
+      if (!fieldColMap.some(c => c.field.id === field.id)) {
+        const idx = headerRow.findIndex(h => h.toLowerCase() === field.label.toLowerCase() || h.toLowerCase() === field.name.toLowerCase())
+        if (idx >= 0) fieldColMap.push({ field, colIdx: idx })
+      }
+    } else if (field.type === "TIME_RANGE") {
       // TIME_RANGE expands to two columns: _start and _end
       const startIdx = headerRow.findIndex((h) => h.toLowerCase() === `${field.label} (algus)`.toLowerCase() || h.toLowerCase() === `${field.name}_start`)
       const endIdx = headerRow.findIndex((h) => h.toLowerCase() === `${field.label} (lõpp)`.toLowerCase() || h.toLowerCase() === `${field.name}_end`)
@@ -223,9 +234,13 @@ async function handlePOST(
     let hasError = false
     let errorMsg = ""
 
-    for (const { field, colIdx, storeAs } of fieldColMap) {
+    for (const { field, colIdx, storeAs, estimateTargetId } of fieldColMap) {
       const storeName = storeAs ?? field.name
       const rawVal = rowData[colIdx] ?? ""
+      if (estimateTargetId) {
+        values[storeName] = JSON.stringify({ ...parseEstimates(values[storeName]), [estimateTargetId]: rawVal })
+        continue
+      }
       if (rawVal === "") {
         values[storeName] = ""
         continue
@@ -259,7 +274,7 @@ async function handlePOST(
       }
     }
 
-    for (const field of inputFields.filter(f => f.type === "POINTS_SELECT" || f.type === "TIME_POINTS")) {
+    for (const field of inputFields.filter(f => f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION")) {
       const error = validateFieldValue(values[field.name], field.name, field.label, field.type, parseValidation(field.validation), field.meta)
       if (error) { hasError = true; errorMsg = error.message; break }
     }

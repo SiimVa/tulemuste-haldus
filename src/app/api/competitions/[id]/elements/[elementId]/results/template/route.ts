@@ -1,3 +1,4 @@
+import { readEstimation } from "@/lib/estimation"
 import { readPointMeta, durationLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -55,7 +56,7 @@ async function handleGET(
 
   // TIME_RANGE fields expand to two columns (algus + lõpp)
   const expandedFields = inputFields.flatMap((f) =>
-    f.type === "TIME_RANGE"
+    f.type === "ESTIMATION" ? readEstimation(f.meta).targets.map(t => ({ label: `${f.label} (${t.label})`, key: `${f.name}_${t.id}` })) : f.type === "TIME_RANGE"
       ? [{ label: `${f.label} (algus)`, key: f.name + "_start" }, { label: `${f.label} (lõpp)`, key: f.name + "_end" }]
       : [{ label: f.label, key: f.name }]
   )

@@ -3,6 +3,7 @@
 import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { AutoRefresh } from "@/components/AutoRefresh"
 import { useState, useEffect } from "react"
+import { JudgeEstimationSettings } from "@/components/JudgeEstimationSettings"
 import { PointFieldInput } from "@/components/PointFieldInput"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { naturalCompare } from "@/lib/utils"
@@ -309,6 +310,8 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
               </div>
             )}
 
+            {selectedElement.fields.filter(f => f.type === "ESTIMATION").map(field => <JudgeEstimationSettings key={field.id} elementId={selectedElement.id} field={field} accessToken={accessToken} />)}
+
             {/* Võistkondade nimekiri */}
             <div className="max-h-64 overflow-y-auto divide-y">
               {teams.map(team => {
@@ -373,7 +376,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                     {field.label}
                     {field.isResultField && <span className="text-green-600 text-xs ml-1">★</span>}
                   </label>
-                  {field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" ? (
+                  {field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" || field.type === "ESTIMATION" ? (
                     <PointFieldInput field={field} value={formValues[field.name] ?? ""} onChange={v => setFormValues({ ...formValues, [field.name]: v })} className="w-full px-3 py-2.5 border rounded-lg text-sm" />
                   ) : field.type === "TIME_RANGE" ? (
                     <div className="space-y-2">

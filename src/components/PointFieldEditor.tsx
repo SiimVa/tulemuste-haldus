@@ -1,6 +1,8 @@
 "use client"
+import { EstimationFieldEditor } from "./EstimationFieldEditor"
 import { durationLabel, durationSeconds, exampleTimeMeta, readPointMeta, type PointFieldMeta } from "@/lib/pointFields"
 export function PointFieldEditor({ type, meta, onChange }: { type: string; meta?: string | null; onChange: (meta: string) => void }) {
+  if (type === "ESTIMATION") return <EstimationFieldEditor meta={meta} onChange={onChange} />
   if (type !== "POINTS_SELECT" && type !== "TIME_POINTS") return null
   const m = readPointMeta(meta)
   const save = (patch: Partial<PointFieldMeta>) => onChange(JSON.stringify({ ...m, ...patch }))
