@@ -1,3 +1,4 @@
+import { calculateEstimation, formatEstimate, readEstimation, validateEstimation } from "./estimation"
 /** Point-valued inputs retain the judge's original choice/duration in Result.values. */
 export type PointOption = { id: string; label: string; points: number }
 export type TimeBand = { through: number; points: number }
@@ -25,6 +26,7 @@ export function durationLabel(seconds: number): string {
 export function pointFieldValue(field: PointField, value: unknown): number | undefined {
   if (value == null || String(value).trim() === "") return undefined
   const meta = readPointMeta(field.meta)
+  if (field.type === "ESTIMATION") return calculateEstimation(readEstimation(field.meta), value).result
   if (field.type === "POINTS_SELECT") return meta.options?.find(o => o.id === String(value))?.points
   if (field.type === "TIME_POINTS") {
     const seconds = durationSeconds(value)
@@ -35,6 +37,12 @@ export function pointFieldValue(field: PointField, value: unknown): number | und
 }
 export function pointFieldLabel(field: PointField, value: unknown): string {
   if (value == null || String(value).trim() === "") return "–"
+  if (field.type === "ESTIMATION") {
+    const config = readEstimation(field.meta)
+    const result = calculateEstimation(config, value)
+    const details = result.rows.map(r => `${r.label}: ${r.guess === null ? "–" : formatEstimate(r.guess)} ${config.unit}`).join("; ")
+    return result.complete ? `${details} | ${formatEstimate(result.points)} p · eksimus ${formatEstimate(result.error)} ${config.unit} · ${formatEstimate(result.errorPercent)}%` : `${details} | Pakkumised pole täielikud`
+  }
   const points = pointFieldValue(field, value)
   if (field.type === "POINTS_SELECT") return `${readPointMeta(field.meta).options?.find(o => o.id === String(value))?.label ?? value} (${points ?? "?"} p)`
   if (field.type === "TIME_POINTS") return `${value} (${points ?? "?"} p)`
@@ -42,6 +50,10 @@ export function pointFieldLabel(field: PointField, value: unknown): string {
 }
 export function validatePointFields(fields: PointField[]): string | null {
   for (const field of fields) {
+    if (field.type === "ESTIMATION") {
+      const error = validateEstimation(readEstimation(field.meta))
+      if (error) return `${field.label || field.name}: ${error}`
+    }
     const m = readPointMeta(field.meta)
     if (field.type === "POINTS_SELECT") {
       if (!Array.isArray(m.options) || !m.options.length || m.options.length > 100 || m.options.some(o => !o || typeof o.id !== "string" || !o.id.trim() || typeof o.label !== "string" || !o.label.trim() || !Number.isFinite(o.points)) || new Set(m.options.map(o => o.id)).size !== m.options.length) return `${field.label || field.name}: määra valikute nimetused ja punktid (kuni 100 valikut).`

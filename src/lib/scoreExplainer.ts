@@ -374,7 +374,7 @@ export function explainElementScores(
         const displayVals: Record<string, string> = {}
         for (const f of section.fields) {
           if (f.type !== "COMPUTED" && rawValues[f.name] !== undefined) {
-            displayVals[f.label] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? pointFieldLabel(f, rawValues[f.name]) : fmt(computed[f.name] ?? rawValues[f.name], f.type)
+            displayVals[f.label] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION" ? pointFieldLabel(f, rawValues[f.name]) : fmt(computed[f.name] ?? rawValues[f.name], f.type)
           }
         }
 
@@ -422,7 +422,7 @@ export function explainElementScores(
     const displayVals: Record<string, string> = {}
     for (const f of element.fields) {
       if (f.type !== "COMPUTED" && rawValues[f.name] !== undefined) {
-        displayVals[f.label] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? pointFieldLabel(f, rawValues[f.name]) : fmt(computed[f.name] ?? rawValues[f.name], f.type)
+        displayVals[f.label] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION" ? pointFieldLabel(f, rawValues[f.name]) : fmt(computed[f.name] ?? rawValues[f.name], f.type)
       }
     }
 

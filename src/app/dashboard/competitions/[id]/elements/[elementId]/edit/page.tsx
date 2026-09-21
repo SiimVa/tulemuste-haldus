@@ -23,6 +23,7 @@ type SectionCalcMethod = { id: string; type: string; params: string; customFormu
 type Section = { id: string; name: string; order: number; maxValue: number | null; fields: SectionField[]; calcMethod: SectionCalcMethod | null }
 
 const FIELD_TYPES = [
+  { value: "ESTIMATION", label: "Kauguste hindamine (veaprotsent)" },
   { value: "POINTS_SELECT", label: "Valik punktidega" },
   { value: "TIME_POINTS", label: "Aeg → punktitabel" },
   { value: "TIME", label: "Aeg (h:mm:ss)" },

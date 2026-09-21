@@ -187,7 +187,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   // Üks bulk-vormi väljasisestus (sama loogika nagu rea muutmisel); keelatud kui erand valitud
   function renderBulkInput(f: Field) {
     const disabled = !!bulkException
-    if (f.type === "POINTS_SELECT" || f.type === "TIME_POINTS") return <PointFieldInput field={f} value={bulkValues[f.name] ?? ""} onChange={v => setBulkValues(p => ({ ...p, [f.name]: v }))} disabled={disabled} className={bulkCls} />
+    if (f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION") return <PointFieldInput field={f} value={bulkValues[f.name] ?? ""} onChange={v => setBulkValues(p => ({ ...p, [f.name]: v }))} disabled={disabled} className={bulkCls} />
     if (f.type === "TIME_RANGE") {
       return (
         <span className="inline-flex items-center gap-1">
@@ -270,7 +270,7 @@ export function ElementResultsTable({ element, teams }: Props) {
                   <td key={f.id} className="px-2 py-1.5">
                     {exceptionLabel ? (
                       <span className="text-gray-300 text-xs">—</span>
-                    ) : f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? (
+                    ) : f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION" ? (
                       <PointFieldInput field={f} value={formValues[f.name] ?? ""} onChange={v => setFormValues({ ...formValues, [f.name]: v })} className="w-full px-2 py-1 border rounded text-xs" />
                     ) : f.type === "TIME_RANGE" ? (
                       <div className="space-y-1">

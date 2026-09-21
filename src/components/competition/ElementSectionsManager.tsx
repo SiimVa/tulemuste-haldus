@@ -17,6 +17,7 @@ type Section = { id: string; name: string; order: number; maxValue: number | nul
 type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; validation: FieldValidation }
 
 const FIELD_TYPES = [
+  { value: "ESTIMATION", label: "Kauguste hindamine (veaprotsent)" },
   { value: "POINTS_SELECT", label: "Valik punktidega" },
   { value: "TIME_POINTS", label: "Aeg → punktitabel" },
   { value: "TIME", label: "Aeg (h:mm:ss)" },
@@ -493,7 +494,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
                   <div key={f.id} className="flex items-center gap-2 py-1.5 text-xs">
                     <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{f.name}</span>
                     <span className="text-gray-700">{f.label}</span>
-                    <span className="text-gray-400">({f.type === "POINTS_SELECT" ? "Valik punktidega" : f.type === "TIME_POINTS" ? "Aeg → punktitabel" : f.type})</span>
+                    <span className="text-gray-400">({f.type === "ESTIMATION" ? "Kauguste hindamine" : f.type === "POINTS_SELECT" ? "Valik punktidega" : f.type === "TIME_POINTS" ? "Aeg → punktitabel" : f.type})</span>
                     {f.rankingPriority === 1 && (
                       <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">tulemusväli</span>
                     )}

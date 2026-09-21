@@ -28,7 +28,7 @@ function computeFields(values: Record<string, string | number>, fields: SimField
   for (const field of fields) {
     if (field.type === "COMPUTED") continue
     if (result[field.name] === undefined) continue
-    if (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS") {
+    if (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" || field.type === "ESTIMATION") {
       result[field.name] = pointFieldValue(field, result[field.name]) ?? 0
     } else if (field.type === "TIME") {
       result[field.name] = simParseTime(String(result[field.name]))
