@@ -1,3 +1,4 @@
+import { readPointMeta, durationLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -90,6 +91,14 @@ async function handleGET(
 
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, element.code.slice(0, 31))
+
+  const pointHelp = inputFields.flatMap(f => {
+    const meta = readPointMeta(f.meta)
+    if (f.type === "POINTS_SELECT") return (meta.options ?? []).map(o => [f.label, o.label, o.points])
+    if (f.type === "TIME_POINTS") return [...(meta.timeBands ?? []).map((b, i, bands) => [f.label, `${durationLabel(i === 0 ? 0 : bands[i - 1].through + 1)}–${durationLabel(b.through)}`, b.points]), [f.label, "Pärast viimast ajapiiri", meta.overflowPoints ?? 0]]
+    return []
+  })
+  if (pointHelp.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Väli", "Valik või ajavahemik", "Punktid"], ...pointHelp]), "Sisestamise juhend")
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
 

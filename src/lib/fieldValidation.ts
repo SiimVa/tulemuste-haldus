@@ -1,3 +1,4 @@
+import { pointFieldValue } from "./pointFields"
 export type FieldValidation = {
   required?: boolean
   min?: number | null
@@ -22,7 +23,8 @@ export function validateFieldValue(
   fieldName: string,
   fieldLabel: string,
   fieldType: string,
-  validation: FieldValidation
+  validation: FieldValidation,
+  meta?: string | null
 ): ValidationError | null {
   const isEmpty = value === undefined || value === null || String(value).trim() === ""
 
@@ -31,6 +33,10 @@ export function validateFieldValue(
   }
 
   if (isEmpty) return null
+
+  if ((fieldType === "POINTS_SELECT" || fieldType === "TIME_POINTS") && pointFieldValue({ name: fieldName, type: fieldType, meta }, value) === undefined) {
+    return { field: fieldName, label: fieldLabel, message: `${fieldLabel}: vali lubatud vastus või sisesta korrektne aeg` }
+  }
 
   if (fieldType === "NUMBER") {
     const raw = String(value).trim()
@@ -50,7 +56,7 @@ export function validateFieldValue(
     }
   }
 
-  if (fieldType === "TIME") {
+  if (fieldType === "TIME" || fieldType === "TIME_POINTS") {
     const str = String(value).trim()
     if (!/^\d+:\d{1,2}(:\d{1,2})?$/.test(str)) {
       return { field: fieldName, label: fieldLabel, message: `${fieldLabel} peab olema formaadis m:ss või h:mm:ss` }

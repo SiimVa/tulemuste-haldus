@@ -1,3 +1,4 @@
+import { pointFieldLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -40,11 +41,13 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
   const buildRow = (team: typeof teams[0], rowNum: number | string) => {
     const result = element.results.find((r) => r.teamId === team.id)
     let fieldValues: Record<string, unknown> = {}
+    let rawValues: Record<string, unknown> = {}
     let exceptionLabel = ""
     if (result?.exceptionLabel) {
       exceptionLabel = result.exceptionLabel
     } else if (result) {
       try { fieldValues = JSON.parse(result.values || "{}") } catch {}
+      rawValues = { ...fieldValues }
       fieldValues = computeFields(fieldValues as Record<string, string | number>, element.fields)
     }
     const score = scoreMap.get(team.id)
@@ -53,7 +56,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
       team.code,
       team.name,
       team.class ?? "",
-      ...inputFields.map((f) => (exceptionLabel ? "" : (fieldValues[f.name] !== undefined ? fieldValues[f.name] : ""))),
+      ...inputFields.map((f) => (exceptionLabel ? "" : (f.type === "TIME_POINTS" ? rawValues[f.name] ?? "" : f.type === "POINTS_SELECT" ? pointFieldLabel(f, rawValues[f.name]) : (fieldValues[f.name] !== undefined ? fieldValues[f.name] : "")))),
       exceptionLabel,
       score !== undefined ? score : "",
     ]

@@ -220,6 +220,8 @@ export default async function ElementPage({
                 isResultField: f.isResultField,
                 rankingPriority: f.rankingPriority,
                 formula: f.formula,
+                meta: f.meta,
+                validation: f.validation,
               })),
               calcMethod: s.calcMethod ? {
                 id: s.calcMethod.id,
@@ -271,7 +273,7 @@ export default async function ElementPage({
                 <div key={f.id} className="flex items-center gap-2 text-sm flex-wrap">
                   <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{f.name}</span>
                   <span className="text-gray-700">{f.label}</span>
-                  <span className="text-gray-400 text-xs">({f.type})</span>
+                  <span className="text-gray-400 text-xs">({f.type === "POINTS_SELECT" ? "Valik punktidega" : f.type === "TIME_POINTS" ? "Aeg → punktitabel" : f.type})</span>
                   {priorityLabel && (
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${priorityLabel.cls}`}>
                       {priorityLabel.text}

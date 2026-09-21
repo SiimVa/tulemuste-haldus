@@ -1,3 +1,4 @@
+import { pointFieldValue } from "../pointFields"
 import { CalcMethod, FieldDefinition } from "@prisma/client"
 import { evaluateFormula } from "../formula"
 
@@ -91,7 +92,9 @@ export function computeFields(
   for (const field of fields) {
     if (field.type === "COMPUTED") continue
     if (result[field.name] === undefined) continue
-    if (field.type === "TIME") {
+    if (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS") {
+      result[field.name] = pointFieldValue(field, result[field.name]) ?? 0
+    } else if (field.type === "TIME") {
       result[field.name] = parseTimeToSeconds(String(result[field.name]))
     } else if (field.type === "NUMBER" || field.type === "CHECKBOX") {
       const n = parseFloat(String(result[field.name]))

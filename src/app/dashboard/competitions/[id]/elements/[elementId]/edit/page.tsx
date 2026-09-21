@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { FormulaInput } from "@/components/FormulaInput"
 import { ElementSectionsManager } from "@/components/competition/ElementSectionsManager"
+import { PointFieldEditor } from "@/components/PointFieldEditor"
+import { readPointMeta, examplePointFields, validatePointFields } from "@/lib/pointFields"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
 import { Card } from "@/components/ui/card"
@@ -14,13 +16,15 @@ import type { TeamCountScope } from "@/lib/classGroups"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
-type FieldRow = { name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
+type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
 type ExceptionRow = { label: string; penalty: string }
 type SectionField = { id: string; name: string; label: string; type: string; isResultField: boolean; rankingPriority: number | null; formula?: string | null }
 type SectionCalcMethod = { id: string; type: string; params: string; customFormula?: string | null }
 type Section = { id: string; name: string; order: number; maxValue: number | null; fields: SectionField[]; calcMethod: SectionCalcMethod | null }
 
 const FIELD_TYPES = [
+  { value: "POINTS_SELECT", label: "Valik punktidega" },
+  { value: "TIME_POINTS", label: "Aeg → punktitabel" },
   { value: "TIME", label: "Aeg (h:mm:ss)" },
   { value: "TIME_RANGE", label: "Algus/Lõpp aeg (kestvus)" },
   { value: "NUMBER", label: "Arv" },
@@ -87,7 +91,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
             if (typeof m.higherIsBetter === "boolean") fieldHigherIsBetter = m.higherIsBetter
           } catch {}
           const rankingPriority = f.rankingPriority ?? (f.isResultField ? 1 : null)
-          return { name: f.name, label: f.label, type: f.type, rankingPriority, formula: f.formula ?? "", displayAsTime, validation: parseValidation(f.validation), fieldHigherIsBetter }
+          return { meta: f.meta, name: f.name, label: f.label, type: f.type, rankingPriority, formula: f.formula ?? "", displayAsTime, validation: parseValidation(f.validation), fieldHigherIsBetter }
         }))
         setExceptions((el.exceptions ?? []).map((ex: { label: string; penalty: number }) => ({
           label: ex.label,
@@ -192,6 +196,8 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const pointError = validatePointFields(fields)
+    if (pointError) { setError(pointError); return }
     setSaving(true)
     setError("")
 
@@ -236,7 +242,9 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         order: i,
         formula: f.type === "COMPUTED" ? f.formula : undefined,
         meta: (() => {
-          const m: Record<string, unknown> = {}
+          const m: Record<string, unknown> = { ...readPointMeta(f.meta) }
+          delete m.displayAs
+          delete m.higherIsBetter
           if (f.type === "COMPUTED" && f.displayAsTime) m.displayAs = "TIME"
           if (f.rankingPriority != null && typeof f.fieldHigherIsBetter === "boolean") m.higherIsBetter = f.fieldHigherIsBetter
           return Object.keys(m).length > 0 ? JSON.stringify(m) : null
@@ -532,6 +540,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
         {/* Sisendväljad (ainult mitte-kombineeritud, mitte-DIRECT_ENTRY elementidel) */}
         {type !== "OTHER" && type !== "ABANDONMENT" && calcType !== "COMBINED" && calcType !== "DIRECT_ENTRY" && sections.length === 0 && (<Card className="p-5 space-y-4">
           <h2 className="font-semibold text-gray-900">Sisendväljad</h2>
+            {fields.length <= 1 && <button type="button" className="text-sm text-blue-600" onClick={() => { setFields(examplePointFields()); setCalcType("ABSOLUTE_POINTS"); setMaxValue("40") }}>Kasuta NATO ülesande näidist (40 p)</button>}
           <p className="text-xs text-gray-500">Määra järjekord, mille alusel pingerida moodustatakse. 1 = esmane, 2+ = viigi lahendaja.</p>
 
           {fields.map((f, i) => (
@@ -610,7 +619,8 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
                   </label>
                 </div>
               )}
-              {f.type !== "COMPUTED" && (
+              <PointFieldEditor type={f.type} meta={f.meta} onChange={v => updateField(i, "meta", v)} />
+                {f.type !== "COMPUTED" && (
                 <FieldValidationEditor
                   fieldType={f.type}
                   validation={f.validation}

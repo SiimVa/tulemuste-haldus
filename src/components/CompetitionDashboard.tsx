@@ -44,7 +44,7 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
         <StatCard label="Võistkonda" value={teamCount} sub={inCompCount !== teamCount ? `${inCompCount} arvestuses` : undefined} />
         <StatCard label="Klassi" value={classCount} />
         <StatCard label="Hindamiselementi" value={elementCount} />
-        <StatCard label="Tulemusi sisestatud" value={`${progressPct}%`} sub={`${totalEntered} / ${totalSlots}`} />
+        <StatCard label="Tulemusi sisestatud" value={`${progressPct.toLocaleString("et-EE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`} sub={`${totalEntered} / ${totalSlots}`} />
       </div>
 
       {/* Üldine edenemine */}
@@ -69,7 +69,7 @@ export function CompetitionDashboard({ data }: { data: CompetitionOverview }) {
             <p className="px-5 py-6 text-sm text-ink-subtle text-center">Ühtegi elementi pole lisatud</p>
           ) : (
             elements.map((el) => {
-              const pct = el.total > 0 ? Math.round((el.entered / el.total) * 100) : 0
+              const pct = el.total > 0 ? (el.entered / el.total) * 100 : 0
               const badge = TYPE_BADGE[el.type] ?? { label: "?", cls: "bg-gray-100 text-gray-600" }
               const done = el.entered >= el.total && el.total > 0
               return (

@@ -1,5 +1,7 @@
 "use client"
 
+import { PointFieldInput } from "@/components/PointFieldInput"
+import { compareElementTimes, pointFieldLabel, readPointMeta } from "@/lib/pointFields"
 import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { useState } from "react"
 import { naturalCompare } from "@/lib/utils"
@@ -62,6 +64,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [exceptionLabel, setExceptionLabel] = useState<string>("")
+  const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [bulkException, setBulkException] = useState("")
   const [bulkValues, setBulkValues] = useState<Record<string, string>>({})
@@ -98,7 +101,7 @@ export function ElementResultsTable({ element, teams }: Props) {
     setBulkApplying(true)
     try {
       for (const team of missing) {
-        await fetch(`/api/elements/${element.id}/results`, {
+        const response = await fetch(`/api/elements/${element.id}/results`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -107,6 +110,7 @@ export function ElementResultsTable({ element, teams }: Props) {
             exceptionLabel: useException ? bulkException : null,
           }),
         })
+        if (!response.ok) { setError((await response.json()).error ?? "Salvestamine ebaõnnestus"); return }
       }
       window.location.reload()
     } finally {
@@ -146,11 +150,11 @@ export function ElementResultsTable({ element, teams }: Props) {
           const newRow: ResultRow = { ...saved, teamName: team.name, teamCode: team.code }
           return idx >= 0 ? prev.map((r, i) => i === idx ? newRow : r) : [...prev, newRow]
         })
+        setEditingTeamId(null)
         window.location.reload()
-      }
+      } else { setError((await res.json()).error ?? "Salvestamine ebaõnnestus") }
     } finally {
       setSaving(false)
-      setEditingTeamId(null)
     }
   }
 
@@ -161,12 +165,19 @@ export function ElementResultsTable({ element, teams }: Props) {
       if (sa === null && sb === null) return naturalCompare(a.code, b.code)
       if (sa === null) return 1
       if (sb === null) return -1
-      return isPlus ? sb - sa : sa - sb
+      return (isPlus ? sb - sa : sa - sb) || compareElementTimes(element.fields, parseValues(getResult(a.id)?.values ?? "{}"), parseValues(getResult(b.id)?.values ?? "{}"))
     })
   }
 
   const dnfTeams = [...teams.filter(teamIsDnf)].sort((a, b) => naturalCompare(a.code, b.code))
   const inCompTeams = sortByScore(teams.filter(t => !teamIsHC(t) && !teamIsDnf(t)))
+  const rankByTeam = new Map<string, number>()
+  let lastRank = 1
+  inCompTeams.forEach((team, index) => {
+    const previous = inCompTeams[index - 1]
+    if (previous && (getScore(team.id) !== getScore(previous.id) || compareElementTimes(element.fields, parseValues(getResult(team.id)?.values ?? "{}"), parseValues(getResult(previous.id)?.values ?? "{}")) !== 0)) lastRank = index + 1
+    rankByTeam.set(team.id, lastRank)
+  })
   const horsCompTeams = sortByScore(teams.filter(t => teamIsHC(t) && !teamIsDnf(t)))
   const totalCols = 2 + inputFields.length + computedFields.length + 3
 
@@ -176,6 +187,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   // Üks bulk-vormi väljasisestus (sama loogika nagu rea muutmisel); keelatud kui erand valitud
   function renderBulkInput(f: Field) {
     const disabled = !!bulkException
+    if (f.type === "POINTS_SELECT" || f.type === "TIME_POINTS") return <PointFieldInput field={f} value={bulkValues[f.name] ?? ""} onChange={v => setBulkValues(p => ({ ...p, [f.name]: v }))} disabled={disabled} className={bulkCls} />
     if (f.type === "TIME_RANGE") {
       return (
         <span className="inline-flex items-center gap-1">
@@ -258,6 +270,8 @@ export function ElementResultsTable({ element, teams }: Props) {
                   <td key={f.id} className="px-2 py-1.5">
                     {exceptionLabel ? (
                       <span className="text-gray-300 text-xs">—</span>
+                    ) : f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? (
+                      <PointFieldInput field={f} value={formValues[f.name] ?? ""} onChange={v => setFormValues({ ...formValues, [f.name]: v })} className="w-full px-2 py-1 border rounded text-xs" />
                     ) : f.type === "TIME_RANGE" ? (
                       <div className="space-y-1">
                         <TimeClockInput
@@ -338,7 +352,7 @@ export function ElementResultsTable({ element, teams }: Props) {
                   <td key={f.id} className="px-4 py-2.5 text-gray-600 text-xs font-mono">
                     {result?.exceptionLabel ? "—" : f.type === "TIME_RANGE"
                       ? formatTimeRange(values, result?.allValues, f.name)
-                      : (values[f.name] ?? <span className="text-gray-300">–</span>)}
+                      : pointFieldLabel(f, values[f.name])}
                   </td>
                 ))}
                 {computedFields.map(f => (
@@ -429,6 +443,8 @@ export function ElementResultsTable({ element, teams }: Props) {
         </div>
       )}
 
+      {element.fields.some(f => f.type === "TIME_POINTS" && readPointMeta(f.meta).timeTieBreak) && <p className="px-4 py-2 text-xs text-blue-700">Võrdsete ülesandepunktide korral määrab koha lühem aeg. Üld- ja klassipingerea viigilahutust see ei muuda.</p>}
+      {error && <p role="alert" className="p-3 text-red-600">{error}</p>}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -453,7 +469,7 @@ export function ElementResultsTable({ element, teams }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {inCompTeams.map((team, idx) => renderRow(team, getScore(team.id) !== null ? idx + 1 : null))}
+            {inCompTeams.map(team => renderRow(team, getScore(team.id) !== null ? rankByTeam.get(team.id)! : null))}
             {horsCompTeams.length > 0 && (
               <>
                 <tr>

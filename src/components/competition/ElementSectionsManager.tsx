@@ -2,19 +2,23 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { PointFieldEditor } from "@/components/PointFieldEditor"
+import { readPointMeta } from "@/lib/pointFields"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import type { TeamCountScope } from "@/lib/classGroups"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
-type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; rankingPriority: number | null; formula?: string | null; validation?: string | null }
+type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; rankingPriority: number | null; formula?: string | null; validation?: string | null; meta?: string | null }
 type SectionCalcMethod = { id: string; type: string; params: string; customFormula?: string | null }
 type Section = { id: string; name: string; order: number; maxValue: number | null; fields: Field[]; calcMethod: SectionCalcMethod | null }
 
-type FieldRow = { name: string; label: string; type: string; rankingPriority: number | null; validation: FieldValidation }
+type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; validation: FieldValidation }
 
 const FIELD_TYPES = [
+  { value: "POINTS_SELECT", label: "Valik punktidega" },
+  { value: "TIME_POINTS", label: "Aeg → punktitabel" },
   { value: "TIME", label: "Aeg (h:mm:ss)" },
   { value: "NUMBER", label: "Arv" },
   { value: "TEXT", label: "Tekst" },
@@ -94,6 +98,7 @@ function sectionToForm(s: Section): SectionForm {
     teamCountBase: fixed.teamCountBase,
     teamCountStep: fixed.teamCountStep,
     fields: s.fields.map(f => ({
+      meta: f.meta,
       name: f.name,
       label: f.label,
       type: f.type,
@@ -109,8 +114,8 @@ function buildSectionFieldsBody(form: SectionForm) {
     validation: Object.keys(f.validation).length ? f.validation : undefined,
     // Vaba sisestuse osa: salvesta suund tulemusväljale, et analüüs näitaks parima/halvima õigesti
     meta: (form.calcType === "DIRECT_ENTRY" && f.rankingPriority === 1)
-      ? JSON.stringify({ higherIsBetter: form.higherIsBetter ?? false })
-      : undefined,
+      ? JSON.stringify({ ...readPointMeta(f.meta), higherIsBetter: form.higherIsBetter ?? false })
+      : f.meta,
   }))
 }
 
@@ -232,6 +237,7 @@ function SectionFormUI({
               </div>
             </div>
             <div className="px-1">
+              <PointFieldEditor type={f.type} meta={f.meta} onChange={v => updateField(i, "meta", v)} />
               <FieldValidationEditor
                 fieldType={f.type}
                 validation={f.validation}
@@ -487,7 +493,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
                   <div key={f.id} className="flex items-center gap-2 py-1.5 text-xs">
                     <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{f.name}</span>
                     <span className="text-gray-700">{f.label}</span>
-                    <span className="text-gray-400">({f.type})</span>
+                    <span className="text-gray-400">({f.type === "POINTS_SELECT" ? "Valik punktidega" : f.type === "TIME_POINTS" ? "Aeg → punktitabel" : f.type})</span>
                     {f.rankingPriority === 1 && (
                       <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">tulemusväli</span>
                     )}

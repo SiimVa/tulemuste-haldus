@@ -1,4 +1,5 @@
 "use client"
+import { PointFieldInput } from "@/components/PointFieldInput"
 
 import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
 import { useEffect, useRef, useState } from "react"
@@ -10,7 +11,7 @@ export type SimEl = {
   type: string
   isCancelled: boolean
   maxValue: number
-  inputFields: { name: string; label: string; type: string }[]
+  inputFields: { name: string; label: string; type: string; meta?: string | null }[]
   values: Record<string, string>
   realScore: number | null
   exceptionLabel: string | null
@@ -164,14 +165,14 @@ export function SimulatorPanel({ competitionId, teamId, teamName, teamCode, team
                   return (
                     <div key={field.name} className="flex items-center justify-between text-sm py-1 border-t first:border-t-0 gap-3">
                       <span className="text-gray-500 shrink-0">{field.label}</span>
-                      <input
+                      {field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" ? <PointFieldInput field={field} value={cur[field.name] ?? ""} onChange={v => setVal(el.id, field.name, v)} disabled={!editable} className="w-48 px-2 py-1 border rounded" /> : <input
                         value={cur[field.name] ?? ""}
                         onChange={(e) => setVal(el.id, field.name, e.target.value)}
                         disabled={!editable}
                         type={field.type === "NUMBER" ? "number" : "text"}
                         placeholder={field.type === "TIME" ? "h:mm:ss" : ""}
                         className="w-32 px-2 py-1.5 border rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:bg-gray-50"
-                      />
+                      />}
                     </div>
                   )
                 })

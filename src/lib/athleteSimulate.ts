@@ -1,3 +1,4 @@
+import { pointFieldValue } from "./pointFields"
 // Kliendiohutu simulatsiooni-loogika võistleja vaate jaoks.
 // EI impordi mathjs ega @prisma/client'i — väldib brauseri paketi paisumist.
 // Toetab ainult "oma-sisendi" arvutusmeetodeid (sõltuvad ainult tiimi enda sisendist).
@@ -5,6 +6,7 @@
 
 export type SimField = {
   name: string
+  meta?: string | null
   type: string
   isResultField: boolean
   rankingPriority: number | null
@@ -26,7 +28,9 @@ function computeFields(values: Record<string, string | number>, fields: SimField
   for (const field of fields) {
     if (field.type === "COMPUTED") continue
     if (result[field.name] === undefined) continue
-    if (field.type === "TIME") {
+    if (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS") {
+      result[field.name] = pointFieldValue(field, result[field.name]) ?? 0
+    } else if (field.type === "TIME") {
       result[field.name] = simParseTime(String(result[field.name]))
     } else if (field.type === "NUMBER" || field.type === "CHECKBOX") {
       const n = parseFloat(String(result[field.name]))
@@ -121,4 +125,4 @@ export function simulateElementScore(opts: {
       return null
   }
 }
-import { evaluateFormula } from "@/lib/formula"
+import { evaluateFormula } from "./formula"

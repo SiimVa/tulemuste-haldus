@@ -3,11 +3,12 @@
 import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { AutoRefresh } from "@/components/AutoRefresh"
 import { useState, useEffect } from "react"
+import { PointFieldInput } from "@/components/PointFieldInput"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { naturalCompare } from "@/lib/utils"
 import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
 
-type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; validation?: string | null }
+type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; validation?: string | null; meta?: string | null }
 type Exception = { id: string; label: string; penalty: number }
 type Element = { id: string; name: string; code: string; order: number; fields: Field[]; exceptions: Exception[] }
 type Team = { id: string; name: string; code: string; class?: string | null; dnfFromElementOrder: number | null }
@@ -131,7 +132,6 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
     if (!exceptionLabel) {
       for (const field of inputFields) {
         const validation = parseValidation(field.validation)
-        if (!Object.keys(validation).length) continue
         if (field.type === "TIME_RANGE") {
           if (validation.required) {
             const hasStart = (formValues[field.name + "_start"] ?? "").trim() !== ""
@@ -143,7 +143,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
           }
           continue
         }
-        const err = validateFieldValue(formValues[field.name], field.name, field.label, field.type, validation)
+        const err = validateFieldValue(formValues[field.name], field.name, field.label, field.type, validation, field.meta)
         if (err) { setError(err.message); return }
       }
     }
@@ -373,7 +373,9 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                     {field.label}
                     {field.isResultField && <span className="text-green-600 text-xs ml-1">★</span>}
                   </label>
-                  {field.type === "TIME_RANGE" ? (
+                  {field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" ? (
+                    <PointFieldInput field={field} value={formValues[field.name] ?? ""} onChange={v => setFormValues({ ...formValues, [field.name]: v })} className="w-full px-3 py-2.5 border rounded-lg text-sm" />
+                  ) : field.type === "TIME_RANGE" ? (
                     <div className="space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <div>

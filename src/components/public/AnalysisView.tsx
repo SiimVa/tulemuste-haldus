@@ -1,4 +1,5 @@
 "use client"
+import { compareElementTimes, readPointMeta } from "@/lib/pointFields"
 
 import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
 import { useState, useEffect, Fragment } from "react"
@@ -40,6 +41,7 @@ export type AnalysisTeam = {
 }
 
 export type AnalysisElementField = {
+  meta?: string | null
   name: string
   label: string
   type: string
@@ -209,7 +211,7 @@ export default function AnalysisView({
           if (sa === null && sb === null) return a.team.code.localeCompare(b.team.code)
           if (sa === null) return 1
           if (sb === null) return -1
-          return isPlusMode ? sb - sa : sa - sb
+          return (isPlusMode ? sb - sa : sa - sb) || compareElementTimes(selectedElement?.fields ?? [], a.stat?.rawValues ?? {}, b.stat?.rawValues ?? {})
         })
     : []
 
@@ -656,7 +658,7 @@ export default function AnalysisView({
                                 )}
                               </td>
                               {kpFields.map((f) => (
-                                <td key={f.name} className={`px-4 py-3 text-right font-mono text-xs ${f.isResultField ? "font-semibold text-gray-800" : f.type === "COMPUTED" ? "text-indigo-600" : "text-gray-500"}`}>
+                                <td key={f.name} title={f.type === "TIME_POINTS" && readPointMeta(f.meta).timeTieBreak ? "Võrdsete ülesandepunktide korral on lühem aeg parem" : undefined} className={`px-4 py-3 text-right font-mono text-xs ${f.isResultField ? "font-semibold text-gray-800" : f.type === "COMPUTED" ? "text-indigo-600" : "text-gray-500"}`}>
                                   {stat?.exceptionLabel ? (
                                     <span className="text-gray-300">—</span>
                                   ) : (

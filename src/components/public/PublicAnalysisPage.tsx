@@ -1,3 +1,4 @@
+import { compareElementTimes, pointFieldLabel } from "@/lib/pointFields"
 import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
@@ -183,14 +184,21 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       ? (typeof cmParams.higherIsBetter === "boolean" ? cmParams.higherIsBetter : isPlusMode)
       : (sectionHigher != null ? sectionHigher : isPlusMode)
 
+    const rawByTeam = new Map(results.filter(r => r.elementId === el.id && !r.exceptionLabel).map(r => {
+      let values: Record<string, unknown> = {}
+      try { values = JSON.parse(r.values || "{}") } catch {}
+      return [r.teamId, values] as const
+    }))
+    const compareScores = (a: { teamId: string; penaltyPoints: number }, b: { teamId: string; penaltyPoints: number }) =>
+      (elHigher ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints) || compareElementTimes(el.fields, rawByTeam.get(a.teamId) ?? {}, rawByTeam.get(b.teamId) ?? {})
     // Overall rank in element
     const sorted = [...elScores].sort((a, b) =>
-      elHigher ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints
+      compareScores(a, b)
     )
     const rankMap = new Map<string, number>()
     let rank = 1
     for (let i = 0; i < sorted.length; i++) {
-      if (i > 0 && sorted[i].penaltyPoints !== sorted[i - 1].penaltyPoints) rank = i + 1
+      if (i > 0 && compareScores(sorted[i], sorted[i - 1]) !== 0) rank = i + 1
       rankMap.set(sorted[i].teamId, rank)
     }
 
@@ -213,11 +221,11 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       )
       const classScores = elScores.filter(s => classTeamIds.has(s.teamId))
       const classSorted = [...classScores].sort((a, b) =>
-        elHigher ? b.penaltyPoints - a.penaltyPoints : a.penaltyPoints - b.penaltyPoints
+        compareScores(a, b)
       )
       let cr = 1
       for (let i = 0; i < classSorted.length; i++) {
-        if (i > 0 && classSorted[i].penaltyPoints !== classSorted[i - 1].penaltyPoints) cr = i + 1
+        if (i > 0 && compareScores(classSorted[i], classSorted[i - 1]) !== 0) cr = i + 1
         classRankInElMap.set(classSorted[i].teamId, cr)
         classOutOfMap.set(classSorted[i].teamId, classScores.length)
       }
@@ -243,9 +251,9 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
         .map(c => c[f.name])
         .filter(v => v !== undefined && v !== null && !isNaN(Number(v)))
         .map(Number)
-      if (nums.length === 0) return { name: f.name, label: f.label, type: f.type, best: null, avg: null, worst: null }
+      if (nums.length === 0) return { name: f.name, label: f.label, meta: f.meta, type: f.type, best: null, avg: null, worst: null }
       return {
-        name: f.name, label: f.label, type: f.type,
+        name: f.name, label: f.label, meta: f.meta, type: f.type,
         best: fHigher ? Math.max(...nums) : Math.min(...nums),
         avg: Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 100) / 100,
         worst: fHigher ? Math.min(...nums) : Math.max(...nums),
@@ -288,7 +296,7 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       if (!resultEntry?.exceptionLabel && Object.keys(rawValues).length > 0) {
         const computedAll = computeFields(rawValues as Record<string, string | number>, el.fields as Parameters<typeof computeFields>[1])
         for (const f of el.fields) {
-          fieldDisplay[f.name] = fmtFieldValue(computedAll[f.name], f.type)
+          fieldDisplay[f.name] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? pointFieldLabel(f, rawValues[f.name]) : fmtFieldValue(computedAll[f.name], f.type)
         }
       }
 
@@ -336,7 +344,7 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
     code: el.code,
     isCancelled: el.isCancelled,
     fields: el.fields
-      .map((f) => ({ name: f.name, label: f.label, type: f.type, isResultField: f.isResultField })),
+      .map((f) => ({ name: f.name, label: f.label, meta: f.meta, type: f.type, isResultField: f.isResultField })),
   }))
 
   // Simulaatori jaoks: elementide arvutuskonfiguratsioon (väljad + calcMethod)
@@ -348,8 +356,8 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       id: el.id, code: el.code, name: el.name, type: el.type,
       isCancelled: el.isCancelled, maxValue: el.maxValue ?? defaultMax, revealPointsToAthletes: el.revealPointsToAthletes ?? false,
       calcType: el.calcMethod?.type ?? null, customFormula: el.calcMethod?.customFormula ?? null, calcParams,
-      fields: el.fields.map((f) => ({ name: f.name, type: f.type, isResultField: f.isResultField, rankingPriority: f.rankingPriority, formula: f.formula, order: f.order })),
-      inputFields: el.fields.filter((f) => f.type !== "COMPUTED").map((f) => ({ name: f.name, label: f.label, type: f.type })),
+      fields: el.fields.map((f) => ({ name: f.name, meta: f.meta, type: f.type, isResultField: f.isResultField, rankingPriority: f.rankingPriority, formula: f.formula, order: f.order })),
+      inputFields: el.fields.filter((f) => f.type !== "COMPUTED").map((f) => ({ name: f.name, label: f.label, meta: f.meta, type: f.type })),
     }
   })
 

@@ -1,11 +1,13 @@
 "use client"
 
+import { PointFieldInput } from "@/components/PointFieldInput"
+import { pointFieldLabel } from "@/lib/pointFields"
 import { useState } from "react"
 import { formatAthletePoints, type AthletePointsMode, type RangeBucket } from "@/lib/athletePoints"
 import { simulateElementScore, simParseTime, type SimField } from "@/lib/athleteSimulate"
 
 type MiscRow = { id: string; description: string; points: number }
-type InputField = { name: string; label: string; type: string }
+type InputField = { name: string; label: string; type: string; meta?: string | null }
 
 export type ResultCard = {
   id: string
@@ -195,7 +197,7 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
                 return (
                   <div key={field.name} className="flex items-center justify-between text-sm py-1 border-t first:border-t-0 gap-3">
                     <span className="text-gray-500 shrink-0">{field.label}</span>
-                    {editing ? (
+                    {editing ? (field.type === "POINTS_SELECT" || field.type === "TIME_POINTS" ? <PointFieldInput field={field} value={cur[field.name] ?? ""} onChange={v => setVal(card.id, field.name, v)} className="w-48 px-2 py-1 border rounded" /> :
                       <input
                         value={cur[field.name] ?? ""}
                         onChange={(e) => setVal(card.id, field.name, e.target.value)}
@@ -204,7 +206,7 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
                         className="w-32 px-2 py-1.5 border rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-purple-500"
                       />
                     ) : (
-                      <span className="font-mono font-medium text-gray-900">{cur[field.name] ?? "–"}</span>
+                      <span className="font-mono font-medium text-gray-900">{pointFieldLabel(field, cur[field.name])}</span>
                     )}
                   </div>
                 )
