@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { FormulaInput } from "@/components/FormulaInput"
 import { PointFieldEditor } from "@/components/PointFieldEditor"
-import { readPointMeta, examplePointFields, validatePointFields } from "@/lib/pointFields"
+import { readPointMeta, validatePointFields } from "@/lib/pointFields"
+import { ELEMENT_FIELD_TYPES } from "@/lib/elementFieldTypes"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
 import { Card } from "@/components/ui/card"
@@ -57,16 +58,7 @@ type CompDefs = {
   registeredTeamCount: number
 }
 
-const FIELD_TYPES = [
-  { value: "ESTIMATION", label: "Kauguste hindamine (veaprotsent)" },
-  { value: "POINTS_SELECT", label: "Valik punktidega" },
-  { value: "TIME_POINTS", label: "Aeg → punktitabel" },
-  { value: "TIME", label: "Aeg (h:mm:ss)" },
-  { value: "TIME_RANGE", label: "Algus/Lõpp aeg (kestvus)" },
-  { value: "NUMBER", label: "Arv" },
-  { value: "TEXT", label: "Tekst" },
-  { value: "COMPUTED", label: "Arvutatud (valem)" },
-]
+const FIELD_TYPES = ELEMENT_FIELD_TYPES
 
 const CALC_TYPES = [
   { value: "RELATIVE_RANKING", label: "Pingerida valemiga", desc: "Parim saab 0p (PENALTY) või max (PLUS), halvim vastupidi. Rangi järgi lineaarne." },
@@ -972,7 +964,6 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         {!isSpecialType && !isMiscType && type !== "PENALTY_BOX" && calcType !== "DIRECT_ENTRY" && (
           <Card className="p-5 space-y-4">
             <h2 className="font-semibold text-gray-900">Sisendväljad</h2>
-            {fields.length <= 1 && <button type="button" disabled={!compDefs} className="text-sm text-blue-600" onClick={() => { setFields(examplePointFields()); setCalcType("ABSOLUTE_POINTS"); setMaxValue("40") }}>Kasuta NATO ülesande näidist (40 p)</button>}
             <p className="text-xs text-gray-500">Märgi ära, milline väli läheb rankingusse (tulemusväli).</p>
             {fields.map((f, i) => (
               <div key={i} className="border rounded-lg p-3 space-y-2">
@@ -999,9 +990,9 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                     {!f.label.trim() && <p className="text-xs text-red-500 mt-0.5">Kohustuslik</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <select value={f.type} onChange={e => updateField(i, "type", e.target.value)}
-                    className="px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    className="max-w-full min-w-0 px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
                     {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                   <select
@@ -1234,7 +1225,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                             className="px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400" />
                           <PointFieldEditor type={f.type} meta={f.meta} onChange={v => updateSectionField(si, fi, "meta", v)} />
                           <select value={f.type} onChange={e => updateSectionField(si, fi, "type", e.target.value)}
-                            className="px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                            className="max-w-full min-w-0 px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
                             {FIELD_TYPES.filter(t => t.value !== "COMPUTED").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                           </select>
                           <div className="flex items-center gap-1">

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { PointFieldEditor } from "@/components/PointFieldEditor"
 import { readPointMeta } from "@/lib/pointFields"
+import { ELEMENT_FIELD_TYPES, elementFieldLabel } from "@/lib/elementFieldTypes"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
@@ -16,14 +17,7 @@ type Section = { id: string; name: string; order: number; maxValue: number | nul
 
 type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; validation: FieldValidation }
 
-const FIELD_TYPES = [
-  { value: "ESTIMATION", label: "Kauguste hindamine (veaprotsent)" },
-  { value: "POINTS_SELECT", label: "Valik punktidega" },
-  { value: "TIME_POINTS", label: "Aeg → punktitabel" },
-  { value: "TIME", label: "Aeg (h:mm:ss)" },
-  { value: "NUMBER", label: "Arv" },
-  { value: "TEXT", label: "Tekst" },
-]
+const FIELD_TYPES = ELEMENT_FIELD_TYPES.filter(f => f.value !== "COMPUTED")
 
 const CALC_TYPES = [
   { value: "RELATIVE_RANKING", label: "Relatiivne pingerida" },
@@ -220,7 +214,7 @@ function SectionFormUI({
                 onChange={e => updateField(i, "label", e.target.value)}
                 className="px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
               <select value={f.type} onChange={e => updateField(i, "type", e.target.value)}
-                className="px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500">
+                className="max-w-full min-w-0 px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500">
                 {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
               <div className="flex items-center gap-1">
@@ -494,7 +488,7 @@ export function ElementSectionsManager({ elementId, competitionId, initialSectio
                   <div key={f.id} className="flex items-center gap-2 py-1.5 text-xs">
                     <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{f.name}</span>
                     <span className="text-gray-700">{f.label}</span>
-                    <span className="text-gray-400">({f.type === "ESTIMATION" ? "Kauguste hindamine" : f.type === "POINTS_SELECT" ? "Valik punktidega" : f.type === "TIME_POINTS" ? "Aeg → punktitabel" : f.type})</span>
+                    <span className="text-gray-400">({elementFieldLabel(f.type)})</span>
                     {f.rankingPriority === 1 && (
                       <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">tulemusväli</span>
                     )}

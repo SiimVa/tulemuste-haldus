@@ -1,8 +1,9 @@
+import { examplePointFields } from "./pointFieldFixture"
 import test from "node:test"
 import assert from "node:assert/strict"
 import { calculateScores, computeFields } from "../src/lib/calculators"
 import { simulateElementScore } from "../src/lib/athleteSimulate"
-import { compareElementTimes, durationLabel, examplePointFields, pointFieldValue, validatePointFields } from "../src/lib/pointFields"
+import { compareElementTimes, durationLabel, pointFieldValue, validatePointFields } from "../src/lib/pointFields"
 import { validateFieldValue } from "../src/lib/fieldValidation"
 import type { FieldDefinition } from "@prisma/client"
 

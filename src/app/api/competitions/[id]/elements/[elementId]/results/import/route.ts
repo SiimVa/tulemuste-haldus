@@ -1,4 +1,4 @@
-import { parseEstimates, readEstimation } from "@/lib/estimation"
+import { parseEstimates, readEstimation, targetUnit } from "@/lib/estimation"
 import { readPointMeta } from "@/lib/pointFields"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
@@ -157,7 +157,7 @@ async function handlePOST(
   for (const field of inputFields) {
     if (field.type === "ESTIMATION") {
       for (const target of readEstimation(field.meta).targets) {
-        const idx = headerRow.findIndex(h => h.toLowerCase() === `${field.label} (${target.label})`.toLowerCase())
+        const idx = headerRow.findIndex(h => (h.toLowerCase() === `${field.label} (${target.label})`.toLowerCase() || h.toLowerCase() === `${field.label} (${target.label}) [${targetUnit(readEstimation(field.meta), target)}]`.toLowerCase()))
         if (idx >= 0) fieldColMap.push({ field, colIdx: idx, estimateTargetId: target.id })
       }
       // Also accept a previously exported JSON value in one column.

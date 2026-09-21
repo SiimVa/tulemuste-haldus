@@ -1,3 +1,4 @@
+import { examplePointFields } from "../tests/pointFieldFixture"
 import { test, expect } from "@playwright/test"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
@@ -21,18 +22,18 @@ test("configure point fields, enter judge results, preserve time and break only 
   await page.getByRole("button", { name: "Logi sisse" }).click()
   await page.waitForURL("**/dashboard")
   await page.goto(`/dashboard/competitions/${competition.id}/elements/new`)
-  await page.getByPlaceholder("KP 1 Politsei").fill("NATO ülesanne")
-  await page.getByPlaceholder("1", { exact: true }).fill("S1")
-  await page.getByRole("button", { name: "Kasuta NATO ülesande näidist (40 p)" }).click()
+  await expect(page.getByRole("button", { name: /Kasuta NATO/ })).toHaveCount(0)
+  const created = await page.request.post(`/api/competitions/${competition.id}/elements`, { data: {
+    name: "Punktidega ülesanne", code: "S1", type: "CHECKPOINT", maxValue: 40,
+    fields: examplePointFields().map((f, order) => ({ ...f, order, isResultField: f.rankingPriority === 1 })),
+    calcMethod: { type: "ABSOLUTE_POINTS", params: { higherIsBetter: true } },
+  } })
+  expect(created.ok()).toBe(true)
+  const element = await db.scoringElement.findFirstOrThrow({ where: { competitionId: competition.id }, include: { fields: true } })
+  await page.goto(`/dashboard/competitions/${competition.id}/elements/${element.id}/edit`)
+  await expect(page.getByRole("button", { name: /Kasuta NATO/ })).toHaveCount(0)
   await expect(page.getByLabel("Valiku nimetus")).toHaveCount(5)
   await expect(page.getByLabel("Ajavahemiku lõpp")).toHaveCount(15)
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByLabel("Ajavahemiku lõpp").first().scrollIntoViewIfNeeded()
-  await page.screenshot({ path: "/tmp/tulemuste-point-fields-editor-mobile.png" })
-  await page.setViewportSize({ width: 1280, height: 800 })
-  await page.getByRole("button", { name: "Salvesta element", exact: true }).click()
-  await page.waitForURL(`**/dashboard/competitions/${competition.id}`)
-  const element = await db.scoringElement.findFirstOrThrow({ where: { competitionId: competition.id }, include: { fields: true } })
   const endpoint = `/api/elements/${element.id}/results`
   expect((await page.request.post(endpoint, { data: { teamId: slow.id, values: { nato: "forged", sedelid: "9", lahendus: "yes", aeg: "4:15" } } })).status()).toBe(422)
   const token = await db.accessToken.create({ data: { competitionId: competition.id, elementId: element.id, type: "JUDGE", name: "Kohtunik" } })
