@@ -72,4 +72,16 @@ test("configure point fields, enter judge results, preserve time and break only 
   await page.getByRole("button", { name: /Salvesta/ }).last().click()
   await page.waitForURL(`**/elements/${element.id}`)
   expect((await db.computedScore.findFirstOrThrow({ where: { elementId: element.id, teamId: slow.id } })).penaltyPoints).toBe(41)
+  // Regression: time must also resolve the rank used to allocate penalty points.
+  await db.competition.update({ where: { id: competition.id }, data: { scoringMode: "PENALTY" } })
+  expect((await page.request.patch(`/api/elements/${element.id}`, { data: { maxValue: 40, calcMethod: { type: "RELATIVE_RANKING", params: { higherIsBetter: true, minPoints: 0 } } } })).ok()).toBe(true)
+  const third = await db.team.create({ data: { competitionId: competition.id, code: "3", name: "Kolmas", class: "A" } })
+  expect((await page.request.post(endpoint, { data: { teamId: third.id, values: { nato: "partly", sedelid: "8", lahendus: "no", aeg: "4:00" } } })).ok()).toBe(true)
+  const penaltyScores = await db.computedScore.findMany({ where: { elementId: element.id } })
+  expect(penaltyScores.find(s => s.teamId === fast.id)?.penaltyPoints).toBe(0)
+  expect(penaltyScores.find(s => s.teamId === slow.id)?.penaltyPoints).toBe(20)
+  expect(penaltyScores.find(s => s.teamId === third.id)?.penaltyPoints).toBe(40)
+  await page.goto(`/dashboard/competitions/${competition.id}/elements/${element.id}`)
+  await expect(table.locator("tbody tr").nth(1)).toContainText("20.00")
+
 })

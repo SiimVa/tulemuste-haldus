@@ -51,3 +51,23 @@ test("reject forged choices, invalid times and incomplete/overlapping configurat
   assert.ok(validatePointFields([{ ...time, meta: JSON.stringify({ timeBands: [{ through: 30, points: 1 }, { through: 20, points: 0 }], overflowPoints: 0 }) }]))
   assert.ok(validatePointFields([{ ...selection, meta: "{}" }]))
 })
+
+test("ranking points use original time instead of equal time-table points", () => {
+  const inputs = [
+    { nato: "yes", sedelid: "9", lahendus: "yes", aeg: "3:00" },
+    { nato: "yes", sedelid: "9", lahendus: "yes", aeg: "2:00" },
+    { nato: "partly", sedelid: "8", lahendus: "no", aeg: "4:00" },
+  ].map((values, i) => ({ teamId: String(i), team: { id: String(i) }, values: JSON.stringify(values), exceptionLabel: null, exceptionPenalty: null }))
+  for (const priority of [null, 2]) {
+    const rankedFields = fields.map(f => f.name === "aeg" ? { ...f, rankingPriority: priority } : f)
+    for (const type of ["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"]) {
+      const element = { id: "el", fields: rankedFields, exceptions: [], maxValue: 40, calcMethod: { id: "m", elementId: "el", sectionId: null, type, params: JSON.stringify({ higherIsBetter: true, minPoints: 0 }), customFormula: null } }
+      const scores = calculateScores(element, inputs, { scoringMode: "PENALTY", defaultKPMaxValue: 40, defaultPKMaxValue: 30 })
+      assert.deepEqual(scores.map(e => e.penaltyPoints), [type === "VALUE_BASED" ? 13.3333 : 20, 0, 40], `${type}, priority ${priority}`)
+      assert.equal(scores[0].allValues.aeg, 15)
+      assert.equal(scores[0].allValues.kokku, 40)
+      const tied = calculateScores(element, inputs.map(r => ({ ...r, values: r.values.replace("3:00", "2:00") })), { scoringMode: "PENALTY", defaultKPMaxValue: 40, defaultPKMaxValue: 30 })
+      assert.deepEqual(tied.map(e => e.penaltyPoints), [0, 0, 40])
+    }
+  }
+})
