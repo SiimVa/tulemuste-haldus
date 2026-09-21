@@ -20,6 +20,7 @@ export function formatDurationDigits(raw: string): string {
 }
 
 type DurationProps = {
+  "aria-label"?: string
   value: string
   onChange: (v: string) => void
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
@@ -28,10 +29,11 @@ type DurationProps = {
   disabled?: boolean
 }
 
-export function TimeDurationInput({ value, onChange, onKeyDown, placeholder, className, disabled }: DurationProps) {
+export function TimeDurationInput({ value, onChange, onKeyDown, placeholder, className, disabled, "aria-label": ariaLabel }: DurationProps) {
   return (
     <input
       type="text"
+      aria-label={ariaLabel}
       inputMode="numeric"
       value={value}
       onChange={(e) => onChange(formatDurationDigits(e.target.value))}

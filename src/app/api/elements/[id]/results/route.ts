@@ -133,7 +133,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
         }
         continue
       }
-      const err = validateFieldValue(values[field.name], field.name, field.label, field.type, validation)
+      const err = validateFieldValue(values[field.name], field.name, field.label, field.type, validation, field.meta)
       if (err) return NextResponse.json({ error: err.message }, { status: 422 })
     }
   }

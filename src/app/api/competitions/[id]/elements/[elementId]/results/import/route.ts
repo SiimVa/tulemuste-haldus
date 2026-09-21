@@ -1,3 +1,5 @@
+import { readPointMeta } from "@/lib/pointFields"
+import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -229,14 +231,19 @@ async function handlePOST(
         continue
       }
 
-      if (field.type === "NUMBER") {
+      if (field.type === "POINTS_SELECT") {
+        const options = readPointMeta(field.meta).options ?? []
+        const option = options.find(o => o.id === rawVal) ?? options.find(o => o.label === rawVal || `${o.label} (${o.points} p)` === rawVal)
+        if (!option) { hasError = true; errorMsg = `${field.label}: tundmatu valik`; break }
+        values[storeName] = option.id
+      } else if (field.type === "NUMBER") {
         if (!isNumericValue(rawVal)) {
           hasError = true
           errorMsg = `Väli "${field.label}" peaks olema arv, saadi: "${rawVal}"`
           break
         }
         values[storeName] = rawVal.replace(",", ".")
-      } else if (field.type === "TIME" || field.type === "TIME_RANGE") {
+      } else if (field.type === "TIME" || field.type === "TIME_POINTS" || field.type === "TIME_RANGE") {
         const excelTime = excelFractionToTime(rawVal)
         if (excelTime !== null) {
           values[storeName] = excelTime
@@ -252,6 +259,10 @@ async function handlePOST(
       }
     }
 
+    for (const field of inputFields.filter(f => f.type === "POINTS_SELECT" || f.type === "TIME_POINTS")) {
+      const error = validateFieldValue(values[field.name], field.name, field.label, field.type, parseValidation(field.validation), field.meta)
+      if (error) { hasError = true; errorMsg = error.message; break }
+    }
     if (hasError) {
       rows.push({
         rowNum,

@@ -69,7 +69,7 @@ export async function getCompetitionOverview(id: string): Promise<CompetitionOve
   const activeElements = progressRows.filter((e) => !e.isCancelled)
   const totalSlots = activeElements.reduce((sum, el) => sum + el.total, 0)
   const totalEntered = activeElements.reduce((s, el) => s + el.entered, 0)
-  const progressPct = totalSlots > 0 ? Math.round((totalEntered / totalSlots) * 100) : 0
+  const progressPct = totalSlots > 0 ? (totalEntered / totalSlots) * 100 : 0
 
   return {
     competition,

@@ -4,6 +4,8 @@ import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { FormulaInput } from "@/components/FormulaInput"
+import { PointFieldEditor } from "@/components/PointFieldEditor"
+import { readPointMeta, examplePointFields, validatePointFields } from "@/lib/pointFields"
 import { FieldValidationEditor } from "@/components/FieldValidationEditor"
 import { FieldValidation, parseValidation } from "@/lib/fieldValidation"
 import { Card } from "@/components/ui/card"
@@ -13,7 +15,7 @@ import type { TeamCountScope } from "@/lib/classGroups"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
 
-type FieldRow = { name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
+type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
 type ExceptionRow = { label: string; penalty: string }
 type SectionRow = {
   id: string // lokaalne key
@@ -56,6 +58,8 @@ type CompDefs = {
 }
 
 const FIELD_TYPES = [
+  { value: "POINTS_SELECT", label: "Valik punktidega" },
+  { value: "TIME_POINTS", label: "Aeg → punktitabel" },
   { value: "TIME", label: "Aeg (h:mm:ss)" },
   { value: "TIME_RANGE", label: "Algus/Lõpp aeg (kestvus)" },
   { value: "NUMBER", label: "Arv" },
@@ -279,7 +283,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                   if (typeof m.higherIsBetter === "boolean") fieldHigherIsBetter = m.higherIsBetter
                 } catch {}
                 const rankingPriority = f.rankingPriority ?? (f.isResultField ? 1 : null)
-                return { name: f.name, label: f.label, type: f.type, rankingPriority, formula: f.formula ?? "", displayAsTime, validation: parseValidation(f.validation), fieldHigherIsBetter }
+                return { meta: f.meta, name: f.name, label: f.label, type: f.type, rankingPriority, formula: f.formula ?? "", displayAsTime, validation: parseValidation(f.validation), fieldHigherIsBetter }
               }))
               setExceptions((el.exceptions ?? []).map((ex: { label: string; penalty: number }) => ({
                 label: ex.label, penalty: String(ex.penalty),
@@ -456,6 +460,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const pointError = validatePointFields(isCombinedMode ? sections.flatMap(s => s.fields) : fields)
+    if (pointError) { setError(pointError); return }
     setLoading(true)
     setError("")
 
@@ -505,7 +511,9 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         order: i,
         formula: f.type === "COMPUTED" ? f.formula : undefined,
         meta: (() => {
-          const m: Record<string, unknown> = {}
+          const m: Record<string, unknown> = { ...readPointMeta(f.meta) }
+          delete m.displayAs
+          delete m.higherIsBetter
           if (f.type === "COMPUTED" && f.displayAsTime) m.displayAs = "TIME"
           if (f.rankingPriority != null && typeof f.fieldHigherIsBetter === "boolean") m.higherIsBetter = f.fieldHigherIsBetter
           return Object.keys(m).length > 0 ? JSON.stringify(m) : undefined
@@ -536,7 +544,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           name: f.name, label: f.label, type: f.type,
           isResultField: f.rankingPriority === 1, rankingPriority: f.rankingPriority,
           order: i,
-          meta: (s.calcType === "DIRECT_ENTRY" && f.rankingPriority === 1) ? JSON.stringify({ higherIsBetter: s.higherIsBetter ?? false }) : undefined,
+          meta: (s.calcType === "DIRECT_ENTRY" && f.rankingPriority === 1) ? JSON.stringify({ ...readPointMeta(f.meta), higherIsBetter: s.higherIsBetter ?? false }) : f.meta,
         })),
         calcMethod: {
           type: s.calcType,
@@ -963,6 +971,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         {!isSpecialType && !isMiscType && type !== "PENALTY_BOX" && calcType !== "DIRECT_ENTRY" && (
           <Card className="p-5 space-y-4">
             <h2 className="font-semibold text-gray-900">Sisendväljad</h2>
+            {fields.length <= 1 && <button type="button" disabled={!compDefs} className="text-sm text-blue-600" onClick={() => { setFields(examplePointFields()); setCalcType("ABSOLUTE_POINTS"); setMaxValue("40") }}>Kasuta NATO ülesande näidist (40 p)</button>}
             <p className="text-xs text-gray-500">Märgi ära, milline väli läheb rankingusse (tulemusväli).</p>
             {fields.map((f, i) => (
               <div key={i} className="border rounded-lg p-3 space-y-2">
@@ -1040,6 +1049,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                     </label>
                   </div>
                 )}
+                <PointFieldEditor type={f.type} meta={f.meta} onChange={v => updateField(i, "meta", v)} />
                 {f.type !== "COMPUTED" && (
                   <FieldValidationEditor
                     fieldType={f.type}
@@ -1221,6 +1231,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                           <input type="text" placeholder="kuvamisnimi" value={f.label}
                             onChange={e => updateSectionField(si, fi, "label", e.target.value)}
                             className="px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                          <PointFieldEditor type={f.type} meta={f.meta} onChange={v => updateSectionField(si, fi, "meta", v)} />
                           <select value={f.type} onChange={e => updateSectionField(si, fi, "type", e.target.value)}
                             className="px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400">
                             {FIELD_TYPES.filter(t => t.value !== "COMPUTED").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}

@@ -1,3 +1,5 @@
+import { recomputeElementScores } from "@/lib/recompute"
+import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -44,6 +46,8 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const body = await req.json()
+  const pointError = validatePointFields([...(Array.isArray(body.fields) ? body.fields : []), ...(Array.isArray(body.sections) ? body.sections.flatMap((section: { fields?: PointField[] }) => section.fields ?? []) : [])])
+  if (pointError) return NextResponse.json({ error: pointError }, { status: 400 })
   const { name, code, type, order, maxValue, config, fields, exceptions, calcMethod, isCancelled, directPointsEntry } = body
 
   try {
@@ -111,6 +115,7 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
       }
     })
 
+    if (fields || calcMethod || maxValue !== undefined) await recomputeElementScores(id)
     const updated = await prisma.scoringElement.findUnique({
       where: { id },
       include: { fields: { orderBy: { order: "asc" } }, exceptions: { orderBy: { order: "asc" } }, calcMethod: true },

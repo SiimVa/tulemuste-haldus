@@ -1,3 +1,4 @@
+import { compareElementTimes, pointFieldLabel, readPointMeta } from "./pointFields"
 import { calculateScores, parseTimeToSeconds, computeFields } from "@/lib/calculators"
 import { scopeKeyFor, TEAM_COUNT_SCOPES, type ClassGroup } from "@/lib/classGroups"
 
@@ -301,10 +302,10 @@ export function explainElementScores(
     const ranked = results
       .filter(r => !r.exceptionLabel)
       .map(r => ({ teamId: r.teamId, score: scoreMap.get(r.teamId) ?? 0 }))
-      .sort((a, b) => (scoringMode === "PLUS" ? b.score - a.score : a.score - b.score))
+      .sort((a, b) => ((scoringMode === "PLUS" ? b.score - a.score : a.score - b.score) || compareElementTimes(element.fields, teamRawValues.get(a.teamId) ?? {}, teamRawValues.get(b.teamId) ?? {})))
     let rk = 1
     for (let i = 0; i < ranked.length; i++) {
-      if (i > 0 && ranked[i].score !== ranked[i - 1].score) rk = i + 1
+      if (i > 0 && (ranked[i].score !== ranked[i - 1].score || compareElementTimes(element.fields, teamRawValues.get(ranked[i].teamId) ?? {}, teamRawValues.get(ranked[i - 1].teamId) ?? {}) !== 0)) rk = i + 1
       rankByTeam.set(ranked[i].teamId, rk)
     }
   }
@@ -373,7 +374,7 @@ export function explainElementScores(
         const displayVals: Record<string, string> = {}
         for (const f of section.fields) {
           if (f.type !== "COMPUTED" && rawValues[f.name] !== undefined) {
-            displayVals[f.label] = fmt(computed[f.name] ?? rawValues[f.name], f.type)
+            displayVals[f.label] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? pointFieldLabel(f, rawValues[f.name]) : fmt(computed[f.name] ?? rawValues[f.name], f.type)
           }
         }
 
@@ -421,7 +422,7 @@ export function explainElementScores(
     const displayVals: Record<string, string> = {}
     for (const f of element.fields) {
       if (f.type !== "COMPUTED" && rawValues[f.name] !== undefined) {
-        displayVals[f.label] = fmt(computed[f.name] ?? rawValues[f.name], f.type)
+        displayVals[f.label] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" ? pointFieldLabel(f, rawValues[f.name]) : fmt(computed[f.name] ?? rawValues[f.name], f.type)
       }
     }
 
@@ -435,13 +436,13 @@ export function explainElementScores(
       rank,
       totalTeams,
       score,
-      explanation,
+      explanation: explanation + (element.fields.some(f => f.type === "TIME_POINTS" && readPointMeta(f.meta).timeTieBreak) && results.some(r => r.teamId !== result.teamId && !r.exceptionLabel && scoreMap.get(r.teamId) === score) ? ` | Viigilahutus: lühem aeg (${element.fields.filter(f => f.type === "TIME_POINTS" && readPointMeta(f.meta).timeTieBreak).map(f => `${f.label}: ${rawValues[f.name] ?? "–"}`).join(", ")})` : ""),
     })
   }
 
   // Sorteeri: PENALTY → väiksem parem; PLUS → suurem parem
   breakdowns.sort((a, b) =>
-    scoringMode === "PLUS" ? b.score - a.score : a.score - b.score
+    (scoringMode === "PLUS" ? b.score - a.score : a.score - b.score) || compareElementTimes(element.fields, teamRawValues.get(a.teamId) ?? {}, teamRawValues.get(b.teamId) ?? {})
   )
 
   return breakdowns

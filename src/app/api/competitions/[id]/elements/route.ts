@@ -1,3 +1,4 @@
+import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -46,6 +47,8 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   const body = await req.json()
+  const pointError = validatePointFields([...(Array.isArray(body.fields) ? body.fields : []), ...(Array.isArray(body.sections) ? body.sections.flatMap((section: { fields?: PointField[] }) => section.fields ?? []) : [])])
+  if (pointError) return NextResponse.json({ error: pointError }, { status: 400 })
   const { name, code, type, order, maxValue, config, fields, exceptions, calcMethod, sections } = body
 
   type FieldInput = { name: string; label: string; type: string; order?: number; isResultField?: boolean; rankingPriority?: number | null; formula?: string; meta?: string; validation?: Record<string, unknown> }

@@ -316,6 +316,7 @@ export async function getTeamResultData(
         realScore: scoreByElement.get(element.id) ?? null,
         fields: result.element.fields.map((field) => ({
           name: field.name,
+          meta: field.meta,
           type: field.type,
           isResultField: field.isResultField,
           rankingPriority: field.rankingPriority,
@@ -326,6 +327,7 @@ export async function getTeamResultData(
           .filter((field) => field.type !== "COMPUTED")
           .map((field) => ({
             name: field.name,
+          meta: field.meta,
             label: field.label,
             type: field.type,
           })),

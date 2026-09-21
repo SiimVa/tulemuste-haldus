@@ -1,3 +1,5 @@
+import { recomputeElementScores } from "@/lib/recompute"
+import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -14,6 +16,8 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   }
   const body = await req.json()
+  const pointError = validatePointFields([...(Array.isArray(body.fields) ? body.fields : []), ...(Array.isArray(body.sections) ? body.sections.flatMap((section: { fields?: PointField[] }) => section.fields ?? []) : [])])
+  if (pointError) return NextResponse.json({ error: pointError }, { status: 400 })
   const { name, maxValue, calcMethod, fields } = body
   const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
     ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
@@ -73,6 +77,7 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
     include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
   })
 
+  await recomputeElementScores(elementId)
   return NextResponse.json(section)
 }
 
