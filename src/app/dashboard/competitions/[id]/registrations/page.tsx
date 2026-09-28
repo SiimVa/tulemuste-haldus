@@ -13,6 +13,8 @@ import {
 import { Card, cardClass } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { RegistrationExportButtons } from "@/components/registration/RegistrationExportButtons"
+import { CompetitionNav } from "@/components/competition/CompetitionNav"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -332,6 +334,23 @@ export default function RegistrationsPage({
         <p className="text-sm text-gray-500 mt-1">
           Halda avaldusi, ootenimekirja ja mandaadi töövoogu.
         </p>
+      </div>
+
+      <CompetitionNav competitionId={competitionId} />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Link href={`/dashboard/competitions/${competitionId}/registration-overview`} className="text-sm text-primary hover:underline">
+          Ava registreerimise ülevaade ja vali ekspordi veerud →
+        </Link>
+        <div className="flex flex-wrap gap-4">
+          <section aria-label="Registreerimise eksport">
+            <p className="mb-2 text-xs text-ink-muted">Kõik registreerimise andmed</p>
+            <RegistrationExportButtons competitionId={competitionId} phase="REGISTRATION" />
+          </section>
+          <section aria-label="Mandaadi eksport">
+            <p className="mb-2 text-xs text-ink-muted">Kõik mandaadi andmed</p>
+            <RegistrationExportButtons competitionId={competitionId} phase="MANDATE" />
+          </section>
+        </div>
       </div>
 
       {error && (

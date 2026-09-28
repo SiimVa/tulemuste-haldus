@@ -101,6 +101,19 @@ Võistluse lehel on jaotis **Registreerimine**, kus omanik, korraldaja või
 süsteemiadministraator näeb kõigi võistkondade olekuid, esindajat ja mandaadi
 koosseisu. Esitatud etapi saab kinnitada või märkusega parandamisele saata.
 
+Menüüs **Registreerimine → Registreerimise ülevaade** saab valida registreerimise
+või mandaadi andmed, kuvatavad põhiandmed ja vormiväljad. Otsing ning klassi- ja
+staatusfilter piiravad tabeli ridu. **Ekspordi Excel** ja **Ekspordi CSV** kasutavad
+samu veerge ja filtreid. Veeruvalik säilib brauseris võistluse ja etapi kaupa.
+Lehel **Registreerimised** saab mõlema etapi kõik andmed ka otse eksportida.
+
+Registreerimise aruanne kasutab avalduse vastuseid; mandaadi aruanne võistkonna
+praeguseid vastuseid ja koosseisu. Varasemad avalduseta võistkonnad on samuti
+kaasatud, kuid avaldusest loodud võistkonda registreerimisel topelt ei loeta.
+Kõik staatused, sh mustandid ja loobumised, on vaikimisi kaasatud. Eksport on
+kättesaadav ainult võistluse haldusõigusega kasutajale. Kustutatud isikuandmeid
+aruandes ei taastata.
+
 Avaliku registreerimise kinnitamisel seotakse registreeringu esitanud kasutaja
 võistkonna esindajaks. Korraldaja saab esindajat hiljem võistluse
 **Juurdepääsu** lehel muuta. Kui esindajal veel kontot ei ole, saab talle samalt
