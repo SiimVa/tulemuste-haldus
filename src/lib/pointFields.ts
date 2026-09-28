@@ -40,7 +40,7 @@ export function pointFieldLabel(field: PointField, value: unknown): string {
   if (field.type === "ESTIMATION") {
     const config = readEstimation(field.meta)
     const result = calculateEstimation(config, value)
-    const details = result.rows.map(r => `${r.label}: ${r.guess === null ? "–" : formatEstimate(r.guess)} ${config.unit}`).join("; ")
+    const details = result.rows.map(r => `${r.label}: ${r.guess === null ? "–" : formatEstimate(r.guess)} ${r.unit}`).join("; ")
     return result.complete ? `${details} | ${formatEstimate(result.points)} p · eksimus ${formatEstimate(result.error)} ${config.unit} · ${formatEstimate(result.errorPercent)}%` : `${details} | Pakkumised pole täielikud`
   }
   const points = pointFieldValue(field, value)
@@ -80,14 +80,4 @@ export const exampleTimeMeta: PointFieldMeta = {
   timeBands: Array.from({ length: 15 }, (_, i) => ({ through: 255 + i * 16, points: 15 - i })),
   overflowPoints: 0,
   timeTieBreak: true,
-}
-export function examplePointFields() {
-  const common = { rankingPriority: null, formula: "", displayAsTime: false, validation: { required: true }, fieldHigherIsBetter: null }
-  return [
-    { ...common, name: "nato", label: "NATO tähestiku kasutamine", type: "POINTS_SELECT", meta: JSON.stringify({ options: [{ id: "yes", label: "Kasutab", points: 2 }, { id: "partly", label: "Kasutab osaliselt", points: 1 }, { id: "no", label: "Ei kasuta", points: 0 }] }) },
-    { ...common, name: "sedelid", label: "Õigesti avatud sedeleid", type: "NUMBER", validation: { required: true, min: 0, max: 9, integer: true } },
-    { ...common, name: "lahendus", label: "Lahendussõna leidmine", type: "POINTS_SELECT", meta: JSON.stringify({ options: [{ id: "yes", label: "Leidis", points: 5 }, { id: "no", label: "Ei leidnud", points: 0 }] }) },
-    { ...common, name: "aeg", label: "Aeg", type: "TIME_POINTS", meta: JSON.stringify(exampleTimeMeta) },
-    { ...common, name: "kokku", label: "Punkte kokku", type: "COMPUTED", rankingPriority: 1, fieldHigherIsBetter: true, formula: "nato + sedelid * 2 + lahendus + aeg", validation: {} },
-  ]
 }

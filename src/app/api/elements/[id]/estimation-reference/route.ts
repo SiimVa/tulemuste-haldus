@@ -26,12 +26,12 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
   }
   setSecurityTargets({ competitionId: element.competitionId, elementId })
   const body = await req.json().catch(() => null)
-  if (!body || typeof body.fieldId !== "string" || !body.correct || typeof body.correct !== "object" || Array.isArray(body.correct)) return NextResponse.json({ error: "Vigased õiged kaugused" }, { status: 400 })
+  if (!body || typeof body.fieldId !== "string" || !body.correct || typeof body.correct !== "object" || Array.isArray(body.correct)) return NextResponse.json({ error: "Vigased õiged väärtused" }, { status: 400 })
   const field = await prisma.fieldDefinition.findFirst({ where: { id: body.fieldId, elementId, type: "ESTIMATION" } })
   if (!field) return NextResponse.json({ error: "Kauguste hindamise välja ei leitud" }, { status: 404 })
   // Only reference distances can be changed by a judge, not scoring rules or targets.
   const config = readEstimation(field.meta)
-  if (Object.keys(body.correct).length !== config.targets.length || config.targets.some(t => typeof body.correct[t.id] !== "number" || !Number.isFinite(body.correct[t.id]) || body.correct[t.id] <= 0)) return NextResponse.json({ error: "Sisesta kõik õiged kaugused" }, { status: 400 })
+  if (Object.keys(body.correct).length !== config.targets.length || config.targets.some(t => typeof body.correct[t.id] !== "number" || !Number.isFinite(body.correct[t.id]) || body.correct[t.id] <= 0)) return NextResponse.json({ error: "Sisesta kõik õiged väärtused" }, { status: 400 })
   const updated = { ...config, targets: config.targets.map(t => ({ ...t, correct: body.correct[t.id] })) }
   const error = validateEstimation(updated)
   if (error) return NextResponse.json({ error }, { status: 422 })

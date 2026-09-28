@@ -1,4 +1,4 @@
-import { calculateEstimation, parseEstimates, readEstimation } from "@/lib/estimation"
+import { calculateEstimation, parseEstimates, readEstimation, targetUnit } from "@/lib/estimation"
 import { pointFieldLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -75,7 +75,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
   const inComp = teams.filter((t) => !t.isHorsDeCompetition)
   const horsComp = teams.filter((t) => t.isHorsDeCompetition)
   const headers = ["#", "Tähis", "Võistkond", "Klass",
-    ...inputFields.flatMap(f => f.type === "ESTIMATION" ? [...readEstimation(f.meta).targets.map(t => `${f.label} (${t.label})`), `${f.label}: punkte`, `${f.label}: eksimus (${readEstimation(f.meta).unit})`, `${f.label}: protsendivigade summa (%)`] : [f.label]),
+    ...inputFields.flatMap(f => f.type === "ESTIMATION" ? [...readEstimation(f.meta).targets.map(t => `${f.label} (${t.label}) [${targetUnit(readEstimation(f.meta), t)}]`), `${f.label}: punkte`, `${f.label}: eksimus (${readEstimation(f.meta).unit})`, `${f.label}: protsendivigade summa (%)`] : [f.label]),
     "Erand", isPlusMode ? "Punktid" : "Karistus"]
 
   const baseName = element.competition.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")

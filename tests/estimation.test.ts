@@ -54,3 +54,22 @@ test("server, computed formulas and athlete simulation agree", () => {
   const scores = calculateScores({ id: "el", fields: [f], exceptions: [], maxValue: 6, calcMethod: { id: "m", elementId: "el", type: "ABSOLUTE_POINTS", params: "{}", customFormula: null } }, [{ teamId: "t", team: { id: "t" }, values: JSON.stringify({ kaugused: guesses }), exceptionLabel: null, exceptionPenalty: null }], { scoringMode: "PLUS", defaultKPMaxValue: 6, defaultPKMaxValue: 30 })
   assert.equal(scores[0].penaltyPoints, 4)
 })
+
+test("mixed cm and m errors are converted to the total unit while percentages and points stay unchanged", () => {
+  const mixed = { ...config, targets: config.targets.map((t, i) => ({ ...t, unit: i === 0 ? "cm" : "m" })) }
+  assert.equal(validateEstimation(mixed), null)
+  const result = calculateEstimation(mixed, guesses)
+  assert.equal(result.points, 4)
+  assert.equal(result.errorPercent, 20)
+  assert.equal(result.error, 20.1)
+  assert.deepEqual(result.rows.map(r => r.unit), ["cm", "m"])
+  assert.equal(calculateEstimation({ ...mixed, unit: "cm" }, guesses).error, 2010)
+  assert.equal(calculateEstimation({ ...mixed, result: "ERROR_ABSOLUTE" }, guesses).result, 20.1)
+})
+
+test("legacy shared units remain unchanged; incompatible units cannot be added together", () => {
+  assert.equal(calculateEstimation({ ...config, unit: "cm" }, guesses).error, 30)
+  assert.deepEqual(calculateEstimation({ ...config, unit: "cm" }, guesses).rows.map(r => r.unit), ["cm", "cm"])
+  assert.ok(validateEstimation({ ...config, targets: config.targets.map(t => ({ ...t, unit: "kg" })) }))
+  assert.equal(validateEstimation({ ...config, unit: "kg", targets: config.targets.map(t => ({ ...t, unit: "g" })) }), null)
+})

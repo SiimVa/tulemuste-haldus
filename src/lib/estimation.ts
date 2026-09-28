@@ -1,4 +1,4 @@
-export type EstimateTarget = { id: string; label: string; correct: number | null }
+export type EstimateTarget = { id: string; label: string; correct: number | null; unit?: string }
 export type ErrorBand = { through: number; points: number }
 export type EstimationConfig = {
   targets: EstimateTarget[]
@@ -10,6 +10,18 @@ export type EstimationConfig = {
 export const defaultEstimation: EstimationConfig = {
   targets: [], bands: [{ through: 5, points: 3 }, { through: 15, points: 2 }, { through: 30, points: 1 }],
   overflowPoints: 0, result: "POINTS", unit: "m",
+}
+// Convert compatible units to the configured total unit. Legacy rows inherit it.
+const unitFactors: Record<string, [string, number]> = {
+  mm: ["length", 0.001], cm: ["length", 0.01], dm: ["length", 0.1], m: ["length", 1], km: ["length", 1000],
+  mg: ["mass", 0.000001], g: ["mass", 0.001], kg: ["mass", 1], t: ["mass", 1000],
+  ml: ["volume", 0.001], cl: ["volume", 0.01], dl: ["volume", 0.1], l: ["volume", 1],
+}
+export const targetUnit = (config: EstimationConfig, target: EstimateTarget) => target.unit ?? config.unit
+export function unitConversion(from: string, to: string): number | null {
+  if (from === to) return 1
+  const a = unitFactors[from], b = unitFactors[to]
+  return a && b && a[0] === b[0] ? a[1] / b[1] : null
 }
 export function readEstimation(meta?: string | null): EstimationConfig {
   try { return JSON.parse(meta || "{}").estimation ?? defaultEstimation } catch { return defaultEstimation }
@@ -26,28 +38,30 @@ export function estimateNumber(value: unknown): number {
   return /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw) ? Number(raw) : NaN
 }
 export function validateEstimation(config: EstimationConfig): string | null {
-  if (!config || !Array.isArray(config.targets) || config.targets.length < 1 || config.targets.length > 100 || config.targets.some(t => !t || typeof t.id !== "string" || !t.id.trim() || typeof t.label !== "string" || !t.label.trim() || (t.correct !== null && (!Number.isFinite(t.correct) || t.correct <= 0))) || new Set(config.targets.map(t => t.id)).size !== config.targets.length) return "Sisesta 1–100 nimetatud õiget kaugust. Määratud õige kaugus peab olema suurem kui 0."
-  if (new Set(config.targets.map(t => t.label.trim().toLowerCase())).size !== config.targets.length) return "Kauguste nimetused peavad olema erinevad."
+  if (!config || !Array.isArray(config.targets) || config.targets.length < 1 || config.targets.length > 100 || config.targets.some(t => !t || typeof t.id !== "string" || !t.id.trim() || typeof t.label !== "string" || !t.label.trim() || (t.correct !== null && (!Number.isFinite(t.correct) || t.correct <= 0))) || new Set(config.targets.map(t => t.id)).size !== config.targets.length) return "Sisesta 1–100 nimetatud õiget väärtust. Määratud õige väärtus peab olema suurem kui 0."
+  if (new Set(config.targets.map(t => t.label.trim().toLowerCase())).size !== config.targets.length) return "Väärtuste nimetused peavad olema erinevad."
   if (!Array.isArray(config.bands) || !config.bands.length || config.bands.length > 100 || config.bands.some((b, i, bands) => !b || !Number.isFinite(b.through) || b.through < 0 || !Number.isFinite(b.points) || (i > 0 && b.through <= bands[i - 1].through)) || !Number.isFinite(config.overflowPoints)) return "Veaprotsendi piirid peavad olema kasvavas järjekorras ja punktid arvud."
   if (!["POINTS", "ERROR_PERCENT", "ERROR_ABSOLUTE"].includes(config.result) || typeof config.unit !== "string" || config.unit.length > 20) return "Vali korrektne tulemus ja mõõtühik."
+  if (config.targets.some(t => typeof targetUnit(config, t) !== "string" || targetUnit(config, t).length > 20 || unitConversion(targetUnit(config, t), config.unit) === null)) return "Ridade mõõtühikud peavad olema teisendatavad veasumma ühikusse (nt cm ja m)."
   return null
 }
 export function calculateEstimation(config: EstimationConfig, value: unknown) {
   const guesses = parseEstimates(value)
   const rows = config.targets.map(target => {
+    const unit = targetUnit(config, target)
     const guess = estimateNumber(guesses[target.id])
-    if (!Number.isFinite(guess) || target.correct === null) return { ...target, guess: null, error: null, errorPercent: null, points: null }
+    if (!Number.isFinite(guess) || target.correct === null) return { ...target, unit, guess: null, error: null, errorPercent: null, points: null }
     const error = Math.abs(guess - target.correct)
     const errorPercent = error / target.correct * 100
     // Compare unrounded values, allowing only floating-point representation noise.
     const points = config.bands.find(b => errorPercent <= b.through + Number.EPSILON * 16 * Math.max(1, b.through))?.points ?? config.overflowPoints
-    return { ...target, guess, error, errorPercent, points }
+    return { ...target, unit, guess, error, errorPercent, points }
   })
   const points = rows.reduce((sum, r) => sum + (r.points ?? 0), 0)
-  const error = rows.reduce((sum, r) => sum + (r.error ?? 0), 0)
+  const error = rows.reduce((sum, r) => sum + (r.error ?? 0) * (unitConversion(r.unit, config.unit) ?? NaN), 0)
   const errorPercent = rows.reduce((sum, r) => sum + (r.errorPercent ?? 0), 0)
   const complete = rows.length > 0 && rows.every(r => r.points !== null) && [points, error, errorPercent].every(Number.isFinite)
   const result = config.result === "ERROR_ABSOLUTE" ? error : config.result === "ERROR_PERCENT" ? errorPercent : points
   return { rows, points, error, errorPercent, complete, result: complete ? result : undefined }
 }
-export const formatEstimate = (value: number) => value.toLocaleString("et-EE", { minimumFractionDigits: 1, maximumFractionDigits: 2 })
+export const formatEstimate = (value: number) => value.toLocaleString("et-EE", { minimumFractionDigits: 1, maximumFractionDigits: 6 })
