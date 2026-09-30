@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { buildRegistrationReport, filterReportRows, reportCsv, reportMatrix, type ReportApplication, type ReportTeam } from "../src/lib/registrationReport"
+import { buildRegistrationReport, filterReportRows, reportCsv, reportMatrix, reportTable, type RegistrationReport, type ReportApplication, type ReportTeam } from "../src/lib/registrationReport"
 import { representativeFormFields, type FormFieldDefinition } from "../src/lib/registrationForm"
 
 const field = (id: string, overrides: Partial<FormFieldDefinition> = {}): FormFieldDefinition => ({ ...representativeFormFields()[0], id, key: id, label: id, ...overrides })
@@ -64,4 +64,58 @@ test("CSV säilitab täpitähed, reavahetused ja jutumärgid ning neutraliseerib
   assert.ok(csv.includes("'=1+1"))
   assert.ok(csv.includes("' +SUM(A1)"))
   assert.ok(csv.endsWith('"-2","0"'))
+})
+
+const summaryReport: RegistrationReport = {
+  name: "Koondamine", phase: "REGISTRATION",
+  columns: [{ key: "county", label: "Maakond", group: "form" }, { key: "class", label: "Klass", group: "basic" }],
+  rows: [["Järva", "Sega"], ["Viru", "Sega"], ["Alutaguse", "Tüdrukud"], ["Alutaguse", "Poisid"], ["Alutaguse", "Sega"], ["Alutaguse", "Lapsevanemad"], ["Järva", "Tüdrukud"]].map(([county, className], index) => ({
+    id: String(index), status: index === 0 ? "WAITLISTED" : "CONFIRMED", className,
+    cells: { county, class: className, name: `Võistkond ${index + 1}` },
+  })),
+}
+
+test("maakonna ja klassi kokkuvõtted loendavad valitud väljade kordused", () => {
+  assert.deepEqual(reportMatrix(summaryReport, ["county"], {}, "summary"), [["Maakond", "Võistkondade arv"], ["Alutaguse", 4], ["Järva", 2], ["Viru", 1]])
+  assert.deepEqual(reportMatrix(summaryReport, ["class"], {}, "summary"), [["Klass", "Võistkondade arv"], ["Sega", 3], ["Tüdrukud", 2], ["Lapsevanemad", 1], ["Poisid", 1]])
+  assert.equal(reportTable(summaryReport, ["county", "class"], {}, "summary").rows.length, 7)
+  assert.equal(reportTable(summaryReport, ["county"], {}, "teams").rows.length, 7)
+})
+
+test("filtrid rakenduvad enne loendamist ja eksport järgib tabeli kokkuvõtet", () => {
+  const filters = { status: "CONFIRMED", className: "Sega" }
+  const table = reportTable(summaryReport, ["county"], filters, "summary")
+  assert.equal(table.rows.reduce((sum, row) => sum + Number(row.cells["summary:count"]), 0), 2)
+  assert.deepEqual(reportMatrix(summaryReport, ["county"], filters, "summary"), [["Maakond", "Võistkondade arv"], ["Alutaguse", 1], ["Viru", 1]])
+  assert.deepEqual(reportMatrix(summaryReport, ["county"], { search: "Võistkond 1" }, "summary"), [["Maakond", "Võistkondade arv"], ["Järva", 1]])
+  assert.deepEqual(reportMatrix(summaryReport, ["county"], { search: "Puuduv" }, "summary"), [["Maakond", "Võistkondade arv"]])
+  assert.deepEqual(reportTable(summaryReport, [], {}, "summary"), { columns: [], rows: [] })
+})
+
+test("vormivastuse filter piirab nii kokkuvõtet kui ka võistkondade eksporti", () => {
+  const filters = { answers: { county: "Alutaguse" } }
+  assert.deepEqual(reportMatrix(summaryReport, ["county"], filters, "summary"), [["Maakond", "Võistkondade arv"], ["Alutaguse", 4]])
+  assert.equal(reportTable(summaryReport, ["class"], filters, "teams").rows.length, 4)
+  assert.deepEqual(reportMatrix(summaryReport, ["county"], { ...filters, className: "Sega", status: "CONFIRMED" }, "summary"), [["Maakond", "Võistkondade arv"], ["Alutaguse", 1]])
+  assert.equal(filterReportRows(summaryReport.rows, { answers: { county: "Alutaguse", class: "Poisid" } }).length, 1)
+  assert.equal(filterReportRows(summaryReport.rows, { answers: { county: "puuduv" } }).length, 0)
+  assert.equal(filterReportRows(report().rows, { answers: { "field:count": "0", "field:consent": "Ei" } }).length, 1)
+  assert.equal(filterReportRows(report().rows, { answers: { "field:count": "" } }).length, 1)
+})
+
+test("koondamine säilitab tühjad vastused ja eristab arvu tekstist ning väärtuste kombinatsioone", () => {
+  const report: RegistrationReport = { ...summaryReport, rows: [
+    { id: "1", status: "CONFIRMED", className: "", cells: { county: "", class: "" } },
+    { id: "2", status: "CONFIRMED", className: "", cells: { county: "", class: "" } },
+    { id: "3", status: "CONFIRMED", className: "", cells: { county: 0, class: "" } },
+    { id: "4", status: "CONFIRMED", className: "", cells: { county: "0", class: "" } },
+    { id: "5", status: "CONFIRMED", className: "", cells: { county: "a,b", class: "c" } },
+    { id: "6", status: "CONFIRMED", className: "", cells: { county: "a", class: "b,c" } },
+  ] }
+  const table = reportTable(report, ["county", "class"], {}, "summary")
+  assert.equal(table.rows.length, 5)
+  assert.equal(table.rows[0].cells["summary:count"], 2)
+  assert.equal(report.rows[0].cells["summary:count"], undefined)
+  const mandate = reportTable({ ...report, phase: "MANDATE" }, ["county"], {}, "summary")
+  assert.equal(mandate.rows[0].cells["summary:count"], 2)
 })

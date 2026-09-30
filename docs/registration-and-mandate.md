@@ -107,6 +107,22 @@ staatusfilter piiravad tabeli ridu. **Ekspordi Excel** ja **Ekspordi CSV** kasut
 samu veerge ja filtreid. Veeruvalik säilib brauseris võistluse ja etapi kaupa.
 Lehel **Registreerimised** saab mõlema etapi kõik andmed ka otse eksportida.
 
+Ülevaates on vaikimisi sisse lülitatud **Koonda samad vastused**. Valitud
+veergudes täpselt samade väärtustega read liidetakse ning lisatakse
+**Võistkondade arv**. Näiteks ainult maakonna valimisel kuvatakse iga maakond
+üks kord koos sealt registreerunud võistkondade arvuga; maakonna ja klassi
+valimisel loendatakse iga maakonna-klassi kombinatsiooni eraldi. Filtrid
+rakenduvad enne loendamist ning Exceli ja CSV eksport sisaldab sama kokkuvõtet.
+Koondamise väljalülitamisel näeb ja ekspordib taas iga võistkonna eraldi real.
+
+Rippmenüüst **Koonda välja järgi → Maakond** saab ühe valikuga avada maakondade
+kokkuvõtte. Koondamise väljad salvestatakse võistkondade loendi veergudest eraldi,
+nii et loendi nimed ja kontaktandmed ei jaga kokkuvõtet üksikuteks võistkondadeks.
+Esimesel avamisel koondatakse klassi järgi. **Filtreeri vormivastuseid** võimaldab
+valida näiteks ühe maakonna või puuduva vastuse. Mitme välja filtrid kehtivad
+korraga, ka peidetud veergude puhul. Excel ja CSV järgivad neid filtreid nii
+kokkuvõttes kui ka võistkondade loendis. Etapi vahetamisel vastusefiltrid tühjendatakse.
+
 Registreerimise aruanne kasutab avalduse vastuseid; mandaadi aruanne võistkonna
 praeguseid vastuseid ja koosseisu. Varasemad avalduseta võistkonnad on samuti
 kaasatud, kuid avaldusest loodud võistkonda registreerimisel topelt ei loeta.

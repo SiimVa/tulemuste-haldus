@@ -8,7 +8,9 @@ export type ReportRow = {
   cells: Record<string, string | number>
 }
 export type RegistrationReport = { name: string; phase: FormPhase; columns: ReportColumn[]; rows: ReportRow[] }
-export type ReportFilters = { status?: string; className?: string; search?: string }
+export type ReportFilters = { status?: string; className?: string; search?: string; answers?: Record<string, string> }
+export type ReportView = "teams" | "summary"
+export type ReportTable = { columns: ReportColumn[]; rows: Pick<ReportRow, "id" | "cells">[] }
 type Values = { fieldId: string; value: string }[]
 export type ReportApplication = {
   id: string; teamName: string; status: string; teamId: string | null
@@ -106,13 +108,45 @@ export function filterReportRows(rows: ReportRow[], filters: ReportFilters): Rep
   const search = filters.search?.trim().toLocaleLowerCase("et")
   return rows.filter(row => (!filters.status || row.status === filters.status)
     && (filters.className === undefined || row.className === filters.className)
+    && Object.entries(filters.answers ?? {}).every(([key, value]) => String(row.cells[key] ?? "") === value)
     && (!search || [row.cells.name, row.cells.code, row.cells.representative, row.cells.email].some(value => String(value ?? "").toLocaleLowerCase("et").includes(search))))
 }
 
-export function reportMatrix(report: RegistrationReport, selected: string[] | undefined, filters: ReportFilters = {}): (string | number)[][] {
+export function reportTable(report: RegistrationReport, selected: string[] | undefined, filters: ReportFilters = {}, view: ReportView = "teams"): ReportTable {
   const keys = selected === undefined ? null : new Set(selected)
   const columns = report.columns.filter(column => keys === null || keys.has(column.key))
-  return [columns.map(column => column.label), ...filterReportRows(report.rows, filters).map(row => columns.map(column => row.cells[column.key] ?? ""))]
+  const rows = filterReportRows(report.rows, filters)
+  if (view === "teams") return { columns, rows }
+  if (columns.length === 0) return { columns, rows: [] }
+
+  // Group only by the selected cells: hidden names, IDs and statuses must not
+  // split a county/class summary. Filtering happens before counting.
+  const groups = new Map<string, Pick<ReportRow, "id" | "cells">>()
+  for (const row of rows) {
+    const values = columns.map(column => row.cells[column.key] ?? "")
+    const key = JSON.stringify(values)
+    const group = groups.get(key)
+    if (group) group.cells["summary:count"] = Number(group.cells["summary:count"]) + 1
+    else groups.set(key, {
+      id: key,
+      cells: { ...Object.fromEntries(columns.map((column, index) => [column.key, values[index]])), "summary:count": 1 },
+    })
+  }
+  const groupedRows = [...groups.values()].sort((a, b) => {
+    const countDifference = Number(b.cells["summary:count"]) - Number(a.cells["summary:count"])
+    if (countDifference) return countDifference
+    for (const column of columns) {
+      const difference = String(a.cells[column.key]).localeCompare(String(b.cells[column.key]), "et", { numeric: true })
+      if (difference) return difference
+    }
+    return 0
+  })
+  return { columns: [...columns, { key: "summary:count", label: "Võistkondade arv", group: "basic" }], rows: groupedRows }
+}
+
+export function reportMatrix(report: RegistrationReport, selected: string[] | undefined, filters: ReportFilters = {}, view: ReportView = "teams"): (string | number)[][] {
+  const table = reportTable(report, selected, filters, view)
+  return [table.columns.map(column => column.label), ...table.rows.map(row => table.columns.map(column => row.cells[column.key] ?? ""))]
 }
 
 export function reportCsv(matrix: (string | number)[][]): string {
