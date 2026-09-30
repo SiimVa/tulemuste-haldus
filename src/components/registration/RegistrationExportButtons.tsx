@@ -3,10 +3,10 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import type { FormPhase } from "@/lib/registrationForm"
-import type { ReportFilters } from "@/lib/registrationReport"
+import type { ReportFilters, ReportView } from "@/lib/registrationReport"
 
-export function RegistrationExportButtons({ competitionId, phase, columns, filters = {}, disabled = false }: {
-  competitionId: string; phase: FormPhase; columns?: string[]; filters?: ReportFilters; disabled?: boolean
+export function RegistrationExportButtons({ competitionId, phase, columns, filters = {}, view = "teams", disabled = false }: {
+  competitionId: string; phase: FormPhase; columns?: string[]; filters?: ReportFilters; view?: ReportView; disabled?: boolean
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
@@ -14,11 +14,12 @@ export function RegistrationExportButtons({ competitionId, phase, columns, filte
     setBusy(true)
     setError("")
     try {
-      const query = new URLSearchParams({ phase, format })
+      const query = new URLSearchParams({ phase, format, view })
       columns?.forEach(column => query.append("column", column))
       if (filters.status) query.set("status", filters.status)
       if (filters.className !== undefined) query.set("class", filters.className)
       if (filters.search) query.set("search", filters.search)
+      Object.entries(filters.answers ?? {}).forEach(answer => query.append("answer", JSON.stringify(answer)))
       const response = await fetch(`/api/competitions/${competitionId}/registrations/export?${query}`, { cache: "no-store" })
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
