@@ -1,6 +1,4 @@
-import { auth } from "@/lib/auth"
-import { canAccessCompetition } from "@/lib/competitionAccess"
-import { notFound, redirect } from "next/navigation"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 
 export default async function CompetitionLayout({
   children,
@@ -9,15 +7,8 @@ export default async function CompetitionLayout({
   children: React.ReactNode
   params: Promise<{ id: string }>
 }) {
-  const session = await auth()
-  if (!session?.user?.id) redirect("/login")
-
   const { id } = await params
-  const allowed = await canAccessCompetition(id, {
-    id: session.user.id,
-    role: session.user.role,
-  })
-  if (!allowed) notFound()
+  await requireCompetitionManager(id)
 
   return children
 }

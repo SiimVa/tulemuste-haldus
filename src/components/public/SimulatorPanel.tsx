@@ -30,6 +30,7 @@ export type Standing = {
 
 type Props = {
   competitionId: string
+  analysisLinkToken?: string
   teamId: string
   teamName: string
   teamCode: string
@@ -41,7 +42,7 @@ type Props = {
 
 type SimResponse = Standing & { elementScores: Record<string, number | null> }
 
-export function SimulatorPanel({ competitionId, teamId, teamName, teamCode, teamClass, scoringMode, elements, initial }: Props) {
+export function SimulatorPanel({ competitionId, analysisLinkToken, teamId, teamName, teamCode, teamClass, scoringMode, elements, initial }: Props) {
   const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>({})
   const [result, setResult] = useState<SimResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -65,7 +66,7 @@ export function SimulatorPanel({ competitionId, teamId, teamName, teamCode, team
         const res = await fetch(`/api/competitions/${competitionId}/simulate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ teamId, overrides }),
+          body: JSON.stringify({ teamId, overrides, analysisLinkToken }),
         })
         if (res.ok) setResult(await res.json())
       } finally {
@@ -73,7 +74,7 @@ export function SimulatorPanel({ competitionId, teamId, teamName, teamCode, team
       }
     }, 400)
     return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [overrides, hasOverrides, competitionId, teamId])
+  }, [overrides, hasOverrides, competitionId, analysisLinkToken, teamId])
 
   function setVal(elId: string, field: string, value: string) {
     setOverrides((prev) => ({ ...prev, [elId]: { ...(prev[elId] ?? {}), [field]: value } }))

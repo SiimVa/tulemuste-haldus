@@ -3,7 +3,7 @@ import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
 import { GapCells, GapHeadings, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
 import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
-import { auth } from "@/lib/auth"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
@@ -11,8 +11,8 @@ import Link from "next/link"
 import { PrintButton } from "@/components/PrintButton"
 
 export default async function LeaderboardPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ class?: string | string[] }> }) {
-  await auth()
   const { id } = await params
+  await requireCompetitionManager(id)
 
   const competition = await prisma.competition.findUnique({ where: { id }, include: { registrationClasses: { where: { isActive: true }, select: { name: true } } } })
   if (!competition) notFound()

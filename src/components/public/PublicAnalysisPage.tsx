@@ -364,6 +364,7 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
   return (
     <AnalysisView
       competitionId={id}
+      analysisLinkToken={access.type === "LINK_ONLY" ? access.analysisLinkToken : undefined}
       competitionName={competition.name}
       scoringMode={scoringMode}
       teams={analysisTeams}

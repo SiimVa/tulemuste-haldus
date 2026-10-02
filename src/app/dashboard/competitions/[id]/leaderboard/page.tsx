@@ -1,4 +1,5 @@
 import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { leaderboardGaps, leaderboardClassFilter } from "@/lib/leaderboard"
 import { GapCells, GapHeadings, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic"
 
 export default async function LeaderboardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ class?: string | string[] }> }) {
   const { id } = await params
+  await requireCompetitionManager(id)
 
   const competition = await prisma.competition.findUnique({ where: { id }, include: { registrationClasses: { where: { isActive: true }, select: { name: true } } } })
   if (!competition) notFound()

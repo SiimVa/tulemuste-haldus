@@ -1,5 +1,5 @@
 import { elementProgress } from "@/lib/elementProgress"
-import { auth } from "@/lib/auth"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
@@ -26,8 +26,8 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default async function CompetitionPage({ params }: { params: Promise<{ id: string }> }) {
-  await auth()
   const { id } = await params
+  await requireCompetitionManager(id)
 
   const competition = await prisma.competition.findUnique({
     where: { id },
