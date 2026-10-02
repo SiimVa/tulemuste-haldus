@@ -63,8 +63,9 @@ curl --fail --silent --show-error \
 
 `APP_URL` on rakenduse HTTPS-aadress ilma lõpus oleva kaldkriipsuta. See cron on
 vajalik ka kümne minuti koondamisaknaga kirjade saatmiseks; igapäevane
-`personal-data-retention` cron seda ei asenda. Sama endpoint tuvastab ajakava
-järgi äsja avanenud mandaadid ning saadab ootele jäänud kirju kuni kuue katsega.
+`personal-data-retention` cron seda ei asenda. Sama endpoint kontrollib turvalogi
+hoiatusi (vt [security.md](security.md)), tuvastab ajakava järgi äsja avanenud
+mandaadid ning saadab ootele jäänud kirju kuni kuue katsega.
 Vastus sisaldab lisatud, saadetud ja ebaõnnestunud e-kirjade arve. Puuduvate
 e-posti muutujate korral säilivad rakendusesisesed teavitused, kuid vastuses on
 `configurationMissing: true`.

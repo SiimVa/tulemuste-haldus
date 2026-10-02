@@ -3,6 +3,7 @@ import { canAccessCompetition } from "@/lib/competitionAccess"
 import { getRegistrationReport } from "@/lib/registrationReport.server"
 import { reportCsv, reportMatrix } from "@/lib/registrationReport"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityRecordCount } from "@/lib/security.server"
 import * as XLSX from "xlsx"
 
 export const GET = withSecurityRoute("/api/competitions/[id]/registrations/export", async (request, { params }) => {
@@ -31,6 +32,7 @@ export const GET = withSecurityRoute("/api/competitions/[id]/registrations/expor
     answers[pair[0]] = pair[1]
   }
   const matrix = reportMatrix(report, selected, { status: query.get("status") ?? undefined, className: query.get("class") ?? undefined, search: query.get("search") ?? undefined, answers }, view)
+  setSecurityRecordCount(matrix.length - 1)
   const title = phase === "MANDATE" ? "Mandaat" : "Registreerimine"
   const filename = `${report.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")}_${title.toLowerCase()}${view === "summary" ? "_kokkuvote" : ""}.${format}`
   const headers = {

@@ -11,6 +11,7 @@ type AuditContext = {
   actorUserId?: string | null
   actorTokenId?: string | null
   targetIds: Record<string, string>
+  recordCount?: number | null
 }
 export const securityContext = new AsyncLocalStorage<AuditContext>()
 
@@ -23,6 +24,12 @@ export function setSecurityActor(actorUserId: string | null, actorTokenId: strin
 export function setSecurityTargets(targets: Record<string, unknown>) {
   const context = securityContext.getStore()
   if (context) Object.assign(context.targetIds, securityTargetIds(targets))
+}
+
+// Exports record how many data rows left the system, for leak detection.
+export function setSecurityRecordCount(count: number) {
+  const context = securityContext.getStore()
+  if (context && Number.isSafeInteger(count) && count >= 0) context.recordCount = count
 }
 
 export function securityFingerprint(scope: string, value: string): string {
@@ -86,6 +93,7 @@ export async function finishSecurityEvent(id: string, status: number, outcome: S
       ...(context ? {
         actorUserId: context.actorUserId, actorTokenId: context.actorTokenId,
         targetIds: securityTargetIds(context.targetIds),
+        recordCount: context.recordCount ?? null,
       } : {}),
     } })
   } catch {
@@ -96,9 +104,14 @@ export async function finishSecurityEvent(id: string, status: number, outcome: S
 
 export async function purgeExpiredSecurityData() {
   const before = new Date(Date.now() - SECURITY_RETENTION_DAYS * 24 * 60 * 60 * 1000)
-  const [events, buckets] = await prisma.$transaction([
+  const [events, buckets, alerts] = await prisma.$transaction([
     prisma.securityEvent.deleteMany({ where: { createdAt: { lt: before } } }),
     prisma.rateLimitBucket.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
+    prisma.securityAlert.deleteMany({ where: { lastEventAt: { lt: before } } }),
   ])
-  return { deletedSecurityEvents: events.count, deletedRateLimitBuckets: buckets.count }
+  return {
+    deletedSecurityEvents: events.count,
+    deletedRateLimitBuckets: buckets.count,
+    deletedSecurityAlerts: alerts.count,
+  }
 }

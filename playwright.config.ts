@@ -10,6 +10,7 @@ const e2eEnvironment = {
   ALLOW_E2E_DATABASE_RESET: "1",
   AUTH_SECRET: "e2e-auth-secret-used-only-by-playwright-tests",
   SETUP_SECRET: "e2e-setup-secret-used-only-by-playwright-tests",
+  CRON_SECRET: "e2e-cron-secret-used-only-by-playwright-tests",
   AUTH_URL: baseURL,
 }
 

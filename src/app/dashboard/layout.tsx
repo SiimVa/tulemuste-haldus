@@ -4,13 +4,15 @@ import Link from "next/link"
 import { SignOutButton } from "@/components/SignOutButton"
 import { NotificationNavLink } from "@/components/notifications/NotificationNavLink"
 import { prisma } from "@/lib/prisma"
+import { openSecurityAlertCount } from "@/lib/securityAlerts.server"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
-  const unreadNotifications = await prisma.notification.count({
-    where: { userId: session.user.id, readAt: null },
-  })
+  const [unreadNotifications, openSecurityAlerts] = await Promise.all([
+    prisma.notification.count({ where: { userId: session.user.id, readAt: null } }),
+    session.user.role === "ADMIN" ? openSecurityAlertCount() : 0,
+  ])
   const roleLabel =
     session.user.role === "ADMIN"
       ? "Admin"
@@ -53,7 +55,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {session.user.role === "ADMIN" && (
           <nav aria-label="Administraatori tööriistad" className="mx-auto flex max-w-7xl flex-wrap gap-4 px-4 pb-2 text-sm">
             <Link href="/dashboard/users" className="text-gray-600 hover:text-blue-600 sm:hidden">Kasutajad</Link>
-            <Link href="/dashboard/security" className="text-gray-600 hover:text-blue-600">Turvalogi</Link>
+            <Link href="/dashboard/security" className="text-gray-600 hover:text-blue-600">
+              Turvalogi
+              {openSecurityAlerts > 0 && (
+                <span className="ml-1 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {openSecurityAlerts}<span className="sr-only"> avatud hoiatust</span>
+                </span>
+              )}
+            </Link>
           </nav>
         )}
       </header>

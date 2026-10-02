@@ -1,5 +1,6 @@
 import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityRecordCount } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { csvCell, csvRow } from "@/lib/csv"
 import { auth } from "@/lib/auth"
@@ -49,6 +50,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
 
   const ranked = rankLeaderboard(inComp, elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig)).map(row => ({ ...row, hc: false }))
   const hcRows = horsComp.map((r) => ({ ...r, rank: null, classRank: null, hc: true, tieBreakReason: null, classTieBreakReason: null }))
+  setSecurityRecordCount(ranked.length + hcRows.length)
   const baseName = competition.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")
 
   if (format === "xlsx") {

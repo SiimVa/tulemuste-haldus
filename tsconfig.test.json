@@ -25,6 +25,7 @@
     "src/lib/passwordPolicy.ts",
     "src/lib/userErrors.ts",
     "src/lib/csv.ts",
+    "src/lib/securityAlerts.ts",
     "src/lib/registrationAllocation.ts",
     "src/lib/registrationClasses.ts",
     "src/lib/registrationForm.ts",

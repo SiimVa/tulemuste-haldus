@@ -14,6 +14,8 @@ test("audit classification includes exports, access, results and registration", 
   assert.equal(securityAction("/api/elements/[id]/results", "POST"), "RESULT_CHANGE")
   assert.equal(securityAction("/api/representative/teams/[teamId]/submit", "POST"), "REGISTRATION_CHANGE")
   assert.equal(securityAction("/api/security-events", "GET"), "AUDIT_READ")
+  assert.equal(securityAction("/api/security-alerts", "GET"), "AUDIT_READ")
+  assert.equal(securityAction("/api/security-alerts/[id]", "PATCH"), "AUDIT_CHANGE")
 })
 
 test("audit outcomes distinguish denials, failed operations and throttling", () => {
