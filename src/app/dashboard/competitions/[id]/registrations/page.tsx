@@ -29,6 +29,8 @@ type RegistrationTeam = {
   code: string
   name: string
   class: string | null
+  pendingRepresentativeEmail: string | null
+  pendingRepresentativeName: string | null
   answers: FormAnswers
   registrationStatus: WorkflowStatus
   registrationReviewNote: string | null
@@ -59,6 +61,8 @@ type RegistrationApplication = {
   class: { id: string; name: string } | null
   submittedBy: { id: string; name: string; email: string }
   team: { id: string; code: string } | null
+  pendingRepresentativeEmail: string | null
+  pendingRepresentativeName: string | null
   answers: FormAnswers
   details: { fieldId: string; label: string; value: string }[]
   events: {
@@ -168,7 +172,7 @@ export default function RegistrationsPage({
 
   function editTeam(team: RegistrationTeam) {
     setEditingApplicationId(null)
-    setEditor({ teamId: team.id, teamName: team.name, className: team.class, answers: team.answers })
+    setEditor({ teamId: team.id, teamName: team.name, className: team.class, answers: team.answers, representativeName: team.pendingRepresentativeName ?? team.representative?.member.user.name, representativeEmail: team.pendingRepresentativeEmail ?? team.representative?.member.user.email })
   }
 
   useEffect(() => {
@@ -435,7 +439,7 @@ export default function RegistrationsPage({
 
       <section className="mb-6">
         <Button type="button" onClick={() => { setEditingApplicationId(null); setEditor({ teamName: "", answers: {} }) }}>Lisa võistkond</Button>
-        <p className="mt-2 text-xs text-gray-500">Korraldaja saab võistkondi lisada ja muuta ka pärast registreerimise lõppu ning mandaadi ajal.</p>
+        <p className="mt-2 text-xs text-gray-500">Korraldaja ja administraator saavad võistkondi lisada ja muuta ka pärast registreerimise lõppu ning mandaadi ajal.</p>
         {editor && <OrganizerRegistrationEditor
           key={editor.applicationId ?? editor.teamId ?? "new"}
           competitionId={competitionId} target={editor} fields={formFields}
@@ -487,8 +491,9 @@ export default function RegistrationsPage({
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
                   {application.class ? `${application.class.name} · ` : ""}
-                  {application.submittedBy.name} ·{" "}
-                  {application.submittedBy.email}
+                  {application.pendingRepresentativeName ?? application.submittedBy.name} ·{" "}
+                  {application.pendingRepresentativeEmail ?? application.submittedBy.email}
+                  {application.pendingRepresentativeEmail && !application.team && " · Konto sidumise ootel"}
                 </p>
                 {application.allocationReason && (
                   <p className="text-xs text-blue-700 mt-1">
@@ -520,7 +525,7 @@ export default function RegistrationsPage({
                     setEditingApplicationId(null)
                     const team = teams.find((item) => item.id === application.team?.id)
                     if (team) editTeam(team)
-                    else setEditor({ applicationId: application.id, teamName: application.teamName, classId: application.class?.id, answers: application.answers })
+                    else setEditor({ applicationId: application.id, teamName: application.teamName, classId: application.class?.id, answers: application.answers, representativeName: application.pendingRepresentativeName ?? application.submittedBy.name, representativeEmail: application.pendingRepresentativeEmail ?? application.submittedBy.email })
                   }}>Muuda võistkonda</Button>
                 )}
                 {editingApplicationId === application.id ? (
@@ -689,7 +694,9 @@ export default function RegistrationsPage({
                   {team.class ? `Klass: ${team.class} · ` : ""}
                   {team.representative
                     ? `${team.representative.member.user.name} · ${team.representative.member.user.email}`
-                    : "Esindaja määramata"}
+                    : team.pendingRepresentativeEmail
+                      ? `${team.pendingRepresentativeName} · ${team.pendingRepresentativeEmail} · Konto sidumise ootel`
+                      : "Esindaja määramata"}
                 </p>
               </div>
               <Button type="button" variant="secondary" size="sm" onClick={() => editTeam(team)}>Muuda võistkonda</Button>

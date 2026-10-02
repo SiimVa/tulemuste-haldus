@@ -1,3 +1,4 @@
+import { linkPendingRepresentativesToUser } from "@/lib/teamRepresentatives.server"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
@@ -47,6 +48,7 @@ async function handlePOST(req: Request) {
       },
     })
     await linkPendingTeamMembersToUser(tx, createdUser)
+    await linkPendingRepresentativesToUser(tx, createdUser)
     return createdUser
   })
   setSecurityTargets({ userId: user.id })

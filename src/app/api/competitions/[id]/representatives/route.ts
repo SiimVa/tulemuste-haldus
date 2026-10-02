@@ -126,6 +126,10 @@ async function handlePOST(
       update: {},
     })
 
+    await tx.team.updateMany({
+      where: { competitionId: id, id: { in: teamIds } },
+      data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
+    })
     for (const teamId of teamIds) {
       await tx.teamRepresentative.upsert({
         where: { teamId },
@@ -206,6 +210,10 @@ async function handleDELETE(
     const assignment = await tx.teamRepresentative.findFirst({
       where: { competitionId: id, teamId: body.teamId },
       select: { memberId: true },
+    })
+    await tx.team.updateMany({
+      where: { competitionId: id, id: body.teamId },
+      data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
     })
     if (!assignment) return
 

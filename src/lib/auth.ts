@@ -1,3 +1,4 @@
+import { linkPendingRepresentativesToUser } from "@/lib/teamRepresentatives.server"
 import NextAuth from "next-auth"
 import type { NextAuthConfig } from "next-auth"
 import { headers } from "next/headers"
@@ -104,12 +105,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         action: "LOGIN", outcome: "SUCCEEDED", route: "/api/auth/[...nextauth]",
         method: "AUTH", actorUserId: user.id, fingerprint: requestFingerprint(await headers()),
       })
-      await prisma.$transaction((tx) =>
-        linkPendingTeamMembersToUser(tx, {
-          id: user.id as string,
-          email: user.email as string,
-        })
-      )
+      await prisma.$transaction(async (tx) => {
+        const identity = { id: user.id as string, email: user.email as string }
+        await linkPendingTeamMembersToUser(tx, identity)
+        await linkPendingRepresentativesToUser(tx, identity)
+      })
     },
   },
   callbacks: {

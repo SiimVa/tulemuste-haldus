@@ -89,6 +89,7 @@ export async function queueRegistrationApplicationNotification(
     select: {
       id: true,
       teamName: true,
+      pendingRepresentativeEmail: true,
       waitlistPosition: true,
       submittedBy: { select: { id: true, email: true } },
       competition: {
@@ -100,7 +101,7 @@ export async function queueRegistrationApplicationNotification(
       },
     },
   })
-  if (!application) return null
+  if (!application || application.pendingRepresentativeEmail) return null
   const content = registrationNotificationContent({
     status,
     competitionName: application.competition.name,

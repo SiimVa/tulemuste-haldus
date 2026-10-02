@@ -188,6 +188,10 @@ export async function updateCompetitionMemberRoles({
       },
     })
     if (roles.includes("REPRESENTATIVE")) {
+      await tx.team.updateMany({
+        where: { competitionId, id: { in: teamIds } },
+        data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
+      })
       for (const teamId of teamIds) {
         await tx.teamRepresentative.upsert({
           where: { teamId },

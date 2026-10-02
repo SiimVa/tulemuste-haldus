@@ -12,6 +12,7 @@ export async function getRegistrationReport(competitionId: string, phase: FormPh
     prisma.registrationApplication.findMany({
       where: { competitionId }, orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
       select: {
+        pendingRepresentativeName: true, pendingRepresentativeEmail: true,
         id: true, teamName: true, status: true, teamId: true, submittedAt: true, waitlistPosition: true, allocationReason: true,
         class: { select: { name: true } }, team: { select: { code: true } },
         submittedBy: { select: { name: true, email: true } }, fieldValues: { select: { fieldId: true, value: true } },
@@ -20,6 +21,7 @@ export async function getRegistrationReport(competitionId: string, phase: FormPh
     prisma.team.findMany({
       where: { competitionId }, orderBy: { code: "asc" },
       select: {
+        pendingRepresentativeName: true, pendingRepresentativeEmail: true,
         id: true, code: true, name: true, class: true,
         registrationStatus: true, registrationSubmittedAt: true, registrationReviewNote: true,
         mandateStatus: true, mandateSubmittedAt: true, mandateReviewNote: true,

@@ -13,12 +13,14 @@ export type ReportView = "teams" | "summary"
 export type ReportTable = { columns: ReportColumn[]; rows: Pick<ReportRow, "id" | "cells">[] }
 type Values = { fieldId: string; value: string }[]
 export type ReportApplication = {
+  pendingRepresentativeName?: string | null; pendingRepresentativeEmail?: string | null
   id: string; teamName: string; status: string; teamId: string | null
   class: { name: string } | null; team: { code: string } | null
   submittedBy: { name: string; email: string }; submittedAt: Date | null
   waitlistPosition: number | null; allocationReason: string | null; fieldValues: Values
 }
 export type ReportTeam = {
+  pendingRepresentativeName?: string | null; pendingRepresentativeEmail?: string | null
   id: string; code: string; name: string; class: string | null
   registrationStatus: string; registrationSubmittedAt: Date | null; registrationReviewNote: string | null
   mandateStatus: string; mandateSubmittedAt: Date | null; mandateReviewNote: string | null
@@ -79,7 +81,7 @@ export function buildRegistrationReport(input: {
     cells: {
       code: application.team?.code ?? "", name: application.teamName, class: application.class?.name ?? "",
       status: REPORT_STATUS_LABELS[application.status] ?? application.status,
-      representative: application.submittedBy.name, email: application.submittedBy.email,
+      representative: application.pendingRepresentativeName ?? application.submittedBy.name, email: application.pendingRepresentativeEmail ?? application.submittedBy.email,
       submittedAt: date(application.submittedAt), note: application.allocationReason ?? "", waitlist: application.waitlistPosition ?? "",
       ...formCells(input.fields, application.fieldValues),
     },
@@ -92,7 +94,7 @@ export function buildRegistrationReport(input: {
       id: `team:${team.id}`, status, className: team.class ?? "",
       cells: {
         code: team.code, name: team.name, class: team.class ?? "", status: REPORT_STATUS_LABELS[status] ?? status,
-        representative: team.representative?.member.user.name ?? "", email: team.representative?.member.user.email ?? "",
+        representative: team.representative?.member.user.name ?? team.pendingRepresentativeName ?? "", email: team.representative?.member.user.email ?? team.pendingRepresentativeEmail ?? "",
         submittedAt: date(mandate ? team.mandateSubmittedAt : team.registrationSubmittedAt),
         note: (mandate ? team.mandateReviewNote : team.registrationReviewNote) ?? "", waitlist: "",
         members: team.members.map(member => [member.name, member.email, member.role === "SUPPORT" ? "Tugiliige" : "Võistleja", member.isCaptain ? "Kapten" : "", member.assignmentRole].filter(Boolean).join(" · ")).join("\n"),

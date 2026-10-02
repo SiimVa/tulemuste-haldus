@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input, Select } from "@/components/ui/input"
 import { DynamicFormFields } from "./DynamicFormFields"
 import { organizerRegistrationFields } from "@/lib/organizerRegistration"
-import { validateFormAnswers, type FormAnswers, type FormFieldDefinition } from "@/lib/registrationForm"
+import { withRepresentativeIdentity, REPRESENTATIVE_FORM_FIELD_KEYS, validateFormAnswers, type FormAnswers, type FormFieldDefinition } from "@/lib/registrationForm"
 import type { TeamCompositionSettings } from "@/lib/teamComposition"
 
 export type OrganizerRegistrationTarget = {
@@ -15,6 +15,8 @@ export type OrganizerRegistrationTarget = {
   classId?: string | null
   className?: string | null
   answers: FormAnswers
+  representativeName?: string
+  representativeEmail?: string
 }
 
 export function OrganizerRegistrationEditor({ competitionId, target, fields, classes, includeMandate, teamComposition, onSaved, onCancel }: {
@@ -27,6 +29,10 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
   onSaved: () => Promise<void>
   onCancel: () => void
 }) {
+  const [assignRepresentative, setAssignRepresentative] = useState(false)
+  const [representativeName, setRepresentativeName] = useState(target.representativeName ?? "")
+  const [representativeEmail, setRepresentativeEmail] = useState(target.representativeEmail ?? "")
+  const representative = { name: representativeName.trim(), email: representativeEmail.trim().toLowerCase() }
   const [name, setName] = useState(target.teamName)
   const [classId, setClassId] = useState(target.classId ?? classes.find((item) => item.name === target.className)?.id ?? (classes.length === 1 ? classes[0].id : ""))
   const [className, setClassName] = useState(target.className ?? "")
@@ -38,7 +44,7 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
 
   async function save(event: React.FormEvent) {
     event.preventDefault()
-    const validated = validateFormAnswers(editableFields, answers, "REGISTRATION")
+    const validated = validateFormAnswers(editableFields, assignRepresentative ? withRepresentativeIdentity(answers, representative) : answers, "REGISTRATION")
     setErrors(validated.errors)
     if (Object.keys(validated.errors).length) { setError("Kontrolli vormi välju"); return }
     setSaving(true)
@@ -46,7 +52,7 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
     try {
       const response = await fetch(`/api/competitions/${competitionId}/registrations`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId: target.applicationId, teamId: target.teamId, teamName: name, classId: classId || null, className, answers: validated.answers }),
+        body: JSON.stringify({ applicationId: target.applicationId, teamId: target.teamId, teamName: name, classId: classId || null, className, representative: assignRepresentative ? representative : undefined, answers: validated.answers }),
       })
       const data = await response.json()
       if (!response.ok) { setError(data.error ?? "Salvestamine ebaõnnestus"); return }
@@ -66,7 +72,24 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
         {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </Select> : <Input aria-label="Klass" value={className} disabled={saving} onChange={(event) => setClassName(event.target.value)} />}
     </label>}
-    <DynamicFormFields organizer fields={editableFields} phase="REGISTRATION" values={answers} errors={errors} disabled={saving} teamComposition={includeMandate ? teamComposition : undefined} onChange={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))} />
+    <fieldset className="space-y-3 rounded-lg border p-3">
+      <legend className="px-1 text-sm font-medium">Võistkonna esindaja</legend>
+      {target.representativeEmail && <p className="text-sm text-gray-600">Praegune esindaja: {target.representativeName} · {target.representativeEmail}</p>}
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={assignRepresentative} disabled={saving} onChange={(event) => setAssignRepresentative(event.target.checked)} />
+        {target.applicationId || target.teamId ? "Muuda esindajat" : "Määra esindajaks teine inimene"}
+      </label>
+      {assignRepresentative && <>
+        <label className="block text-sm">Esindaja nimi
+          <Input aria-label="Määratava esindaja nimi" required maxLength={200} value={representativeName} disabled={saving} onChange={(event) => setRepresentativeName(event.target.value)} />
+        </label>
+        <label className="block text-sm">Esindaja e-post
+          <Input aria-label="Määratava esindaja e-post" type="email" required maxLength={320} value={representativeEmail} disabled={saving} onChange={(event) => setRepresentativeEmail(event.target.value)} />
+        </label>
+        <p className="text-xs text-gray-500">Olemasolev konto seotakse kohe. Kui kontot veel pole, saab inimene võistkonnale ligipääsu sama e-postiga sisse logides.</p>
+      </>}
+    </fieldset>
+    <DynamicFormFields organizer fields={editableFields.filter((field) => !assignRepresentative || (field.key !== REPRESENTATIVE_FORM_FIELD_KEYS.name && field.key !== REPRESENTATIVE_FORM_FIELD_KEYS.email))} phase="REGISTRATION" values={answers} errors={errors} disabled={saving} teamComposition={includeMandate ? teamComposition : undefined} onChange={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))} />
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <div className="flex gap-2">
       <Button type="submit" disabled={saving}>{saving ? "Salvestan..." : "Salvesta võistkond"}</Button>

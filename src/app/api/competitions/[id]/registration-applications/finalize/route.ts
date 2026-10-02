@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client"
+import { setTeamRepresentative } from "@/lib/teamRepresentatives.server"
 import { archiveRegistrationStatistics } from "@/lib/registrationForecast.server"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -150,6 +152,8 @@ async function handlePOST(
             class: application.class?.name ?? null,
             code: nextTeamCode(codes, createdTeams + 1),
             registrationStatus: "APPROVED",
+            pendingRepresentativeEmail: application.pendingRepresentativeEmail,
+            pendingRepresentativeName: application.pendingRepresentativeName,
             formValues: {
               create: application.fieldValues.map((fieldValue) => ({
                 fieldId: fieldValue.fieldId,
@@ -173,39 +177,9 @@ async function handlePOST(
           competitionId,
           resolvedMembers.flatMap(({ userId }) => (userId ? [userId] : []))
         )
-        const representativeMembership = await tx.competitionMember.upsert({
-          where: {
-            competitionId_userId: {
-              competitionId,
-              userId: application.submittedById,
-            },
-          },
-          create: {
-            competitionId,
-            userId: application.submittedById,
-          },
-          update: {},
-        })
-        await tx.competitionMemberRole.upsert({
-          where: {
-            memberId_role: {
-              memberId: representativeMembership.id,
-              role: "REPRESENTATIVE",
-            },
-          },
-          create: {
-            memberId: representativeMembership.id,
-            role: "REPRESENTATIVE",
-          },
-          update: {},
-        })
-        await tx.teamRepresentative.create({
-          data: {
-            competitionId,
-            teamId: team.id,
-            memberId: representativeMembership.id,
-          },
-        })
+        if (!application.pendingRepresentativeEmail) {
+          await setTeamRepresentative(tx, competitionId, team.id, application.submittedById)
+        }
         await tx.registrationApplication.update({
           where: { id: application.id },
           data: { teamId: team.id },
@@ -241,7 +215,7 @@ async function handlePOST(
 
       await archiveRegistrationStatistics(tx, competitionId, finalizedAt, true)
       return { finalizedAt, createdTeams }
-    })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
     await deliverPendingNotificationsSafely()
     return NextResponse.json(result)
