@@ -101,6 +101,24 @@ Võistluse lehel on jaotis **Registreerimine**, kus omanik, korraldaja või
 süsteemiadministraator näeb kõigi võistkondade olekuid, esindajat ja mandaadi
 koosseisu. Esitatud etapi saab kinnitada või märkusega parandamisele saata.
 
+Nupp **Muuda võistkonda** avab korraldajale võistkonna nime, klassi ja vormi
+vastused, sealhulgas esindaja kontaktandmed ja liikmed. Muudatused saab otse
+salvestada ka pärast registreerimise tähtaega ning mandaadi ajal. Salvestamine
+ei muuda avalduse ega mandaadi kinnitamise staatust. Esindaja kontaktandmete
+muutmine ei vaheta võistkonnaga seotud kasutajakontot; konto määratakse endiselt
+**Juurdepääsu** lehel.
+
+**Lisa võistkond** loob enne osalejate nimekirja kinnitamist korraldaja esitatud
+kinnitatud avalduse. Avatud automaatse registreerimise korral rakendub sellele
+ka tavapärane kohtade jaotus. Pärast nimekirja kinnitamist luuakse kohe kinnitatud
+registreerimisega võistkond, mille mandaat on mustand. Hiljem lisatud võistkonnale
+saab esindaja määrata **Juurdepääsu** lehel.
+
+Pärast nimekirja kinnitamist muudab nupp võistkonna praeguseid andmeid ja
+mandaadi koosseisu; registreerimisavalduse varasemad vastused säilivad
+registreerimise aruande jaoks. Korraldaja muudatused salvestatakse auditisse.
+Esindaja enda tähtaja- ja muutmispiirangud jäävad kehtima.
+
 Menüüs **Registreerimine → Registreerimise ülevaade** saab valida registreerimise
 või mandaadi andmed, kuvatavad põhiandmed ja vormiväljad. Otsing ning klassi- ja
 staatusfilter piiravad tabeli ridu. **Ekspordi Excel** ja **Ekspordi CSV** kasutavad
