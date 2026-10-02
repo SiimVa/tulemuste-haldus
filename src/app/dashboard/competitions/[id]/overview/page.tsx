@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { getCompetitionOverview } from "@/lib/competitionOverview"
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic"
 
 export default async function OverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  await requireCompetitionManager(id)
   const data = await getCompetitionOverview(id)
   if (!data) notFound()
 

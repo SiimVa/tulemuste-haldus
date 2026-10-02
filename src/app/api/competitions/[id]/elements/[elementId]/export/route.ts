@@ -2,6 +2,7 @@ import { calculateEstimation, parseEstimates, readEstimation, targetUnit } from 
 import { pointFieldLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
+import { csvCell, csvRow } from "@/lib/csv"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
@@ -81,15 +82,13 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
   const baseName = element.competition.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")
 
   if (format === "csv") {
-    const toCsvRow = (row: unknown[]) =>
-      row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")
     const lines = [
-      `"${element.competition.name} — ${element.code} ${element.name}"`,
+      csvCell(`${element.competition.name} — ${element.code} ${element.name}`),
       "",
-      toCsvRow(headers),
-      ...inComp.map((t, i) => toCsvRow(buildRow(t, i + 1))),
+      csvRow(headers),
+      ...inComp.map((t, i) => csvRow(buildRow(t, i + 1))),
       ...(horsComp.length > 0
-        ? ['"Arvestusvälised"', ...horsComp.map((t) => toCsvRow(buildRow(t, "AV")))]
+        ? ['"Arvestusvälised"', ...horsComp.map((t) => csvRow(buildRow(t, "AV")))]
         : []),
     ]
     return new NextResponse(lines.join("\r\n"), {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { passwordPolicyError } from "@/lib/passwordPolicy"
 
 // Admin: lähtesta teise kasutaja parool
 async function handlePATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -11,9 +12,8 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params
   const { password } = await req.json()
-  if (!password || password.length < 6) {
-    return NextResponse.json({ error: "Parool peab olema vähemalt 6 tähemärki" }, { status: 400 })
-  }
+  const passwordError = passwordPolicyError(password)
+  if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 })
 
   const passwordHash = await bcrypt.hash(password, 12)
   await prisma.user.update({ where: { id }, data: { passwordHash } })

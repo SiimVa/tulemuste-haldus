@@ -4,6 +4,12 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 
+// Public like the leaderboard page: only fields that the page itself shows.
+const publicTeamSelect = {
+  id: true, code: true, name: true, class: true, isHorsDeCompetition: true,
+  hcFromElementOrder: true, dnfFromElementOrder: true, dqFromElementOrder: true, dnsFlag: true,
+} as const
+
 async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = await params
 
@@ -12,12 +18,12 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
       where: { id: competitionId },
       select: { scoringMode: true, tieBreakConfig: true },
     }),
-    prisma.team.findMany({ where: { competitionId } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
+    prisma.team.findMany({ where: { competitionId }, select: publicTeamSelect }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
     prisma.computedScore.findMany({
       where: { element: { competitionId } },
-      include: { element: { select: { id: true, name: true, code: true } } },
+      select: { teamId: true, elementId: true, penaltyPoints: true },
     }),
-    prisma.manualPenalty.findMany({ where: { competitionId } }),
+    prisma.manualPenalty.findMany({ where: { competitionId }, select: { id: true, teamId: true, points: true } }),
     prisma.scoringElement.findMany({
       where: { competitionId },
       orderBy: { order: "asc" },
@@ -25,7 +31,8 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
     }),
   ])
 
-  const scoringMode = competition?.scoringMode ?? "PENALTY"
+  if (!competition) return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
+  const scoringMode = competition.scoringMode
 
   const leaderboard = teams.map((team) => {
     const teamScores = scores.filter((s) => s.teamId === team.id)
@@ -50,7 +57,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
       kpTotal: Math.round(kpTotal * 1000) / 1000,
       manualTotal: Math.round(manualTotal * 1000) / 1000,
       byElement,
-      manualPenalties: teamPenalties,
+      manualPenalties: teamPenalties.map(({ id, points }) => ({ id, points })),
     }
   })
 
@@ -61,7 +68,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
 
   const eligible = (row: typeof leaderboard[number]) => !row.team.isHorsDeCompetition && row.team.hcFromElementOrder == null && row.team.dnfFromElementOrder == null
   const result = [
-    ...rankLeaderboard(leaderboard.filter(eligible), elements, scoringMode, parseTieBreakConfig(competition?.tieBreakConfig)),
+    ...rankLeaderboard(leaderboard.filter(eligible), elements, scoringMode, parseTieBreakConfig(competition.tieBreakConfig)),
     ...leaderboard.filter(row => !eligible(row)).map(row => ({ ...row, rank: null, classRank: null, tieBreakReason: null, classTieBreakReason: null })),
   ]
 

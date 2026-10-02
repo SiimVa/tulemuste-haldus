@@ -8,6 +8,7 @@ import {
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { userErrorMessage } from "@/lib/userErrors"
 import {
   recalculateRegistrationAllocation,
   reindexWaitlistPositions,
@@ -357,8 +358,7 @@ async function handleDELETE(
       ) {
         continue
       }
-      const message =
-        error instanceof Error ? error.message : "Loobumine ebaõnnestus"
+      const message = userErrorMessage(error, "Loobumine ebaõnnestus")
       return NextResponse.json({ error: message }, { status: 409 })
     }
   }
@@ -409,8 +409,10 @@ async function handlePATCH(
       ) {
         continue
       }
-      const message =
-        error instanceof Error ? error.message : "Muutmine ebaõnnestus"
+      const message = userErrorMessage(error, "Muutmine ebaõnnestus", [
+        RegistrationUpdateValidationError,
+        RegistrationClassError,
+      ])
       return NextResponse.json(
         { error: message },
         {

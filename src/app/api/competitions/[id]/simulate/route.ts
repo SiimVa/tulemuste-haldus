@@ -2,17 +2,30 @@ import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { canViewCompetitionAnalysis } from "@/lib/analysisViewAccess.server"
 import { computeAllScores, type ComputeResult, type ComputeElement, type ComputeConfig } from "@/lib/scoreCompute"
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+const isFieldOverrides = (value: unknown): value is Record<string, Record<string, string>> =>
+  isPlainObject(value) && Object.values(value).every((fieldVals) =>
+    isPlainObject(fieldVals) && Object.values(fieldVals).every((item) => typeof item === "string"))
 
-// Avalik dry-run: arvuta hüpoteetiline seis valitud võistkonnale (ei salvesta andmebaasi).
+// Analüüsivaate dry-run: arvuta hüpoteetiline seis valitud võistkonnale (ei salvesta andmebaasi).
 async function handlePOST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: competitionId } = await params
   const body = await req.json().catch(() => ({}))
-  const teamId: string = body.teamId
-  const overrides: Record<string, Record<string, string>> = body.overrides ?? {}
+  const teamId = typeof body?.teamId === "string" ? body.teamId : ""
+  const overrides = body?.overrides ?? {}
   if (!teamId) return NextResponse.json({ error: "teamId puudub" }, { status: 400 })
+  if (!isFieldOverrides(overrides)) {
+    return NextResponse.json({ error: "Vigased simuleeritud väärtused" }, { status: 400 })
+  }
+  // The simulator reveals standings, so it follows the analysis page's access mode.
+  if (!await canViewCompetitionAnalysis(competitionId, body.analysisLinkToken)) {
+    return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
+  }
 
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },
@@ -55,9 +68,12 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     exceptionLabel: r.exceptionLabel, exceptionPenalty: r.exceptionPenalty, team: r.team,
   }))
   const teamMeta = teams.find((t) => t.id === teamId)
-  const teamForResult = { id: teamId, isHorsDeCompetition: teamMeta?.isHorsDeCompetition ?? false, hcFromElementOrder: teamMeta?.hcFromElementOrder ?? null, dnfFromElementOrder: teamMeta?.dnfFromElementOrder ?? null }
+  if (!teamMeta) return NextResponse.json({ error: "Võistkonda ei leitud" }, { status: 404 })
+  const teamForResult = { id: teamId, isHorsDeCompetition: teamMeta.isHorsDeCompetition, hcFromElementOrder: teamMeta.hcFromElementOrder, dnfFromElementOrder: teamMeta.dnfFromElementOrder }
+  const elementIds = new Set(elements.map((el) => el.id))
 
   for (const [elementId, fieldVals] of Object.entries(overrides)) {
+    if (!elementIds.has(elementId)) continue
     const existing = results.find((r) => r.elementId === elementId && r.teamId === teamId)
     if (existing) {
       let v: Record<string, unknown> = {}
@@ -86,7 +102,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   })), elements, competition.scoringMode, parseTieBreakConfig(competition.tieBreakConfig))
   const myTotal = round3(totalByTeam.get(teamId) ?? 0)
   const rankIdx = ranked.findIndex((r) => r.id === teamId)
-  const myClass = teamMeta?.class ?? "–"
+  const myClass = teamMeta.class ?? "–"
   const classRanked = ranked.filter((r) => r.class === myClass)
   const classIdx = classRanked.findIndex((r) => r.id === teamId)
 

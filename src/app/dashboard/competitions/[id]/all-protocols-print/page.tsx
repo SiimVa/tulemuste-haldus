@@ -1,5 +1,5 @@
 import { EmptyProtocolOptions, EmptyProtocolRowCountInput } from "@/components/protocol/EmptyProtocolOptions"
-import { auth } from "@/lib/auth"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
@@ -14,8 +14,8 @@ export default async function AllProtocolsPrintPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await auth()
   const { id: competitionId } = await params
+  await requireCompetitionManager(competitionId)
 
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy"
 
 type User = { id: string; email: string; name: string; role: string; createdAt: string }
 
@@ -60,7 +61,7 @@ export default function UsersPage() {
   }
 
   async function resetPassword(id: string, name: string) {
-    const password = prompt(`Uus parool kasutajale "${name}" (vähemalt 6 tähemärki):`)
+    const password = prompt(`Uus parool kasutajale "${name}" (vähemalt ${MIN_PASSWORD_LENGTH} tähemärki):`)
     if (!password) return
     const res = await fetch(`/api/users/${id}`, {
       method: "PATCH",
@@ -108,8 +109,8 @@ export default function UsersPage() {
           </div>
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Parool *</label>
-            <input type="password" required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
-              placeholder="••••••••"
+            <input type="password" required minLength={MIN_PASSWORD_LENGTH} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+              placeholder={`vähemalt ${MIN_PASSWORD_LENGTH} tähemärki`}
               className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>

@@ -87,6 +87,7 @@ export type ElementStat = {
 
 interface Props {
   competitionId: string
+  analysisLinkToken?: string
   competitionName: string
   scoringMode: "PENALTY" | "PLUS"
   teams: AnalysisTeam[]
@@ -137,6 +138,7 @@ type Tab = "team" | "kp" | "sim"
 
 export default function AnalysisView({
   competitionId,
+  analysisLinkToken,
   competitionName,
   scoringMode,
   teams,
@@ -739,6 +741,7 @@ export default function AnalysisView({
             ) : (
               <SimulatorPanel
                 competitionId={competitionId}
+                analysisLinkToken={analysisLinkToken}
                 teamId={selectedTeamId}
                 teamName={simTeam?.name ?? ""}
                 teamCode={

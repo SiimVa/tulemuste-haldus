@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react"
 import { getProviders, signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { safeCallbackPath } from "@/lib/safeRedirect"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
@@ -15,11 +16,7 @@ function LoginForm() {
   const authError = searchParams.has("error")
     ? "Sisselogimine ei õnnestunud. Proovi Google’iga uuesti. Kui viga kordub, ava leht tavalises brauseris ja luba küpsised."
     : ""
-  const requestedCallback = searchParams.get("callbackUrl")
-  const callbackUrl =
-    requestedCallback?.startsWith("/") && !requestedCallback.startsWith("//")
-      ? requestedCallback
-      : "/dashboard"
+  const callbackUrl = safeCallbackPath(searchParams.get("callbackUrl"))
 
   useEffect(() => {
     getProviders()

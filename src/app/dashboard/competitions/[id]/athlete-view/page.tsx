@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { parseRanges, type AthletePointsMode } from "@/lib/athletePoints"
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic"
 
 export default async function AthleteViewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  await requireCompetitionManager(id)
 
   const competition = await prisma.competition.findUnique({
     where: { id },

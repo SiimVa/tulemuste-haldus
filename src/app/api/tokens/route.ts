@@ -3,6 +3,7 @@ import { setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { generateAccessToken } from "@/lib/accessTokens.server"
 import {
   canAccessCompetition,
   canAccessToken,
@@ -46,6 +47,8 @@ async function handlePOST(req: Request) {
 
   const token = await prisma.accessToken.create({
     data: {
+      // Never rely on the schema default: cuid() is predictable, not a secret.
+      token: generateAccessToken(),
       type,
       name: name.trim(),
       competitionId,

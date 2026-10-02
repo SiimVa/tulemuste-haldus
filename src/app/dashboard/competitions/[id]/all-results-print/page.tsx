@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
@@ -7,8 +7,8 @@ import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentH
 import { ProtocolPrintToolbar } from "@/components/protocol/ProtocolPrintToolbar"
 
 export default async function AllResultsPrintPage({ params }: { params: Promise<{ id: string }> }) {
-  await auth()
   const { id: competitionId } = await params
+  await requireCompetitionManager(competitionId)
 
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },

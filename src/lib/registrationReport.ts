@@ -1,3 +1,4 @@
+import { csvRow } from "./csv"
 import { formatFormAnswer, isFormFieldVisible, parseFormAnswer, type FormFieldDefinition, type FormPhase, type MemberAnswer } from "./registrationForm"
 
 export type ReportColumn = { key: string; label: string; group: "basic" | "form" }
@@ -152,9 +153,5 @@ export function reportMatrix(report: RegistrationReport, selected: string[] | un
 }
 
 export function reportCsv(matrix: (string | number)[][]): string {
-  return "\uFEFF" + matrix.map(row => row.map(value => {
-    // User-entered text must not become a spreadsheet formula when opening CSV.
-    const safe = typeof value === "string" && /^[\s\uFEFF]*[=+@-]/.test(value) ? `'${value}` : String(value)
-    return `"${safe.replace(/"/g, '""')}"`
-  }).join(",")).join("\r\n")
+  return "\uFEFF" + matrix.map(csvRow).join("\r\n")
 }

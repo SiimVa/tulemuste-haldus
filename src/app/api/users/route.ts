@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { linkPendingTeamMembersToUser } from "@/lib/teamMemberAccounts.server"
 import bcrypt from "bcryptjs"
+import { passwordPolicyError } from "@/lib/passwordPolicy"
 
 async function handleGET() {
   const session = await auth()
@@ -24,6 +25,8 @@ async function handlePOST(req: Request) {
 
   const { email, name, password } = await req.json()
   if (!email || !name || !password) return NextResponse.json({ error: "Kõik väljad on kohustuslikud" }, { status: 400 })
+  const passwordError = passwordPolicyError(password)
+  if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 })
   const normalizedEmail = String(email).trim().toLowerCase()
   const normalizedName = String(name).trim()
 

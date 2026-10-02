@@ -1,5 +1,5 @@
 import { elementFieldLabel } from "@/lib/elementFieldTypes"
-import { auth } from "@/lib/auth"
+import { requireCompetitionManager } from "@/lib/competitionPageAccess.server"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { naturalCompare } from "@/lib/utils"
@@ -27,11 +27,11 @@ export default async function ElementPage({
 }: {
   params: Promise<{ id: string; elementId: string }>
 }) {
-  await auth()
   const { id: competitionId, elementId } = await params
+  await requireCompetitionManager(competitionId)
 
-  const element = await prisma.scoringElement.findUnique({
-    where: { id: elementId },
+  const element = await prisma.scoringElement.findFirst({
+    where: { id: elementId, competitionId },
     include: {
       fields: { orderBy: { order: "asc" } },
       exceptions: { orderBy: { order: "asc" } },

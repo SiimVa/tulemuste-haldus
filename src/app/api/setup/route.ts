@@ -2,6 +2,7 @@ import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { passwordPolicyError } from "@/lib/passwordPolicy"
 import { timingSafeEqual } from "node:crypto"
 
 // Ühekordne setup: loo admin konto (kasutada ainult esimest korda)
@@ -29,9 +30,8 @@ async function handlePOST(req: Request) {
   if (typeof email !== "string" || typeof password !== "string" || typeof name !== "string" || !email.trim() || !name.trim()) {
     return NextResponse.json({ error: "Kõik väljad on kohustuslikud" }, { status: 400 })
   }
-  if (password.length < 12) {
-    return NextResponse.json({ error: "Parool peab olema vähemalt 12 tähemärki" }, { status: 400 })
-  }
+  const passwordError = passwordPolicyError(password)
+  if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 })
 
   const passwordHash = await bcrypt.hash(password, 12)
   const user = await prisma.user.create({

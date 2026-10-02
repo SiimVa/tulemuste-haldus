@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs"
 import { prisma } from "../src/lib/prisma"
 import { consumeRateLimit, purgeExpiredSecurityData, securityFingerprint } from "../src/lib/security.server"
 import { apiRateLimitPolicy, LOGIN_ACCOUNT_POLICY } from "../src/lib/security"
+import { generateAnalysisLinkToken, hashAnalysisLinkToken } from "../src/lib/analysisAccess.server"
 
 const databaseURL = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5432/tulemuste_haldus?schema=e2e"
 const database = new URL(databaseURL)
@@ -223,5 +224,64 @@ test.describe.serial("turvalogi ja päringupiirangud", () => {
     expect(event.outcome).toBe("SUCCEEDED")
     expect(event.targetIds).toMatchObject({ competitionId: competition.id, teamId: team.id, elementId: element.id })
     expect(JSON.stringify(event)).not.toContain(token.token)
+  })
+
+  test("haldusleht kontrollib õigusi ka siis, kui RSC päring jätab layout'i vahele", async ({ browser, request }) => {
+    const competition = await prisma.competition.create({ data: { name: "RSC test", createdById: adminId, organizerId: adminId } })
+    const marker = `rsc-private-${Date.now()}`
+    const element = await prisma.scoringElement.create({ data: { competitionId: competition.id, name: `${marker}-element`, code: "R1" } })
+    await prisma.team.create({ data: { competitionId: competition.id, name: `${marker}-team`, code: "R1" } })
+    const memberCompetition = await prisma.competition.create({ data: { name: "RSC member test", createdById: adminId, organizerId: memberId } })
+    // The client claims it already rendered the sibling overview page, so Next.js skips shared layouts.
+    const pageText = async (requester: typeof request, competitionId: string, path: string) => {
+      const routerState = ["", { children: ["dashboard", { children: ["competitions", { children: [["id", competitionId, "d"], {
+        children: ["overview", { children: ["__PAGE__", {}] }],
+      }] }] }] }, null, null, true]
+      const response = await requester.get(`/dashboard/competitions/${competitionId}/${path}`, {
+        headers: { RSC: "1", "Next-Router-State-Tree": encodeURIComponent(JSON.stringify(routerState)) },
+        maxRedirects: 0,
+      })
+      return response.text()
+    }
+    for (const path of ["leaderboard", `elements/${element.id}`, "all-results-print"]) {
+      expect(await pageText(request, competition.id, path), path).not.toContain(marker)
+    }
+    const memberContext = await browser.newContext()
+    const memberPage = await memberContext.newPage()
+    await login(memberPage, member)
+    // Organizer of another competition cannot open this element through their own competition URL.
+    expect(await pageText(memberPage.request, memberCompetition.id, `elements/${element.id}`)).not.toContain(marker)
+    await memberContext.close()
+    const adminContext = await browser.newContext()
+    const adminPage = await adminContext.newPage()
+    await login(adminPage, admin)
+    expect(await pageText(adminPage.request, competition.id, "leaderboard")).toContain(marker)
+    await adminContext.close()
+  })
+
+  test("avalikud tulemuste API-d järgivad analüüsi ligipääsu ega avalda sisemisi välju", async ({ request }) => {
+    const competition = await prisma.competition.create({ data: { name: "Public API test", createdById: adminId, organizerId: adminId, analysisAccessMode: "PRIVATE" } })
+    const pendingEmail = `pending-${Date.now()}@example.com`
+    const team = await prisma.team.create({ data: {
+      competitionId: competition.id, name: "Public API team", code: "P1",
+      pendingRepresentativeEmail: pendingEmail, registrationReviewNote: "internal review note",
+    } })
+    await prisma.manualPenalty.create({ data: { competitionId: competition.id, teamId: team.id, description: "internal penalty note", points: 2, enteredById: adminId } })
+    const leaderboard = await request.get(`/api/competitions/${competition.id}/leaderboard`)
+    expect(leaderboard.status()).toBe(200)
+    const body = await leaderboard.text()
+    for (const privateValue of [pendingEmail, "internal review note", "internal penalty note", adminId]) {
+      expect(body).not.toContain(privateValue)
+    }
+    expect(JSON.parse(body).leaderboard[0].manualTotal).toBe(2)
+
+    const simulate = (data: Record<string, unknown> = {}) =>
+      request.post(`/api/competitions/${competition.id}/simulate`, { data: { teamId: team.id, overrides: {}, ...data } })
+    expect((await simulate()).status()).toBe(404)
+    const token = generateAnalysisLinkToken()
+    await prisma.competition.update({ where: { id: competition.id }, data: { analysisAccessMode: "LINK_ONLY", analysisTokenHash: hashAnalysisLinkToken(token) } })
+    expect((await simulate()).status()).toBe(404)
+    expect((await simulate({ analysisLinkToken: generateAnalysisLinkToken() })).status()).toBe(404)
+    expect((await simulate({ analysisLinkToken: token })).status()).toBe(200)
   })
 })

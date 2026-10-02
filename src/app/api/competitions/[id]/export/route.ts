@@ -1,6 +1,7 @@
 import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
+import { csvCell, csvRow } from "@/lib/csv"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
@@ -101,13 +102,11 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
     ...elements.map((el) => el.code), "Lisaärid", "Kokku", "Staatus", "Viigilahutus (üld)", "Viigilahutus (klass)"]
 
   const toCsv = (r: typeof ranked[0] | typeof hcRows[0]) =>
-    [r.rank ?? "", r.classRank ?? "", r.team.code, r.team.name, r.team.class ?? "",
+    csvRow([r.rank ?? "", r.classRank ?? "", r.team.code, r.team.name, r.team.class ?? "",
       ...elements.map((el) => { const v = r.byElement[el.id]; return v !== undefined ? v.toFixed(2) : "" }),
-      r.manualTotal > 0 ? r.manualTotal.toFixed(2) : "", r.total.toFixed(2), r.team.dnfFromElementOrder != null ? "KAT" : r.hc ? "AV" : "", r.tieBreakReason ?? "", r.classTieBreakReason ?? ""]
-      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-      .join(",")
+      r.manualTotal > 0 ? r.manualTotal.toFixed(2) : "", r.total.toFixed(2), r.team.dnfFromElementOrder != null ? "KAT" : r.hc ? "AV" : "", r.tieBreakReason ?? "", r.classTieBreakReason ?? ""])
 
-  const lines = [`"${competition.name}"`, "", headers.map((h) => `"${h}"`).join(","),
+  const lines = [csvCell(competition.name), "", csvRow(headers),
     ...ranked.map(toCsv),
     ...(hcRows.length > 0 ? ["", '"Arvestusvälised ja katkestanud"', ...hcRows.map(toCsv)] : []),
   ]

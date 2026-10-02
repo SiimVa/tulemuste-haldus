@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { passwordPolicyError } from "@/lib/passwordPolicy"
 
 // Oma parooli muutmine (vajab praeguse parooli kinnitust)
 async function handlePOST(req: Request) {
@@ -13,9 +14,8 @@ async function handlePOST(req: Request) {
   if (!newPassword) {
     return NextResponse.json({ error: "Uus parool on kohustuslik" }, { status: 400 })
   }
-  if (newPassword.length < 6) {
-    return NextResponse.json({ error: "Uus parool peab olema vähemalt 6 tähemärki" }, { status: 400 })
-  }
+  const passwordError = passwordPolicyError(newPassword)
+  if (passwordError) return NextResponse.json({ error: passwordError }, { status: 400 })
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } })
   if (!user) return NextResponse.json({ error: "Kasutajat ei leitud" }, { status: 404 })

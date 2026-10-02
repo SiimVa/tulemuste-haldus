@@ -8,6 +8,7 @@ import {
 import { auth } from "@/lib/auth"
 import { getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { userErrorMessage } from "@/lib/userErrors"
 import { recalculateRegistrationAllocation } from "@/lib/registrationAllocation.server"
 import {
   deliverPendingNotificationsSafely,
@@ -240,8 +241,10 @@ async function handlePOST(
       ) {
         continue
       }
-      const message =
-        error instanceof Error ? error.message : "Registreerimine ebaõnnestus"
+      const message = userErrorMessage(error, "Registreerimine ebaõnnestus", [
+        RegistrationValidationError,
+        RegistrationClassError,
+      ])
       return NextResponse.json(
         { error: message },
         {

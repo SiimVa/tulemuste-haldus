@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { MIN_PASSWORD_LENGTH, passwordPolicyError } from "@/lib/passwordPolicy"
 
 export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("")
@@ -19,8 +20,9 @@ export default function ProfilePage() {
       setError("Uued paroolid ei kattu")
       return
     }
-    if (newPassword.length < 6) {
-      setError("Uus parool peab olema vähemalt 6 tähemärki")
+    const passwordError = passwordPolicyError(newPassword)
+    if (passwordError) {
+      setError(passwordError)
       return
     }
 
@@ -66,7 +68,8 @@ export default function ProfilePage() {
           <input type="password" required value={newPassword}
             onChange={e => setNewPassword(e.target.value)}
             autoComplete="new-password"
-            placeholder="vähemalt 6 tähemärki"
+            minLength={MIN_PASSWORD_LENGTH}
+            placeholder={`vähemalt ${MIN_PASSWORD_LENGTH} tähemärki`}
             className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
