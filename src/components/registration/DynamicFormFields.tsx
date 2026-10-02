@@ -28,6 +28,7 @@ export function DynamicFormFields({
   errors = {},
   disabled = false,
   teamComposition,
+  organizer = false,
 }: {
   fields: FormFieldDefinition[]
   phase: FormPhase
@@ -36,6 +37,7 @@ export function DynamicFormFields({
   errors?: Record<string, string>
   disabled?: boolean
   teamComposition?: TeamCompositionSettings
+  organizer?: boolean
 }) {
   const visibleFields = [...fields]
     .sort((a, b) => a.order - b.order)
@@ -56,9 +58,9 @@ export function DynamicFormFields({
             : field.requiredInMandate
         const fieldDisabled =
           disabled ||
-          (phase === "MANDATE" && !field.editableInMandate) ||
+          (!organizer && ((phase === "MANDATE" && !field.editableInMandate) ||
           field.key === REPRESENTATIVE_FORM_FIELD_KEYS.name ||
-          field.key === REPRESENTATIVE_FORM_FIELD_KEYS.email
+          field.key === REPRESENTATIVE_FORM_FIELD_KEYS.email))
         const value = valueFor(field, values)
         const inputId = `dynamic-field-${field.key}`
 
@@ -220,7 +222,7 @@ export function DynamicFormFields({
                     : []
                 }
                 disabled={fieldDisabled}
-                teamComposition={phase === "MANDATE" ? teamComposition : undefined}
+                teamComposition={phase === "MANDATE" || organizer ? teamComposition : undefined}
                 onChange={(members) => onChange(field.key, members)}
               />
             )}

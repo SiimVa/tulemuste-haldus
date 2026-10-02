@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { OrganizerRegistrationEditor, type OrganizerRegistrationTarget } from "@/components/registration/OrganizerRegistrationEditor"
+import type { TeamCompositionSettings } from "@/lib/teamComposition"
 import { use, useCallback, useEffect, useState } from "react"
 import { DynamicFormFields } from "@/components/registration/DynamicFormFields"
 import {
@@ -27,6 +29,7 @@ type RegistrationTeam = {
   code: string
   name: string
   class: string | null
+  answers: FormAnswers
   registrationStatus: WorkflowStatus
   registrationReviewNote: string | null
   mandateStatus: WorkflowStatus
@@ -74,6 +77,7 @@ type RegistrationOverview = {
   mandateApprovalMode: "AUTOMATIC" | "MANUAL"
   registrationFinalizedAt: string | null
   registrationCapacity: number | null
+  registrationClasses: { id: string; name: string }[]
 }
 
 const STATUS_LABEL: Record<WorkflowStatus, string> = {
@@ -123,6 +127,9 @@ export default function RegistrationsPage({
   params: Promise<{ id: string }>
 }) {
   const { id: competitionId } = use(params)
+  const [editor, setEditor] = useState<OrganizerRegistrationTarget | null>(null)
+  const [formFields, setFormFields] = useState<FormFieldDefinition[]>([])
+  const [teamComposition, setTeamComposition] = useState<TeamCompositionSettings>()
   const [teams, setTeams] = useState<RegistrationTeam[]>([])
   const [applications, setApplications] = useState<RegistrationApplication[]>([])
   const [memberFormFields, setMemberFormFields] = useState<
@@ -150,6 +157,8 @@ export default function RegistrationsPage({
       setLoading(false)
       return
     }
+    setFormFields(data.formFields ?? [])
+    setTeamComposition(data.teamComposition)
     setTeams(data.legacyTeams ?? [])
     setApplications(data.applications ?? [])
     setMemberFormFields(data.memberFormFields ?? [])
@@ -157,7 +166,17 @@ export default function RegistrationsPage({
     setLoading(false)
   }, [competitionId])
 
+  function editTeam(team: RegistrationTeam) {
+    setEditingApplicationId(null)
+    setEditor({ teamId: team.id, teamName: team.name, className: team.class, answers: team.answers })
+  }
+
+  useEffect(() => {
+    if (editor) document.querySelector('[aria-label="Võistkonna andmete muutmine"]')?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [editor])
+
   function startEditingMembers(application: RegistrationApplication) {
+    setEditor(null)
     setEditingApplicationId(application.id)
     setEditingAnswers(application.answers ?? {})
     setEditingErrors({})
@@ -414,6 +433,19 @@ export default function RegistrationsPage({
         </div>
       )}
 
+      <section className="mb-6">
+        <Button type="button" onClick={() => { setEditingApplicationId(null); setEditor({ teamName: "", answers: {} }) }}>Lisa võistkond</Button>
+        <p className="mt-2 text-xs text-gray-500">Korraldaja saab võistkondi lisada ja muuta ka pärast registreerimise lõppu ning mandaadi ajal.</p>
+        {editor && <OrganizerRegistrationEditor
+          key={editor.applicationId ?? editor.teamId ?? "new"}
+          competitionId={competitionId} target={editor} fields={formFields}
+          classes={overview?.registrationClasses ?? []} teamComposition={teamComposition}
+          includeMandate={Boolean(editor.teamId || (!editor.applicationId && overview?.registrationFinalizedAt))}
+          onCancel={() => setEditor(null)}
+          onSaved={async () => { setEditor(null); setMessage("Võistkonna andmed salvestatud"); await loadTeams() }}
+        />}
+      </section>
+
       <section className="mb-8">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
           <div>
@@ -482,6 +514,14 @@ export default function RegistrationsPage({
                       </div>
                     ))}
                   </dl>
+                )}
+                {!["WITHDRAWN", "REJECTED"].includes(application.status) && (
+                  <Button type="button" variant="secondary" size="sm" className="mt-4" onClick={() => {
+                    setEditingApplicationId(null)
+                    const team = teams.find((item) => item.id === application.team?.id)
+                    if (team) editTeam(team)
+                    else setEditor({ applicationId: application.id, teamName: application.teamName, classId: application.class?.id, answers: application.answers })
+                  }}>Muuda võistkonda</Button>
                 )}
                 {editingApplicationId === application.id ? (
                   <div className="mt-4 border-t pt-4 space-y-4">
@@ -652,6 +692,7 @@ export default function RegistrationsPage({
                     : "Esindaja määramata"}
                 </p>
               </div>
+              <Button type="button" variant="secondary" size="sm" onClick={() => editTeam(team)}>Muuda võistkonda</Button>
               <Link
                 href={`/dashboard/competitions/${competitionId}/settings`}
                 className="text-xs text-blue-600 hover:underline"

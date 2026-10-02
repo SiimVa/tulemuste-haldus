@@ -1,3 +1,10 @@
+import { setSecurityTargets } from "@/lib/security.server"
+import { organizerTeamAnswers } from "@/lib/organizerRegistration"
+import { saveOrganizerRegistration, OrganizerRegistrationError } from "@/lib/organizerRegistration.server"
+import { RegistrationClassError } from "@/lib/registrationClasses"
+import { TeamMemberAccountConflictError } from "@/lib/teamMemberAccounts.server"
+import { deliverPendingNotificationsSafely } from "@/lib/notifications.server"
+import { parseTeamMemberRoles } from "@/lib/teamComposition"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -47,11 +54,14 @@ async function handleGET(
         mandateClosesAt: true,
         mandateFinalizedAt: true,
         mandateApprovalMode: true,
+        captainRequired: true,
+        representativeRequired: true,
+        teamMemberRoles: true,
+        registrationClasses: { where: { isActive: true }, orderBy: { order: "asc" }, select: { id: true, name: true } },
         registrationFormFields: {
           where: {
             isActive: true,
-            showInRegistration: true,
-            type: "MEMBER_LIST",
+
           },
           orderBy: [{ order: "asc" }, { createdAt: "asc" }],
           select: {
@@ -86,6 +96,7 @@ async function handleGET(
           select: {
             id: true,
             name: true,
+            email: true,
             role: true,
             isCaptain: true,
             assignmentRole: true,
@@ -195,7 +206,9 @@ async function handleGET(
       registrationStatus: getCompetitionRegistrationStatus(competition),
       mandateStatus: getCompetitionMandateStatus(competition),
     },
-    memberFormFields: registrationFormFields.map(toFormFieldDefinition),
+    formFields: registrationFormFields.map(toFormFieldDefinition),
+    teamComposition: { representativeRequired: competition.representativeRequired, captainRequired: competition.captainRequired, memberRoles: parseTeamMemberRoles(competition.teamMemberRoles) },
+    memberFormFields: registrationFormFields.filter((field) => field.showInRegistration && field.type === "MEMBER_LIST").map(toFormFieldDefinition),
     applications: applications.map(({ fieldValues, ...application }) => {
       const sortedValues = fieldValues.sort(
         (a, b) => a.field.order - b.field.order
@@ -220,6 +233,10 @@ async function handleGET(
     }),
     legacyTeams: teams.map(({ formValues, ...team }) => ({
       ...team,
+      answers: organizerTeamAnswers(registrationFormFields.map(toFormFieldDefinition), Object.fromEntries(formValues.flatMap(({ field, value }) => {
+        const answer = parseFormAnswer(value)
+        return answer === undefined ? [] : [[field.key, answer]]
+      })), team.members),
       details: formValues
         .sort((a, b) => a.field.order - b.field.order)
         .map(({ field, value }) => {
@@ -238,3 +255,23 @@ async function handleGET(
 }
 
 export const GET = withSecurityRoute("/api/competitions/[id]/registrations", handleGET)
+
+
+export const POST = withSecurityRoute("/api/competitions/[id]/registrations", async (request, { params }) => {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { id } = await params
+  if (!await canAccessCompetition(id, { id: session.user.id, role: session.user.role })) return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  try {
+    const body = await request.json()
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Vigased andmed" }, { status: 400 })
+    const result = await saveOrganizerRegistration(id, session.user.id, body)
+    setSecurityTargets(result)
+    await deliverPendingNotificationsSafely()
+    return NextResponse.json(result)
+  } catch (error) {
+    if (error instanceof OrganizerRegistrationError) return NextResponse.json({ error: error.message }, { status: error.status })
+    if (error instanceof RegistrationClassError || error instanceof TeamMemberAccountConflictError) return NextResponse.json({ error: error.message }, { status: 400 })
+    throw error
+  }
+})
