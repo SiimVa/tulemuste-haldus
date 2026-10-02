@@ -15,9 +15,51 @@ ning oma teadaolevate tegevustega. Kahtluse korral eemalda asjassepuutuvad
 võistluse õigused või tühista ligipääsutoken; säilita uurimiseks vajalikud logid
 turvalises, piiratud ligipääsuga asukohas.
 
-See PR ei saada automaatseid turvahoiatusi e-postiga. Turvalogi ei ole täielik
-ründetuvastussüsteem ega tõend, et andmeleket pole toimunud. Enne paigaldamist
-toimunud tegevusi tagasiulatuvalt ei lisata.
+Turvalogi ei ole täielik ründetuvastussüsteem ega tõend, et andmeleket pole
+toimunud. Enne paigaldamist toimunud tegevusi tagasiulatuvalt ei lisata.
+
+## Automaatsed hoiatused
+
+Teavituste cron (`/api/internal/notifications/deliver`, iga 5 minuti järel)
+vaatab enne kirjade saatmist läbi viimase tunni turvasündmused. Reegli
+täitumisel tekib hoiatus, mida näeb Turvalogi ülaosas ja menüü punase loenduri
+järgi. Kõrge ja keskmise tasemega hoiatusest saavad kõik administraatorid
+rakendusesisese teavituse ja e-kirja. Madala tasemega hoiatusi näeb ainult
+Turvalogis.
+
+| Hoiatus | Tase | Millal |
+| --- | --- | --- |
+| Sisselogimine õnnestus pärast korduvaid ebaõnnestumisi | Kõrge | Kontol vähemalt 5 ebaõnnestunud paroolikatset ja seejärel õnnestunud sisselogimine |
+| Loodi administraatori konto | Kõrge | Algseadistus (`/api/setup`) õnnestus |
+| Üks allikas proovis mitut kontot | Keskmine | Samast allikast ebaõnnestunud sisselogimised vähemalt 5 erinevasse kontosse |
+| Sisselogimiskatsete piirang rakendus | Keskmine | Konto või allika sisselogimispiirang |
+| Korduvad keelatud päringud | Keskmine | Vähemalt 20 vastust 401/403/404 vähemalt 5 erineva objekti kohta |
+| Tavapärasest suurem andmete eksport | Keskmine | Vähemalt 10 eksporti, 1000 eksporditud rida või 3 võistlust |
+| Kasutaja parool lähtestati, kasutajakonto kustutati, võistluse omanik vahetati, võistlus kustutati, võistluse isikuandmed kustutati | Keskmine | Iga õnnestunud toiming |
+| API päringute piirang rakendus | Madal | Muu API päringupiirang |
+| Loodi kasutajakonto | Madal | Administraator lõi konto |
+
+Kõik lävendid kehtivad ühe tunni kohta. Sama reegli ja subjekti (kasutaja,
+ligipääsutoken või pseudonüümne allikas) jätkuvad sündmused lisatakse avatud
+hoiatusele, uut kirja ei saadeta. Pärast „Märgi lahendatuks” tekib uus hoiatus
+ainult siis, kui uued sündmused ületavad lävendi uuesti. Kui avatud hoiatusel
+pole tunni jooksul uusi sündmusi, alustab hilisem tegevus uue hoiatuse.
+Ilma usaldatud proksita kasutatav ühine `unknown` allikas ei tekita
+allikapõhiseid hoiatusi. Paralleelsed cron-käivitused ei tekita topelthoiatusi:
+tuvastus käib PostgreSQL-i lukuga ühes transaktsioonis.
+
+Hoiatuses on ainult reegel, loendurid, ajavahemik, kasutaja ID või allika
+HMAC ning sihtobjektide ID-d, mitte e-posti aadresse ega päringute sisu. Teavitus
+ja e-kiri sisaldavad kasutaja praegust nime. „Näita sündmusi” filtreerib logi
+hoiatuse subjekti järgi. Hoiatused kustutatakse koos sündmustega 90 päeva järel.
+
+Ekspordid salvestavad eksporditud andmeridade arvu (võistkonnad, registreeringud,
+juurdepääsulingid). Logi ja suure ekspordi reegel kasutavad seda.
+
+Lävendid on algväärtused ja vajavad pärast esimesi võistlusi ülevaatamist. Hoiatus
+ei tõesta rünnet: põhjuseks võib olla ka unustatud parool, ühine võrk või
+tavapärasest suurem töö. Rakendusest mööda minevaid tegevusi (andmebaasi
+otsepöördumised, Railway haldus, lekkinud varukoopiad) hoiatused ei näe.
 
 ## Salvestatav teave ja piirid
 
@@ -119,9 +161,11 @@ range skriptide CSP ega täielik XSS-kaitse.
    Railway teenust ei lisata. Kui cron ei käivitu, säilivad vanad kirjed kauem.
 3. Ava administraatorina Turvalogi, tee üks teadaolev muudatus ja kontrolli,
    et tulemus on „Õnnestus”. Kontrolli cron-i järgmise käivituse edukust.
-4. Jälgi `Security service unavailable` ja `Security audit completion failed`
-   rakenduslogisid. Teavitus nende vigade või kahtlaste mustrite kohta tuleks
-   järgmise etapina ühendada automaatse välise seirega.
+4. Jälgi `Security service unavailable`, `Security audit completion failed` ja
+   `Security alert detection failed` rakenduslogisid. Kahtlastest mustritest
+   teavitab rakendus ise (vt „Automaatsed hoiatused”), aga nende vigade kohta
+   tasub lisada väline seire. Hoiatuste e-kirjad vajavad teavituste cron'i ja
+   Resendi seadistust; nende puudumisel on hoiatused näha ainult Turvalogis.
 
 Kontrollid: `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build` ja
 `npm run test:e2e` kohalikul PostgreSQL-i testiskeemil. Turvatestid kontrollivad

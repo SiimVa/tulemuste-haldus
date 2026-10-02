@@ -23,10 +23,12 @@ export const SECURITY_ACTION_LABELS: Record<string, string> = {
   REGISTRATION_CHANGE: "Registreerimise või mandaadi muutmine",
   EXPORT: "Andmete eksport",
   AUDIT_READ: "Turvalogi vaatamine",
+  AUDIT_CHANGE: "Turvahoiatuse käsitlemine",
 }
 
 export function securityAction(route: string, method: string): string {
-  if (route === "/api/security-events") return "AUDIT_READ"
+  if (route === "/api/security-events" || route === "/api/security-alerts") return "AUDIT_READ"
+  if (route.startsWith("/api/security-alerts/")) return "AUDIT_CHANGE"
   if (route.includes("/export")) return "EXPORT"
   if (method === "GET" || method === "HEAD") return "API_READ"
   if (route.startsWith("/api/users") || route === "/api/setup") return "ACCOUNT_CHANGE"

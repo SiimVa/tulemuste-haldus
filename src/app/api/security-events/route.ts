@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { SECURITY_ACTION_LABELS, SECURITY_OUTCOMES, type SecurityOutcome } from "@/lib/security"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { securityEventSubjectWhere } from "@/lib/securityAlerts.server"
 
 export const dynamic = "force-dynamic"
 
@@ -13,15 +14,17 @@ async function handleGET(request: Request) {
   const outcome = params.get("outcome")
   const action = params.get("action")
   const cursor = params.get("cursor")
+  const subject = params.get("subject")
+  const subjectWhere = subject ? securityEventSubjectWhere(subject) : {}
   if ((outcome && !SECURITY_OUTCOMES.includes(outcome as SecurityOutcome)) ||
       (action && !Object.hasOwn(SECURITY_ACTION_LABELS, action)) ||
-      (cursor && !/^c[a-z0-9]{24}$/.test(cursor))) {
+      (cursor && !/^c[a-z0-9]{24}$/.test(cursor)) || !subjectWhere) {
     return Response.json({ error: "Vigane filter" }, { status: 400 })
   }
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const [rows, counts] = await Promise.all([
     prisma.securityEvent.findMany({
-      where: { ...(outcome ? { outcome } : {}), ...(action ? { action } : {}) },
+      where: { ...(outcome ? { outcome } : {}), ...(action ? { action } : {}), ...subjectWhere },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 51,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

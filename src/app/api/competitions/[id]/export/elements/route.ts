@@ -1,4 +1,5 @@
 import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityRecordCount } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -31,6 +32,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
   if (!competition) return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
 
   const teams = await prisma.team.findMany({ where: { competitionId } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code)))
+  setSecurityRecordCount(competition.elements.length * teams.length)
   const isPlusMode = competition.scoringMode === "PLUS"
   const baseName = competition.name.replace(/[^a-zA-Z0-9äöüõÄÖÜÕ_-]/g, "_")
 

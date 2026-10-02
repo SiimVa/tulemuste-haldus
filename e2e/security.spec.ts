@@ -12,6 +12,7 @@ if (!["127.0.0.1", "localhost", "[::1]"].includes(database.hostname) || database
 }
 process.env.DATABASE_URL = databaseURL
 process.env.AUTH_SECRET = "e2e-auth-secret-used-only-by-playwright-tests"
+const cronSecret = "e2e-cron-secret-used-only-by-playwright-tests"
 
 const admin = { email: "security-admin.e2e@example.com", password: "security-test-password-123" }
 const member = { email: "security-member.e2e@example.com", password: "security-test-password-456" }
@@ -283,5 +284,63 @@ test.describe.serial("turvalogi ja päringupiirangud", () => {
     expect((await simulate()).status()).toBe(404)
     expect((await simulate({ analysisLinkToken: generateAnalysisLinkToken() })).status()).toBe(404)
     expect((await simulate({ analysisLinkToken: token })).status()).toBe(200)
+  })
+
+  test("turvahoiatus tuvastatakse, teavitab administraatorit ja selle saab lahendada", async ({ page, request }, testInfo) => {
+    const runDetection = async () => {
+      const response = await request.get("/api/internal/notifications/deliver", { headers: { Authorization: `Bearer ${cronSecret}` } })
+      expect(response.status(), await response.text()).toBe(200)
+      return (await response.json()).securityAlerts
+    }
+    const now = Date.now()
+    const loginAccountHash = securityFingerprint("login-audit-account", member.email)
+    await prisma.securityEvent.createMany({ data: [
+      ...Array.from({ length: 6 }, (_, index) => ({
+        action: "LOGIN", outcome: "DENIED", route: "/api/auth/callback/credentials", method: "POST", status: 401,
+        targetIds: { userId: memberId, loginAccountHash }, createdAt: new Date(now - 240_000 + index * 1000),
+      })),
+      { action: "LOGIN", outcome: "SUCCEEDED", route: "/api/auth/[...nextauth]", method: "AUTH", actorUserId: memberId, createdAt: new Date(now - 120_000) },
+    ] })
+    expect((await runDetection()).failed).toBeUndefined()
+    const where = { rule: "LOGIN_SUCCESS_AFTER_FAILURES", subjectKey: `user:${memberId}` }
+    const alert = await prisma.securityAlert.findFirstOrThrow({ where })
+    expect(alert.severity).toBe("HIGH")
+    expect(alert.resolvedAt).toBeNull()
+    expect(JSON.stringify(alert)).not.toContain(member.email)
+    const notification = await prisma.notification.findUniqueOrThrow({ where: { dedupeKey: `security-alert:${alert.id}:${adminId}` } })
+    expect(notification.type).toBe("SECURITY_ALERT")
+    expect(notification.message).toContain("Turvatesti kasutaja")
+    await runDetection()
+    expect(await prisma.securityAlert.count({ where })).toBe(1)
+
+    await login(page, admin)
+    await page.goto("/dashboard/security")
+    const alertCard = page.getByRole("list", { name: "Avatud hoiatused" }).getByRole("listitem")
+      .filter({ hasText: "Sisselogimine õnnestus pärast korduvaid ebaõnnestumisi" })
+    await expect(alertCard).toContainText("Turvatesti kasutaja")
+    const alertsSection = page.getByRole("region", { name: "Hoiatused" })
+    await alertsSection.screenshot({ path: testInfo.outputPath("security-alerts-desktop.png") })
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await alertsSection.screenshot({ path: testInfo.outputPath("security-alerts-mobile.png") })
+    await alertCard.getByRole("button", { name: "Näita sündmusi" }).click()
+    await expect(page.getByText("Ainult: Turvatesti kasutaja")).toBeVisible()
+    await expect(page.getByText("Proovitud konto (kinnitamata): Turvatesti kasutaja").first()).toBeVisible()
+    await alertCard.getByRole("button", { name: "Märgi lahendatuks" }).click()
+    await expect(alertCard).toBeHidden()
+    expect((await prisma.securityAlert.findUniqueOrThrow({ where: { id: alert.id } })).resolvedById).toBe(adminId)
+    await runDetection()
+    expect(await prisma.securityAlert.count({ where })).toBe(1)
+  })
+
+  test("eksport salvestab eksporditud ridade arvu", async ({ page }) => {
+    const competition = await prisma.competition.create({ data: { name: "Export count test", createdById: adminId, organizerId: adminId } })
+    await prisma.team.createMany({ data: ["1", "2", "3"].map(code => ({ competitionId: competition.id, name: `Export ${code}`, code })) })
+    await login(page, admin)
+    expect((await page.request.get(`/api/competitions/${competition.id}/export?format=csv`)).status()).toBe(200)
+    const event = await prisma.securityEvent.findFirstOrThrow({
+      where: { action: "EXPORT", targetIds: { path: ["id"], equals: competition.id } }, orderBy: { createdAt: "desc" },
+    })
+    expect(event.recordCount).toBe(3)
   })
 })

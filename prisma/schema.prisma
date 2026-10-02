@@ -33,6 +33,8 @@ model SecurityEvent {
   fingerprint    String?
   targetIds      Json     @default("{}")
   durationMs     Int?
+  // Eksporditud andmeridade arv; muudel sündmustel null.
+  recordCount    Int?
 
   @@index([createdAt, id])
   @@index([outcome, createdAt])
@@ -45,6 +47,30 @@ model RateLimitBucket {
   expiresAt DateTime @db.Timestamptz(3)
 
   @@index([expiresAt])
+}
+
+// Turvalogi reeglist tekkinud hoiatus. Sama reegli ja subjekti (kasutaja ID või
+// allika HMAC) jätkuvad sündmused koondatakse avatud hoiatusse. Nagu
+// SecurityEventil, ei ole siin kaskaadseoseid ega lisaisikuandmeid.
+model SecurityAlert {
+  id           String    @id @default(cuid())
+  rule         String
+  severity     String
+  subjectKey   String
+  // Kasutaja, keda hoiatus puudutab (tegija või rünnatav konto).
+  userId       String?
+  fingerprint  String?
+  targetIds    Json      @default("{}")
+  eventCount   Int
+  details      Json      @default("{}")
+  firstEventAt DateTime  @db.Timestamptz(3)
+  lastEventAt  DateTime  @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  resolvedAt   DateTime? @db.Timestamptz(3)
+  resolvedById String?
+
+  @@index([resolvedAt, lastEventAt])
+  @@index([lastEventAt])
 }
 
 model User {

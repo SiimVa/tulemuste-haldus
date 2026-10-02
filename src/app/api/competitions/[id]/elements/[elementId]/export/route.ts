@@ -1,6 +1,7 @@
 import { calculateEstimation, parseEstimates, readEstimation, targetUnit } from "@/lib/estimation"
 import { pointFieldLabel } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityRecordCount } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { csvCell, csvRow } from "@/lib/csv"
 import { auth } from "@/lib/auth"
@@ -75,6 +76,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
 
   const inComp = teams.filter((t) => !t.isHorsDeCompetition)
   const horsComp = teams.filter((t) => t.isHorsDeCompetition)
+  setSecurityRecordCount(inComp.length + horsComp.length)
   const headers = ["#", "Tähis", "Võistkond", "Klass",
     ...inputFields.flatMap(f => f.type === "ESTIMATION" ? [...readEstimation(f.meta).targets.map(t => `${f.label} (${t.label}) [${targetUnit(readEstimation(f.meta), t)}]`), `${f.label}: punkte`, `${f.label}: eksimus (${readEstimation(f.meta).unit})`, `${f.label}: protsendivigade summa (%)`] : [f.label]),
     "Erand", isPlusMode ? "Punktid" : "Karistus"]

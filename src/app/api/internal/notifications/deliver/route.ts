@@ -4,6 +4,7 @@ import {
   deliverPendingNotifications,
   enqueueDueMandateOpenedNotifications,
 } from "@/lib/notifications.server"
+import { detectSecurityAlertsSafely } from "@/lib/securityAlerts.server"
 
 export const dynamic = "force-dynamic"
 
@@ -24,7 +25,9 @@ export async function GET(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+  // Runs before delivery so that new alert e-mails are sent in the same run.
+  const securityAlerts = await detectSecurityAlertsSafely()
   const queued = await enqueueDueMandateOpenedNotifications()
   const delivery = await deliverPendingNotifications({ limit: 100 })
-  return NextResponse.json({ queued, ...delivery })
+  return NextResponse.json({ queued, securityAlerts, ...delivery })
 }

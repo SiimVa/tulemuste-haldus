@@ -1,4 +1,5 @@
 import { withSecurityRoute } from "@/lib/securityRoute.server"
+import { setSecurityRecordCount } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -82,6 +83,7 @@ async function handleGET(
         status: 404, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
       })
     }
+    setSecurityRecordCount(entries.length)
     return new NextResponse(await renderAccessQrExport(competition.name, entries, qrOptions.perPage), {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
@@ -91,6 +93,7 @@ async function handleGET(
     })
   }
 
+  setSecurityRecordCount(sorted.length)
   const rows = sorted.map(t => {
     const path = t.type === "JUDGE" ? `/judge/${t.token}` : `/athlete/${t.token}`
     const link = `${baseUrl}${path}`
