@@ -1,9 +1,10 @@
+import { setTeamRepresentative } from "./teamRepresentatives.server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "./prisma"
 import { getCompetitionRegistrationStatus } from "./competitionPhases"
 import { organizerRegistrationFields } from "./organizerRegistration"
 import { resolveRegistrationClass } from "./registrationClasses"
-import { parseFormAnswer, serializeFormAnswer, toFormFieldDefinition, validateFormAnswers, type MemberAnswer } from "./registrationForm"
+import { withRepresentativeIdentity, parseFormAnswer, serializeFormAnswer, toFormFieldDefinition, validateFormAnswers, type MemberAnswer } from "./registrationForm"
 import { cleanupCompetitorRoles, ensureCompetitorRoles, resolveTeamMemberAccounts } from "./teamMemberAccounts.server"
 import { recalculateRegistrationAllocation } from "./registrationAllocation.server"
 
@@ -33,11 +34,27 @@ export async function saveOrganizerRegistration(competitionId: string, actorId: 
     if (application && (application.teamId || competition.registrationFinalizedAt)) throw new OrganizerRegistrationError("Muuda kinnitatud võistkonna andmeid mandaadi jaotises", 409)
     if (application && ["REJECTED", "WITHDRAWN"].includes(application.status)) throw new OrganizerRegistrationError("Seda avaldust ei saa enam muuta", 409)
 
+    let representative: { name: string; email: string; userId: string | null } | undefined
+    if (body.representative !== undefined) {
+      const input = body.representative as { name?: unknown; email?: unknown } | null
+      const email = typeof input?.email === "string" ? input.email.trim().toLowerCase() : ""
+      const name = typeof input?.name === "string" ? input.name.trim() : ""
+      if (!name || name.length > 200 || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new OrganizerRegistrationError("Sisesta esindaja nimi ja korrektne e-post")
+      }
+      const user = await tx.user.findUnique({ where: { email }, select: { id: true } })
+      representative = { name, email, userId: user?.id ?? null }
+    }
+    const pendingRepresentative = representative ? {
+      pendingRepresentativeEmail: representative.userId ? null : representative.email,
+      pendingRepresentativeName: representative.userId ? null : representative.name,
+    } : {}
+
     const classId = resolveRegistrationClass(competition.registrationClasses.map((item) => item.id), typeof body.classId === "string" ? body.classId : null)
     const teamClass = competition.registrationClasses.find((item) => item.id === classId)?.name ?? (typeof body.className === "string" ? body.className.trim().slice(0, 200) || null : team?.class ?? null)
     const saveTeam = Boolean(team || (!application && competition.registrationFinalizedAt))
     const fields = organizerRegistrationFields(competition.registrationFormFields.map(toFormFieldDefinition), saveTeam)
-    const validated = validateFormAnswers(fields, body.answers, "REGISTRATION")
+    const validated = validateFormAnswers(fields, representative ? withRepresentativeIdentity(body.answers, representative) : body.answers, "REGISTRATION")
     if (Object.keys(validated.errors).length) throw new OrganizerRegistrationError(Object.entries(validated.errors).map(([key, error]) => `${fields.find((field) => field.key === key)?.label}: ${error}`).join("; "))
     const values = fields.filter((field) => field.id).map((field) => ({
       fieldId: field.id!,
@@ -46,11 +63,11 @@ export async function saveOrganizerRegistration(competitionId: string, actorId: 
     }))
 
     if (!saveTeam) {
-      const data = { teamName: name, classId }
+      const data = { teamName: name, classId, ...pendingRepresentative, ...(representative ? { submittedById: representative.userId ?? actorId } : {}) }
       const saved = application
         ? await tx.registrationApplication.update({ where: { id: application.id }, data })
         : await tx.registrationApplication.create({ data: {
-            ...data, competitionId, submittedById: actorId, status: "CONFIRMED", submittedAt: new Date(), decidedAt: new Date(), allocationReason: "Korraldaja lisatud",
+            ...data, competitionId, submittedById: representative?.userId ?? actorId, status: "CONFIRMED", submittedAt: new Date(), decidedAt: new Date(), allocationReason: "Korraldaja lisatud",
           } })
       for (const value of values) {
         await tx.registrationApplicationFieldValue.upsert({
@@ -65,7 +82,7 @@ export async function saveOrganizerRegistration(competitionId: string, actorId: 
       if (competition.registrationApprovalMode === "AUTOMATIC" && getCompetitionRegistrationStatus(competition) === "OPEN") {
         await recalculateRegistrationAllocation(tx, competitionId, { actorId })
       }
-      return { applicationId: saved.id }
+      return { applicationId: saved.id, representativePending: Boolean(saved.pendingRepresentativeEmail) }
     }
 
     let savedTeam = team
@@ -75,11 +92,12 @@ export async function saveOrganizerRegistration(competitionId: string, actorId: 
       while (codes.has(`REG-${String(sequence).padStart(3, "0")}`)) sequence++
       savedTeam = await tx.team.create({ data: {
         competitionId, name, class: teamClass, code: `REG-${String(sequence).padStart(3, "0")}`,
-        registrationStatus: "APPROVED", registrationReviewedAt: new Date(),
+        registrationStatus: "APPROVED", registrationReviewedAt: new Date(), ...pendingRepresentative,
       }, include: { formValues: true, members: true } })
     } else {
-      await tx.team.update({ where: { id: savedTeam.id }, data: { name, class: teamClass } })
+      await tx.team.update({ where: { id: savedTeam.id }, data: { name, class: teamClass, ...pendingRepresentative } })
     }
+    if (representative) await setTeamRepresentative(tx, competitionId, savedTeam.id, representative.userId)
     const memberFieldIds = new Set(fields.filter((field) => field.type === "MEMBER_LIST").map((field) => field.id))
     const membersChanged = values.some((value) => memberFieldIds.has(value.fieldId) && value.value !== savedTeam.formValues.find((existing) => existing.fieldId === value.fieldId)?.value)
     if (membersChanged) {
@@ -102,6 +120,6 @@ export async function saveOrganizerRegistration(competitionId: string, actorId: 
         create: { teamId: savedTeam.id, ...value }, update: { value: value.value },
       })
     }
-    return { teamId: savedTeam.id }
+    return { teamId: savedTeam.id, representativePending: representative ? !representative.userId : Boolean(savedTeam.pendingRepresentativeEmail) }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 }

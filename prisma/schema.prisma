@@ -305,6 +305,8 @@ model RegistrationApplication {
   id               String            @id @default(cuid())
   competitionId    String
   competition      Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  pendingRepresentativeEmail String?
+  pendingRepresentativeName  String?
   submittedById    String
   submittedBy      User              @relation(fields: [submittedById], references: [id], onDelete: Restrict)
   teamName         String
@@ -327,6 +329,7 @@ model RegistrationApplication {
   @@index([competitionId, status, submittedAt])
   @@index([competitionId, status, waitlistPosition], map: "RegistrationApplication_waitlist_order_idx")
   @@index([submittedById, createdAt])
+  @@index([pendingRepresentativeEmail])
 }
 
 // Korraldaja seadistatav registreerimise ja mandaadi vormiväli.
@@ -518,6 +521,8 @@ model Team {
   isHorsDeCompetition Boolean     @default(false)
   createdAt           DateTime    @default(now())
   workflowUpdatedAt   DateTime    @default(now()) @updatedAt
+  pendingRepresentativeEmail String?
+  pendingRepresentativeName  String?
 
   // Registreerimine: "DRAFT" | "SUBMITTED" | "APPROVED" | "CHANGES_REQUESTED"
   registrationStatus      String    @default("DRAFT")
@@ -551,6 +556,7 @@ model Team {
   @@unique([id, competitionId])
   @@index([competitionId, registrationStatus])
   @@index([competitionId, mandateStatus])
+  @@index([pendingRepresentativeEmail])
 }
 
 model TeamFormFieldValue {

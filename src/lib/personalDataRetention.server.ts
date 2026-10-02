@@ -166,6 +166,14 @@ export async function purgeCompetitionPersonalData(
     where: { competitionId, email: { not: null } },
     data: { email: null },
   })
+  await tx.registrationApplication.updateMany({
+    where: { competitionId },
+    data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
+  })
+  await tx.team.updateMany({
+    where: { competitionId },
+    data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
+  })
   await tx.competition.update({
     where: { id: competitionId },
     data: { personalDataPurgedAt: now },
