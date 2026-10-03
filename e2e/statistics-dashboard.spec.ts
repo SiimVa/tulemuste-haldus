@@ -251,7 +251,7 @@ test("külmutatud pingerida peidab hilisemad muudatused avalikkuse eest kuni ava
   await visitor.page.goto(`/public/${competition.id}/analysis`)
   await expect(visitor.page.getByText("Analüüs avaneb pärast tulemuste avalikustamist.", { exact: false })).toBeVisible()
   const simulate = await visitor.page.request.post(`/api/competitions/${competition.id}/simulate`, { data: { teamId: teams["Viru KT"], overrides: {} } })
-  expect(simulate.status()).toBe(403)
+  expect(simulate.status()).toBe(423)
   await visitor.page.goto(`/athlete/${athlete.token}`)
   await expect(visitor.page.getByText(/Punktid ja kohad avalikustatakse autasustamisel/)).toBeVisible()
   await expect(visitor.page.getByText("Üldkoht")).toHaveCount(0)

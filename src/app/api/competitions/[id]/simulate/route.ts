@@ -33,7 +33,8 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   if (await getPublicFreeze(competitionId)) {
     const session = await auth()
     if (!session?.user?.id || !await canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role })) {
-      return NextResponse.json({ error: "Tulemused on külmutatud. Simulaator avaneb pärast tulemuste avalikustamist." }, { status: 403 })
+      // 423, mitte 403: lukustatud seis ei ole keelatud ligipääs ega turvalogi keeldumine.
+      return NextResponse.json({ error: "Tulemused on külmutatud. Simulaator avaneb pärast tulemuste avalikustamist." }, { status: 423 })
     }
   }
 
