@@ -33,6 +33,20 @@
     "src/lib/teamWorkflow.ts",
     "src/lib/classGroups.ts",
     "src/lib/calculators/index.ts",
+    "src/lib/exceptionKinds.ts",
+    "src/lib/dashboard/config.ts",
+    "src/lib/dashboard/types.ts",
+    "src/lib/dashboard/routes.ts",
+    "src/lib/dashboard/progress.ts",
+    "src/lib/dashboard/standings.ts",
+    "src/lib/dashboard/analysis.ts",
+    "src/lib/dashboard/mapData.ts",
+    "src/lib/dashboard/format.ts",
+    "src/lib/geo/mgrs.ts",
+    "src/lib/geo/georef.ts",
+    "src/lib/mapTemplate.ts",
+    "src/lib/imageSize.ts",
+    "src/lib/leaderboardFreeze.ts",
     "tests/**/*.test.ts"
   ]
 }

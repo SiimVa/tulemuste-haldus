@@ -67,3 +67,7 @@ on kirjeldatud failis [docs/notifications.md](docs/notifications.md).
 
 Administraatori turvalogi, päringupiirangute, turvapäiste ning seire piiride
 kirjeldus on failis [docs/security.md](docs/security.md).
+
+Statistika töölaua vidinad, KP-de kaart koos MGRS-koordinaatidega, ekraanirežiim
+ja avaliku pingerea külmutamine on kirjeldatud failis
+[docs/statistics-dashboard.md](docs/statistics-dashboard.md).

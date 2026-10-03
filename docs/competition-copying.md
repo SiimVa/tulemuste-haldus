@@ -11,11 +11,15 @@ Alati kopeeritakse:
 - registreerimise ja mandaadi kinnitusrežiimid ning kohtade arv;
 - aktiivsed klassid, registreerimisvormi väljad ja kohtade jaotusreeglid;
 - esindaja, kapteni ja liikmerollide nõuded;
-- isikuandmete säilitustähtaeg.
+- isikuandmete säilitustähtaeg;
+- statistika töölaua seaded (vidinad, lävendid, klasside KP-de järjekord).
 
 Hindamiselementide kopeerimise saab enne toimingut välja lülitada. Valiku
 sisselülitamisel kopeeritakse kõik aktiivsed elemendid koos väljade,
-hindamisosade, erandite ja arvutusmeetoditega.
+hindamisosade, erandite (koos statistika liigiga) ja arvutusmeetoditega ning
+lisaks kaardipilt, kaardimärgid ja elementide asukohad. Töölaua seadetes olevad
+elemendiviited seotakse uute elementidega; ilma elementideta koopias need
+eemaldatakse. Pingerea külmutust ei kopeerita.
 
 Koopiasse ei kanta kuupäevi, registreerimise ega mandaadi ajakava, avalikku
 olekut, osalejaid, registreerimisavaldusi, tulemusi, arvutatud punkte,
@@ -32,7 +36,7 @@ Elemendiga kopeeritakse:
 
 - tüüp, seadistus ja maksimaalne väärtus;
 - sisendväljad, valemid, metaandmed ja valideerimisreeglid;
-- erandid ja arvutusmeetod;
+- erandid koos statistika liigiga ja arvutusmeetod;
 - kombineeritud elemendi hindamisosad, nende väljad ja arvutusmeetodid;
 - otsepunktide sisestamise ja võistlejale punktide näitamise seadistus.
 

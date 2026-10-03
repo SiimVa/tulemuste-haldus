@@ -15,9 +15,11 @@ import { Button } from "@/components/ui/button"
 import type { TeamCountScope } from "@/lib/classGroups"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
+import { EXCEPTION_KINDS, EXCEPTION_KIND_LABELS, inferExceptionKind, isExceptionKind, type ExceptionKind } from "@/lib/exceptionKinds"
 
 type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
-type ExceptionRow = { label: string; penalty: string }
+// kind puudub, kui korraldaja pole liiki valinud: siis tuletatakse see nimest.
+type ExceptionRow = { label: string; penalty: string; kind?: ExceptionKind }
 type SectionRow = {
   id: string // lokaalne key
   name: string
@@ -278,8 +280,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                 const rankingPriority = f.rankingPriority ?? (f.isResultField ? 1 : null)
                 return { meta: f.meta, name: f.name, label: f.label, type: f.type, rankingPriority, formula: f.formula ?? "", displayAsTime, validation: parseValidation(f.validation), fieldHigherIsBetter }
               }))
-              setExceptions((el.exceptions ?? []).map((ex: { label: string; penalty: number }) => ({
-                label: ex.label, penalty: String(ex.penalty),
+              setExceptions((el.exceptions ?? []).map((ex: { label: string; penalty: number; kind?: string | null }) => ({
+                label: ex.label, penalty: String(ex.penalty), kind: isExceptionKind(ex.kind) ? ex.kind : undefined,
               })))
               if (el.calcMethod) {
                 setCalcType(el.calcMethod.type)
@@ -405,10 +407,14 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
     setExceptions([...exceptions, { label: "", penalty: "0" }])
   }
 
-  function updateException(i: number, key: keyof ExceptionRow, val: string) {
+  function updateException(i: number, key: "label" | "penalty", val: string) {
     const updated = [...exceptions]
     updated[i] = { ...updated[i], [key]: val }
     setExceptions(updated)
+  }
+
+  function updateExceptionKind(i: number, kind: ExceptionKind) {
+    setExceptions(exceptions.map((ex, index) => (index === i ? { ...ex, kind } : ex)))
   }
 
   function buildPKFieldsAndConfig() {
@@ -514,7 +520,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
         validation: f.validation && Object.keys(f.validation).length ? f.validation : undefined,
       }))),
       exceptions: exceptions.map((ex, i) => ({
-        label: ex.label, penalty: parseFloat(ex.penalty), order: i,
+        label: ex.label, penalty: parseFloat(ex.penalty), order: i, kind: ex.kind ?? inferExceptionKind(ex.label),
       })),
       calcMethod: isCombined ? undefined : ((type === "OTHER" || type === "ABANDONMENT") ? undefined : pkOverride ? pkOverride.calcMethod : isDirectEntry ? { type: "DIRECT_ENTRY", params: { higherIsBetter: directHigherIsBetter }, customFormula: undefined } : (() => {
         const primaryDir = fields.find(f => f.rankingPriority === 1)?.fieldHigherIsBetter ?? false
@@ -1348,11 +1354,16 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               <button type="button" onClick={addException}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Lisa erand</button>
             </div>
+            <p className="text-xs text-gray-500">Liik määrab, kuidas erandit statistikas loetakse (nt „Ei läbinud” ei ole KP-s käimine).</p>
             {exceptions.map((ex, i) => (
-              <div key={i} className="flex gap-2 items-center">
+              <div key={i} className="flex flex-wrap gap-2 items-center">
                 <Input type="text" value={ex.label} onChange={e => updateException(i, "label", e.target.value)}
                   placeholder="Erand (nt Ei läbinud)"
-                  className="flex-1 focus:ring-1" />
+                  className="min-w-40 flex-1 focus:ring-1" />
+                <Select aria-label="Erandi liik statistikas" value={ex.kind ?? inferExceptionKind(ex.label)}
+                  onChange={e => updateExceptionKind(i, e.target.value as ExceptionKind)} className="w-auto focus:ring-1">
+                  {EXCEPTION_KINDS.map(kind => <option key={kind} value={kind}>{EXCEPTION_KIND_LABELS[kind]}</option>)}
+                </Select>
                 <Input type="number" value={ex.penalty} onChange={e => updateException(i, "penalty", e.target.value)}
                   placeholder="Karistus"
                   onFocus={e => e.target.select()}

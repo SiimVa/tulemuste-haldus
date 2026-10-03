@@ -1,3 +1,6 @@
+import { auth } from "@/lib/auth"
+import { canAccessCompetition } from "@/lib/competitionAccess"
+import { getPublicFreeze } from "@/lib/leaderboardFreeze.server"
 import { rankLeaderboard, parseTieBreakConfig } from "@/lib/tieBreak"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -25,6 +28,13 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   // The simulator reveals standings, so it follows the analysis page's access mode.
   if (!await canViewCompetitionAnalysis(competitionId, body.analysisLinkToken)) {
     return NextResponse.json({ error: "Ei leitud" }, { status: 404 })
+  }
+  // Külmutatud tulemuste ajal paljastaks simulaator jooksva seisu.
+  if (await getPublicFreeze(competitionId)) {
+    const session = await auth()
+    if (!session?.user?.id || !await canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role })) {
+      return NextResponse.json({ error: "Tulemused on külmutatud. Simulaator avaneb pärast tulemuste avalikustamist." }, { status: 403 })
+    }
   }
 
   const competition = await prisma.competition.findUnique({

@@ -41,6 +41,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.18.0",
+    "mgrs": "^2.2.0",
     "next": "^15.5.21",
     "next-auth": "^5.0.0-beta.32",
     "prisma": "^5.22.0",

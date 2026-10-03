@@ -5,6 +5,7 @@ import {
   enqueueDueMandateOpenedNotifications,
 } from "@/lib/notifications.server"
 import { detectSecurityAlertsSafely } from "@/lib/securityAlerts.server"
+import { processDueLeaderboardFreezesSafely } from "@/lib/leaderboardFreeze.server"
 
 export const dynamic = "force-dynamic"
 
@@ -27,7 +28,9 @@ export async function GET(req: Request) {
   }
   // Runs before delivery so that new alert e-mails are sent in the same run.
   const securityAlerts = await detectSecurityAlertsSafely()
+  // Ajastatud pingerea külmutus saab snapshot'i ka ilma avaliku vaate avamiseta.
+  const leaderboardFreezes = await processDueLeaderboardFreezesSafely()
   const queued = await enqueueDueMandateOpenedNotifications()
   const delivery = await deliverPendingNotifications({ limit: 100 })
-  return NextResponse.json({ queued, securityAlerts, ...delivery })
+  return NextResponse.json({ queued, securityAlerts, leaderboardFreezes, ...delivery })
 }

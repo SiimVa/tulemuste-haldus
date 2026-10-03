@@ -257,6 +257,10 @@ model Competition {
   captainRequired        Boolean @default(false)
   teamMemberRoles        String  @default("[]")
 
+  // Statistika töölaua seaded: vidinad, nende nähtavus, lävendid ja klasside
+  // liikumisjärjekord. JSON, vt src/lib/dashboard/config.ts.
+  dashboardConfig String @default("{}")
+
   elements                    ScoringElement[]
   teams                       Team[]
   accessTokens                AccessToken[]
@@ -271,9 +275,40 @@ model Competition {
   judgeAssignments            JudgeElementAssignment[]
   roleInvitations             CompetitionRoleInvitation[]
   notifications               Notification[]
+  map                         CompetitionMap?
+  leaderboardFreeze           LeaderboardFreeze?
 
   @@index([createdById])
   @@index([organizerId])
+}
+
+// Statistika töölaua kaart: üleslaaditud kaardipilt ja lisamärgid (start,
+// finiš jm). Pilt on eraldi tabelis, et võistluse päringud seda kaasa ei loeks.
+model CompetitionMap {
+  competitionId  String      @id
+  competition    Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  image          Bytes?
+  imageType      String?
+  imageWidth     Int?
+  imageHeight    Int?
+  imageName      String?
+  imageUpdatedAt DateTime?
+  // [{ id, label, mapX?, mapY?, mgrs?, latitude?, longitude? }]
+  markers        Json        @default("[]")
+  updatedAt      DateTime    @updatedAt
+}
+
+// Avaliku pingerea külmutamine. Alates freezeAt näevad avalikud vaated
+// snapshot'is olevat seisu; korraldajad näevad jooksvat seisu edasi.
+model LeaderboardFreeze {
+  competitionId String      @id
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  freezeAt      DateTime
+  snapshot      Json?
+  snapshotAt    DateTime?
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 // Kasutaja teavitus on ühtlasi e-kirja outbox. Töövoo muudatus ja teavitus
@@ -478,6 +513,15 @@ model ScoringElement {
   directPointsEntry      Boolean     @default(false)
   revealPointsToAthletes Boolean     @default(false) // kas selle elemendi punktid on võistlejatele nähtavad
 
+  // Asukoht statistika kaardil. mapX/mapY on käsitsi märgitud koht kaardipildil
+  // (0–1 pildi laiusest/kõrgusest); mgrs on sisestatud koordinaat ja
+  // latitude/longitude selle WGS84 vaste.
+  mapX      Float?
+  mapY      Float?
+  mgrs      String?
+  latitude  Float?
+  longitude Float?
+
   fields           FieldDefinition[]
   exceptions       ElementException[]
   calcMethod       CalcMethod?
@@ -533,6 +577,9 @@ model ElementException {
   label     String
   penalty   Float
   order     Int            @default(0)
+  // Statistika jaoks: "NOT_PASSED" | "PASSED_NOT_DONE" | "OTHER".
+  // null = vanem kirje, liik tuletatakse nimest.
+  kind      String?
 }
 
 // ─── Võistkonnad ─────────────────────────────────────────────────────────────

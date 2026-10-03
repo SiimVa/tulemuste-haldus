@@ -9,6 +9,7 @@ import {
   type RangeBucket,
 } from "@/lib/athletePoints"
 import { prisma } from "@/lib/prisma"
+import { getPublicFreeze } from "@/lib/leaderboardFreeze.server"
 
 export type TeamResultTotalBlock = {
   tieBreakReason: string | null
@@ -38,6 +39,8 @@ export type TeamResultData = {
   scoringMode: "PENALTY" | "PLUS"
   totalBlock: TeamResultTotalBlock | null
   cards: ResultCard[]
+  // Pingerea külmutamise ajal on punktid ja kohad peidetud.
+  frozenAt: Date | null
 }
 
 export async function getTeamResultData(
@@ -75,8 +78,10 @@ export async function getTeamResultData(
   if (!team) return null
 
   const competitionId = team.competitionId
-  const pointsMode =
-    (team.competition.athletePointsMode as AthletePointsMode) ?? "HIDDEN"
+  const freeze = await getPublicFreeze(competitionId)
+  const pointsMode: AthletePointsMode = freeze
+    ? "HIDDEN"
+    : (team.competition.athletePointsMode as AthletePointsMode) ?? "HIDDEN"
   const pointsRanges = parseRanges(team.competition.athletePointsRanges)
   const showTotal =
     team.competition.athleteShowTotal && pointsMode !== "HIDDEN"
@@ -273,9 +278,9 @@ export async function getTeamResultData(
           type: element.type,
           isCancelled: element.isCancelled,
           maxValue: element.maxValue ?? defaultMax,
-          revealPointsToAthletes: element.revealPointsToAthletes,
+          revealPointsToAthletes: !freeze && element.revealPointsToAthletes,
           exceptionLabel: null,
-          realScore: scoreByElement.get(element.id) ?? null,
+          realScore: freeze ? null : scoreByElement.get(element.id) ?? null,
           fields: [],
           inputFields: [],
           values: {},
@@ -311,9 +316,9 @@ export async function getTeamResultData(
         type: element.type,
         isCancelled: element.isCancelled,
         maxValue: element.maxValue ?? defaultMax,
-        revealPointsToAthletes: element.revealPointsToAthletes,
+        revealPointsToAthletes: !freeze && element.revealPointsToAthletes,
         exceptionLabel: result.exceptionLabel ?? null,
-        realScore: scoreByElement.get(element.id) ?? null,
+        realScore: freeze ? null : scoreByElement.get(element.id) ?? null,
         fields: result.element.fields.map((field) => ({
           name: field.name,
           meta: field.meta,
@@ -359,5 +364,6 @@ export async function getTeamResultData(
     scoringMode,
     totalBlock,
     cards,
+    frozenAt: freeze?.freezeAt ?? null,
   }
 }

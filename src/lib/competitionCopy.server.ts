@@ -1,4 +1,5 @@
 import { parseTieBreakConfig } from "@/lib/tieBreak"
+import { parseDashboardConfig, remapDashboardElementIds } from "@/lib/dashboard/config"
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import {
@@ -110,6 +111,7 @@ export async function copyScoringElementConfiguration(
                 label: exception.label,
                 penalty: exception.penalty,
                 order: exception.order,
+                kind: exception.kind,
               })),
             }
           : undefined,
@@ -354,7 +356,38 @@ export async function copyCompetitionConfiguration({
         : rule.kind === "PREFERRED_ELEMENT"
           ? { ...rule, elementId: elementIdMap.get(rule.elementId ?? ""), enabled: rule.enabled && elementIdMap.has(rule.elementId ?? "") }
           : rule)
-      await tx.competition.update({ where: { id: created.id }, data: { tieBreakConfig: JSON.stringify(tieBreak) } })
+      const dashboardConfig = remapDashboardElementIds(parseDashboardConfig(source.dashboardConfig), elementIdMap)
+      await tx.competition.update({ where: { id: created.id }, data: { tieBreakConfig: JSON.stringify(tieBreak), dashboardConfig: JSON.stringify(dashboardConfig) } })
+
+      // Kaart ja KP-de asukohad tulevad kaasa koos elementidega.
+      if (includeElements) {
+        const located = await tx.scoringElement.findMany({
+          where: { competitionId: sourceCompetitionId, id: { in: [...elementIdMap.keys()] } },
+          select: { id: true, mapX: true, mapY: true, mgrs: true, latitude: true, longitude: true },
+        })
+        for (const element of located) {
+          if (element.mapX == null && element.mgrs == null) continue
+          await tx.scoringElement.update({
+            where: { id: elementIdMap.get(element.id)! },
+            data: { mapX: element.mapX, mapY: element.mapY, mgrs: element.mgrs, latitude: element.latitude, longitude: element.longitude },
+          })
+        }
+        const map = await tx.competitionMap.findUnique({ where: { competitionId: sourceCompetitionId } })
+        if (map) {
+          await tx.competitionMap.create({
+            data: {
+              competitionId: created.id,
+              image: map.image,
+              imageType: map.imageType,
+              imageWidth: map.imageWidth,
+              imageHeight: map.imageHeight,
+              imageName: map.imageName,
+              imageUpdatedAt: map.imageUpdatedAt,
+              markers: map.markers ?? [],
+            },
+          })
+        }
+      }
 
       return tx.competition.findUniqueOrThrow({
         where: { id: created.id },

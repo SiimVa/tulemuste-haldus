@@ -13,6 +13,8 @@ import { LeaderboardHighlighter } from "@/components/public/LeaderboardHighlight
 import { isAutomaticRegistrationCode } from "@/lib/teamDisplay"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { getPublicFreeze } from "@/lib/leaderboardFreeze.server"
+import { applyFrozenElementStatus, applyFrozenTeamStatus, formatFreezeTime } from "@/lib/leaderboardFreeze"
 
 export const dynamic = "force-dynamic"
 
@@ -30,13 +32,25 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
 
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
 
-  const [teams, scores, penalties, elements, miscEntries] = await Promise.all([
+  const [freeze, liveTeams, liveScores, livePenalties, liveElements, liveMiscEntries] = await Promise.all([
+    getPublicFreeze(id),
     prisma.team.findMany({ where: { competitionId: id } }).then(t => t.sort((a, b) => naturalCompare(a.code, b.code))),
-    prisma.computedScore.findMany({ where: { element: { competitionId: id } } }),
-    prisma.manualPenalty.findMany({ where: { competitionId: id } }),
+    prisma.computedScore.findMany({ where: { element: { competitionId: id } }, select: { teamId: true, elementId: true, penaltyPoints: true } }),
+    prisma.manualPenalty.findMany({ where: { competitionId: id }, select: { teamId: true, points: true } }),
     prisma.scoringElement.findMany({ where: { competitionId: id }, orderBy: { order: "asc" } }),
     prisma.miscEntry.findMany({ where: { element: { competitionId: id, type: { in: ["OTHER", "ABANDONMENT"] } } }, select: { elementId: true, teamId: true, points: true, description: true, element: { select: { type: true } } } }),
   ])
+
+  // Külmutatud pingerida: punktid ja staatused külmutamise hetke seisuga.
+  const teams = freeze ? applyFrozenTeamStatus(liveTeams, freeze.snapshot) : liveTeams
+  const elements = freeze ? applyFrozenElementStatus(liveElements, freeze.snapshot) : liveElements
+  const scores: { teamId: string; elementId: string; penaltyPoints: number }[] = freeze
+    ? freeze.snapshot.scores.map((score) => ({ teamId: score.teamId, elementId: score.elementId, penaltyPoints: score.points }))
+    : liveScores
+  const penalties: { teamId: string; points: number }[] = freeze ? freeze.snapshot.penalties : livePenalties
+  const miscEntries: { elementId: string; teamId: string; points: number; description: string; element: { type: string } }[] = freeze
+    ? freeze.snapshot.miscEntries.map((entry) => ({ elementId: entry.elementId, teamId: entry.teamId, points: entry.points, description: entry.description, element: { type: entry.elementType } }))
+    : liveMiscEntries
 
   // Muu/Katkestamise kirjete selgitused (element + tiim) → popover pingereas
   const miscMap = new Map<string, { description: string; points: number }[]>()
@@ -110,7 +124,7 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
               <Badge tone={isPlusMode ? "info" : "warning"}>
                 {isPlusMode ? "Plusspunktid" : "Karistuspunktid"}
               </Badge>
-              {competition.analysisAccessMode === "PUBLIC" && (
+              {competition.analysisAccessMode === "PUBLIC" && !freeze && (
                 <Link href={`/public/${id}/analysis`} className="text-xs text-blue-600 hover:underline">
                   VK analüüs →
                 </Link>
@@ -119,13 +133,19 @@ export default async function PublicLeaderboardPage({ params, searchParams }: { 
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-gray-400 flex items-center gap-2">
-              <span>Uuendatud: {updatedAt}</span>
+              <span>{freeze ? `Seis: ${formatFreezeTime(freeze.freezeAt)}` : `Uuendatud: ${updatedAt}`}</span>
               <span>·</span>
               <AutoRefresh intervalSeconds={30} />
             </p>
             <LeaderboardHighlighter competitionId={id} teams={teams.map(t => ({ id: t.id, code: t.code, name: t.name }))} />
           </div>
         </div>
+
+        {freeze && (
+          <p role="status" className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Pingerida on külmutatud seisuga {formatFreezeTime(freeze.freezeAt)}. Lõplik pingerida avalikustatakse autasustamisel.
+          </p>
+        )}
 
         <LeaderboardClassFilter classes={classes} />
 

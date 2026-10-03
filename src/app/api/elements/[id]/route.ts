@@ -1,3 +1,4 @@
+import { parseExceptionKind } from "@/lib/exceptionKinds"
 import { recomputeElementScores } from "@/lib/recompute"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
@@ -88,11 +89,12 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
       if (exceptions) {
         await tx.elementException.deleteMany({ where: { elementId: id } })
         await tx.elementException.createMany({
-          data: exceptions.map((e: {label:string;penalty:number;order?:number}, i: number) => ({
+          data: exceptions.map((e: {label:string;penalty:number;order?:number;kind?:unknown}, i: number) => ({
             elementId: id,
             label: e.label,
             penalty: e.penalty,
             order: e.order ?? i,
+            kind: parseExceptionKind(e.kind, String(e.label ?? "")),
           })),
         })
       }
