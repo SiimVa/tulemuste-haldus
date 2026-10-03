@@ -45,6 +45,7 @@
     "src/lib/geo/mgrs.ts",
     "src/lib/geo/georef.ts",
     "src/lib/mapTemplate.ts",
+    "src/lib/registrationFinalize.ts",
     "src/lib/imageSize.ts",
     "src/lib/leaderboardFreeze.ts",
     "tests/**/*.test.ts"

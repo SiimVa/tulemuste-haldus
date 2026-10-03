@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { RegistrationExportButtons } from "@/components/registration/RegistrationExportButtons"
 import { CompetitionNav } from "@/components/competition/CompetitionNav"
+import { FinalizeReview, type FinalizeCheck } from "@/components/registration/FinalizeReview"
 
 type WorkflowStatus =
   | "DRAFT"
@@ -145,6 +146,7 @@ export default function RegistrationsPage({
   const [message, setMessage] = useState("")
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [finalizing, setFinalizing] = useState(false)
+  const [finalizeCheck, setFinalizeCheck] = useState<FinalizeCheck | null>(null)
   const [editingApplicationId, setEditingApplicationId] = useState<
     string | null
   >(null)
@@ -232,6 +234,7 @@ export default function RegistrationsPage({
       setEditingAnswers({})
       setMessage("Osalejate andmed salvestatud")
       await loadTeams()
+      if (finalizeCheck) await loadFinalizeCheck()
     }
     setReviewing(null)
   }
@@ -288,9 +291,11 @@ export default function RegistrationsPage({
       action === "REQUEST_CHANGES"
         ? window.prompt("Kirjelda, mida registreerija peab täiendama:")
         : action === "REJECT"
-          ? window.prompt("Soovi korral lisa tagasilükkamise põhjus:") ?? ""
+          ? window.prompt("Soovi korral lisa tagasilükkamise põhjus:")
           : ""
-    if (action === "REQUEST_CHANGES" && !note?.trim()) return
+    // Katkestatud küsimus ei tee otsust.
+    if (note === null) return
+    if (action === "REQUEST_CHANGES" && !note.trim()) return
     setReviewing(`application-${applicationId}`)
     setError("")
     const response = await fetch(
@@ -306,6 +311,7 @@ export default function RegistrationsPage({
       setError(data.error ?? "Otsuse salvestamine ebaõnnestus")
     } else {
       await loadTeams()
+      if (finalizeCheck) await loadFinalizeCheck()
     }
     setReviewing(null)
   }
@@ -317,27 +323,58 @@ export default function RegistrationsPage({
     )
   }
 
-  async function finalizeRegistrations() {
-    if (
-      !window.confirm(
-        "Kinnitan osalejate nimekirja. Kinnitatud avaldustest luuakse võistkonnad ja registreerimine lukustatakse."
-      )
-    ) {
-      return
-    }
+  // Eelkontroll näitab kõik kinnitamise takistused ja e-posti kordused korraga.
+  async function loadFinalizeCheck() {
     setFinalizing(true)
     setError("")
     const response = await fetch(
       `/api/competitions/${competitionId}/registration-applications/finalize`,
-      { method: "POST" }
+      { cache: "no-store" }
+    )
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) setError(data.error ?? "Nimekirja kontroll ebaõnnestus")
+    else setFinalizeCheck(data as FinalizeCheck)
+    setFinalizing(false)
+  }
+
+  async function finalizeRegistrations(acceptedIssueKeys: string[]) {
+    setFinalizing(true)
+    setError("")
+    setMessage("")
+    const response = await fetch(
+      `/api/competitions/${competitionId}/registration-applications/finalize`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptedIssueKeys }),
+      }
     )
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      setError(data.error ?? "Nimekirja kinnitamine ebaõnnestus")
+      // Vahepeal muutunud avaldused: näita uut seisu, mitte vana kinnitust.
+      if (Array.isArray(data.issues) || Array.isArray(data.blocking)) {
+        setFinalizeCheck((current) => ({
+          blocking: data.blocking ?? [],
+          issues: data.issues ?? [],
+          applicationCount: current?.applicationCount ?? 0,
+        }))
+        setError("Avaldused muutusid vahepeal. Vaata ülevaatus uuesti üle.")
+      } else {
+        setError(data.error ?? "Nimekirja kinnitamine ebaõnnestus")
+      }
     } else {
+      setFinalizeCheck(null)
+      setMessage(`Osalejate nimekiri kinnitatud. Loodi ${data.createdTeams} võistkonda.`)
       await loadTeams()
     }
     setFinalizing(false)
+  }
+
+  function editMembersFromReview(applicationId: string) {
+    const application = applications.find((item) => item.id === applicationId)
+    if (!application) return
+    startEditingMembers(application)
+    requestAnimationFrame(() => document.getElementById(`application-${applicationId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }))
   }
 
   if (loading) return <p className="text-gray-400 py-10">Laadin...</p>
@@ -414,11 +451,11 @@ export default function RegistrationsPage({
               !overview.registrationFinalizedAt && (
                 <Button size="sm" className="mt-4 py-2"
                   type="button"
-                  onClick={finalizeRegistrations}
+                  onClick={loadFinalizeCheck}
                   disabled={finalizing}
                 >
-                  {finalizing
-                    ? "Kinnitan..."
+                  {finalizing && !finalizeCheck
+                    ? "Kontrollin..."
                     : "Kinnita osalejate nimekiri"}</Button>
               )}
           </section>
@@ -435,6 +472,21 @@ export default function RegistrationsPage({
             </p>
           </section>
         </div>
+      )}
+
+      {finalizeCheck && !overview?.registrationFinalizedAt && (
+        <FinalizeReview
+          check={finalizeCheck}
+          busy={finalizing || Boolean(reviewing)}
+          canEdit={(applicationId) => {
+            const application = applications.find((item) => item.id === applicationId)
+            return Boolean(application && canEditApplicationMembers(application))
+          }}
+          onEditMembers={editMembersFromReview}
+          onReject={(applicationId) => void decideApplication(applicationId, "REJECT")}
+          onConfirm={(keys) => void finalizeRegistrations(keys)}
+          onCancel={() => setFinalizeCheck(null)}
+        />
       )}
 
       <section className="mb-6">
@@ -472,7 +524,8 @@ export default function RegistrationsPage({
           {applications.map((application, index) => (
             <article
               key={application.id}
-              className={cn(cardClass, "p-4 flex flex-wrap items-center justify-between gap-4")}
+              id={`application-${application.id}`}
+              className={cn(cardClass, "p-4 flex flex-wrap items-center justify-between gap-4 scroll-mt-4")}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">

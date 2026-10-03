@@ -114,6 +114,25 @@ ka tavapärane kohtade jaotus. Pärast nimekirja kinnitamist luuakse kohe kinnit
 registreerimisega võistkond, mille mandaat on mustand. Hiljem lisatud võistkonnale
 saab esindaja määrata **Juurdepääsu** lehel.
 
+### Osalejate nimekirja kinnitamine
+
+**Kinnita osalejate nimekiri** kontrollib enne kõiki kinnitatud avaldusi ja
+näitab kõik leitud probleemid korraga:
+
+- mis kinnitamist takistab (registreerimine on avatud, ootel avaldused koos
+  võistkondade nimedega);
+- liikmete e-posti kordused: sama e-post mitmel liikmel ühes avalduses, teises
+  varem esitatud avalduses või olemasoleva võistkonna liikmel.
+
+Liikme e-post seob ta kasutajakontoga, seega võib üks e-post olla võistlusel
+ainult ühel liikmel. Iga probleemse avalduse juures saab avada **Muuda
+osalejaid** või avalduse **tagasi lükata**; ülevaatus uueneb kohe. **Kinnita
+nii** kinnitab nimekirja nii, et e-post jääb esimesele liikmele (olemasoleva
+võistkonna liikmele, varem esitatud avaldusele, avalduses esimesena kirjas
+olevale liikmele). Teisi liikmeid kontoga ei seota; nende e-post jääb avalduse
+andmetesse ja eksporti. Kui avaldused vahepeal muutuvad, näidatakse uut
+ülevaatust ega kinnitata vana nõusoleku põhjal.
+
 Pärast nimekirja kinnitamist muudab nupp võistkonna praeguseid andmeid ja
 mandaadi koosseisu; registreerimisavalduse varasemad vastused säilivad
 registreerimise aruande jaoks. Korraldaja muudatused salvestatakse auditisse.
