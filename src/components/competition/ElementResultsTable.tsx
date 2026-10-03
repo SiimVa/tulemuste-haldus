@@ -6,6 +6,7 @@ import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { useState } from "react"
 import { naturalCompare } from "@/lib/utils"
 import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
+import { exceptionOptionLabel, isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; meta?: string | null }
 
@@ -33,7 +34,7 @@ function formatComputedValue(f: Field, value: unknown): string {
   return Number.isInteger(num) ? String(num) : num.toFixed(2)
 }
 
-type Exception = { id: string; label: string; penalty: number }
+type Exception = { id: string; label: string; penalty: number; kind?: string | null }
 type ResultRow = { id: string; teamId: string; teamName: string; teamCode: string; values: string; allValues?: Record<string, unknown>; exceptionLabel?: string | null; exceptionPenalty?: number | null; updatedAt: Date }
 type Score = { teamId: string; penaltyPoints: number }
 type Team = { id: string; name: string; code: string; isHorsDeCompetition?: boolean; hcFromElementOrder?: number | null; dnfFromElementOrder?: number | null }
@@ -53,6 +54,9 @@ interface Props {
     scores: Score[]
     directPointsEntry?: boolean
     scoringMode?: "PENALTY" | "PLUS"
+    // Ebaõnnestumise valikus näidatakse karistuse asemel viimast kohta.
+    calcType?: string | null
+    hasSections?: boolean
   }
   teams: Team[]
 }
@@ -88,11 +92,21 @@ export function ElementResultsTable({ element, teams }: Props) {
     try { return JSON.parse(valuesJson) } catch { return {} }
   }
 
+  // Ebaõnnestunud tulemusel on väljad nagu sooritusel, lisaks märge.
+  const keepsValues = (label: string | null | undefined) => resultKeepsValues({ exceptionLabel: label }, element.exceptions)
+  const optionLabel = (ex: Exception) => exceptionOptionLabel(ex, element)
+  // Viigi aeg ainult erandita tulemustelt: ebaõnnestunud jagavad viimast kohta.
+  const tieValues = (teamId: string) => {
+    const result = getResult(teamId)
+    return result && !result.exceptionLabel ? parseValues(result.values) : {}
+  }
+
   // Kas bulk-vormis on mõni väljaväärtus sisestatud (nt vaikeväärtus "0")
   const hasBulkValues = Object.values(bulkValues).some(v => (v ?? "").trim() !== "")
 
   // Lisab kõigile sisestamata võistkondadele korraga sama tulemuse VÕI erandi.
-  // Erand (kui valitud) võidab — väljaväärtused jäetakse siis kõrvale (nagu ühe rea vormis).
+  // Erand (kui valitud) võidab — väljaväärtused jäetakse siis kõrvale (nagu ühe rea vormis),
+  // välja arvatud ebaõnnestumisel, kus väärtused salvestatakse koos märkega.
   async function bulkApply() {
     const missing = teams.filter(t => !teamIsDnf(t) && !results.find(r => r.teamId === t.id))
     if (missing.length === 0) return
@@ -106,7 +120,7 @@ export function ElementResultsTable({ element, teams }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             teamId: team.id,
-            values: useException ? {} : bulkValues,
+            values: keepsValues(bulkException) ? bulkValues : {},
             exceptionLabel: useException ? bulkException : null,
           }),
         })
@@ -138,7 +152,7 @@ export function ElementResultsTable({ element, teams }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teamId,
-          values: exceptionLabel ? {} : formValues,
+          values: keepsValues(exceptionLabel) ? formValues : {},
           exceptionLabel: exceptionLabel || null,
         }),
       })
@@ -165,7 +179,7 @@ export function ElementResultsTable({ element, teams }: Props) {
       if (sa === null && sb === null) return naturalCompare(a.code, b.code)
       if (sa === null) return 1
       if (sb === null) return -1
-      return (isPlus ? sb - sa : sa - sb) || compareElementTimes(element.fields, parseValues(getResult(a.id)?.values ?? "{}"), parseValues(getResult(b.id)?.values ?? "{}"))
+      return (isPlus ? sb - sa : sa - sb) || compareElementTimes(element.fields, tieValues(a.id), tieValues(b.id))
     })
   }
 
@@ -175,7 +189,7 @@ export function ElementResultsTable({ element, teams }: Props) {
   let lastRank = 1
   inCompTeams.forEach((team, index) => {
     const previous = inCompTeams[index - 1]
-    if (previous && (getScore(team.id) !== getScore(previous.id) || compareElementTimes(element.fields, parseValues(getResult(team.id)?.values ?? "{}"), parseValues(getResult(previous.id)?.values ?? "{}")) !== 0)) lastRank = index + 1
+    if (previous && (getScore(team.id) !== getScore(previous.id) || compareElementTimes(element.fields, tieValues(team.id), tieValues(previous.id)) !== 0)) lastRank = index + 1
     rankByTeam.set(team.id, lastRank)
   })
   const horsCompTeams = sortByScore(teams.filter(t => teamIsHC(t) && !teamIsDnf(t)))
@@ -184,9 +198,11 @@ export function ElementResultsTable({ element, teams }: Props) {
   const missingTeams = teams.filter(t => !teamIsDnf(t) && !results.find(r => r.teamId === t.id))
   const bulkCls = "px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-300"
 
-  // Üks bulk-vormi väljasisestus (sama loogika nagu rea muutmisel); keelatud kui erand valitud
+  // Üks bulk-vormi väljasisestus (sama loogika nagu rea muutmisel); keelatud kui valitud
+  // erand jätab väärtused kõrvale
+  const bulkDisabled = !keepsValues(bulkException)
   function renderBulkInput(f: Field) {
-    const disabled = !!bulkException
+    const disabled = bulkDisabled
     if (f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION") return <PointFieldInput field={f} value={bulkValues[f.name] ?? ""} onChange={v => setBulkValues(p => ({ ...p, [f.name]: v }))} disabled={disabled} className={bulkCls} />
     if (f.type === "TIME_RANGE") {
       return (
@@ -215,6 +231,7 @@ export function ElementResultsTable({ element, teams }: Props) {
     const result = getResult(team.id)
     const score = getScore(team.id)
     const values = result ? parseValues(result.values) : {}
+    const showValues = keepsValues(result?.exceptionLabel)
     const isEditing = editingTeamId === team.id
     const isDnf = teamIsDnf(team)
     const isHC = teamIsHC(team) && !isDnf
@@ -246,7 +263,7 @@ export function ElementResultsTable({ element, teams }: Props) {
           <>
             {isDirectEntry ? (
               <td className="px-2 py-1.5" colSpan={inputFields.length + computedFields.length}>
-                {exceptionLabel ? (
+                {!keepsValues(exceptionLabel) ? (
                   <span className="text-gray-300 text-xs">—</span>
                 ) : (
                   <input
@@ -268,7 +285,7 @@ export function ElementResultsTable({ element, teams }: Props) {
               <>
                 {inputFields.map(f => (
                   <td key={f.id} className="px-2 py-1.5">
-                    {exceptionLabel ? (
+                    {!keepsValues(exceptionLabel) ? (
                       <span className="text-gray-300 text-xs">—</span>
                     ) : f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION" ? (
                       <PointFieldInput field={f} value={formValues[f.name] ?? ""} onChange={v => setFormValues({ ...formValues, [f.name]: v })} className="w-full px-2 py-1 border rounded text-xs" />
@@ -322,7 +339,7 @@ export function ElementResultsTable({ element, teams }: Props) {
               >
                 <option value="">– Sooritati –</option>
                 {element.exceptions.map(ex => (
-                  <option key={ex.id} value={ex.label}>{ex.label} ({ex.penalty}p)</option>
+                  <option key={ex.id} value={ex.label}>{optionLabel(ex)}</option>
                 ))}
               </select>
             </td>
@@ -344,27 +361,27 @@ export function ElementResultsTable({ element, teams }: Props) {
           <>
             {isDirectEntry ? (
               <td className="px-4 py-2.5 text-gray-600 text-xs font-mono" colSpan={inputFields.length + computedFields.length}>
-                {result?.exceptionLabel ? "—" : (resultField ? (values[resultField.name] ?? <span className="text-gray-300">–</span>) : <span className="text-gray-300">–</span>)}
+                {!showValues ? "—" : (resultField ? (values[resultField.name] ?? <span className="text-gray-300">–</span>) : <span className="text-gray-300">–</span>)}
               </td>
             ) : (
               <>
                 {inputFields.map(f => (
                   <td key={f.id} className="px-4 py-2.5 text-gray-600 text-xs font-mono">
-                    {result?.exceptionLabel ? "—" : f.type === "TIME_RANGE"
+                    {!showValues ? "—" : f.type === "TIME_RANGE"
                       ? formatTimeRange(values, result?.allValues, f.name)
                       : pointFieldLabel(f, values[f.name])}
                   </td>
                 ))}
                 {computedFields.map(f => (
                   <td key={f.id} className="px-4 py-2.5 text-blue-600 text-xs font-mono">
-                    {result?.exceptionLabel ? "—" : formatComputedValue(f, result?.allValues?.[f.name])}
+                    {!showValues ? "—" : formatComputedValue(f, result?.allValues?.[f.name])}
                   </td>
                 ))}
               </>
             )}
             <td className="px-4 py-2.5 text-xs">
               {result?.exceptionLabel ? (
-                <span className="text-red-600 font-medium">{result.exceptionLabel}</span>
+                <span className={`font-medium ${isFailedResult(result, element.exceptions) ? "text-amber-700" : "text-red-600"}`}>{result.exceptionLabel}</span>
               ) : (
                 <span className="text-gray-300">–</span>
               )}
@@ -401,12 +418,12 @@ export function ElementResultsTable({ element, teams }: Props) {
         <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-500 shrink-0">Lisa kõigile sisestamata ({missingTeams.length}):</span>
 
-          {/* Väljade vaikeväärtused (nt 0) — keelatud kui erand on valitud */}
+          {/* Väljade vaikeväärtused (nt 0) — keelatud, kui valitud erand jätab väärtused kõrvale */}
           {isDirectEntry ? (
             <span className="inline-flex items-center gap-1">
               <span className="text-xs text-gray-400">Punktid</span>
               <input type="number" step="0.5" inputMode="decimal" onWheel={e => e.currentTarget.blur()}
-                value={resultField ? (bulkValues[resultField.name] ?? "") : ""} disabled={!!bulkException}
+                value={resultField ? (bulkValues[resultField.name] ?? "") : ""} disabled={bulkDisabled}
                 onChange={e => resultField && setBulkValues(p => ({ ...p, [resultField.name]: e.target.value }))}
                 className={`w-24 ${bulkCls}`} />
             </span>
@@ -428,7 +445,7 @@ export function ElementResultsTable({ element, teams }: Props) {
             >
               <option value="">– Erand (valikuline) –</option>
               {element.exceptions.map(ex => (
-                <option key={ex.id} value={ex.label}>{ex.label} ({ex.penalty}p)</option>
+                <option key={ex.id} value={ex.label}>{optionLabel(ex)}</option>
               ))}
             </select>
           )}

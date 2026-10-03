@@ -233,14 +233,16 @@ export function ResultsImportModal({ elementId, competitionId, elementName, onCl
                         <td className="px-3 py-1.5 font-mono text-gray-700">{row.teamCode}</td>
                         <td className="px-3 py-1.5 text-gray-700">{row.teamName}</td>
                         <td className="px-3 py-1.5 text-gray-500">
-                          {row.exceptionLabel ? (
+                          {row.exceptionLabel && (
                             <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-xs">
                               {row.exceptionLabel}
                             </span>
-                          ) : row.message ? (
+                          )}
+                          {row.message ? (
                             row.message
-                          ) : row.values ? (
-                            <span className="text-gray-400">
+                          ) : row.values && Object.values(row.values).some((v) => v !== "") ? (
+                            // Ebaõnnestunud real on väärtused koos märkega.
+                            <span className={`text-gray-400 ${row.exceptionLabel ? "ml-2" : ""}`}>
                               {Object.entries(row.values)
                                 .filter(([, v]) => v !== "")
                                 .map(([k, v]) => `${k}: ${v}`)

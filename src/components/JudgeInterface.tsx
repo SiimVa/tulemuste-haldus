@@ -8,10 +8,11 @@ import { PointFieldInput } from "@/components/PointFieldInput"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { naturalCompare } from "@/lib/utils"
 import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
+import { exceptionOptionLabel, isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; validation?: string | null; meta?: string | null }
-type Exception = { id: string; label: string; penalty: number }
-type Element = { id: string; name: string; code: string; order: number; fields: Field[]; exceptions: Exception[] }
+type Exception = { id: string; label: string; penalty: number; kind?: string | null }
+type Element = { id: string; name: string; code: string; order: number; fields: Field[]; exceptions: Exception[]; calcType?: string | null; hasSections?: boolean }
 type Team = { id: string; name: string; code: string; class?: string | null; dnfFromElementOrder: number | null }
 type ExistingResult = { elementId: string; teamId: string; values: string; exceptionLabel?: string | null; updatedAt: Date }
 
@@ -61,6 +62,9 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
 
   const selectedElement = elements.find(e => e.id === selectedElementId)
   const inputFields = selectedElement?.fields.filter(f => f.type !== "COMPUTED") ?? []
+  // Ebaõnnestunud tulemusel sisestatakse väljad nagu sooritusel, lisaks märge.
+  const keepsValues = resultKeepsValues({ exceptionLabel }, selectedElement?.exceptions ?? [])
+  const failedSelected = Boolean(exceptionLabel) && keepsValues
   const hasTimeRange = (selectedElement?.fields ?? []).some(f => f.type === "TIME_RANGE")
 
   function timeToSec(v: string): number {
@@ -129,10 +133,11 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
     if (!selectedTeamId || !selectedElementId) return
     setError("")
 
-    // Kliendipoolne valideerimine
-    if (!exceptionLabel) {
+    // Kliendipoolne valideerimine; ebaõnnestunul võib mõni väärtus puududa
+    if (keepsValues) {
       for (const field of inputFields) {
-        const validation = parseValidation(field.validation)
+        const parsedValidation = parseValidation(field.validation)
+        const validation = failedSelected ? { ...parsedValidation, required: false } : parsedValidation
         if (field.type === "TIME_RANGE") {
           if (validation.required) {
             const hasStart = (formValues[field.name + "_start"] ?? "").trim() !== ""
@@ -161,7 +166,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
       headers,
       body: JSON.stringify({
         teamId: selectedTeamId,
-        values: exceptionLabel ? {} : formValues,
+        values: keepsValues ? formValues : {},
         exceptionLabel: exceptionLabel || null,
       }),
     })
@@ -179,7 +184,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
         const newResult: ExistingResult = {
           elementId: selectedElementId,
           teamId: selectedTeamId,
-          values: exceptionLabel ? "{}" : JSON.stringify(formValues),
+          values: keepsValues ? JSON.stringify(formValues) : "{}",
           exceptionLabel: exceptionLabel || null,
           updatedAt: new Date(),
         }
@@ -330,7 +335,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                     {withdrawn ? (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">KAT · tulemust ei oodata</span>
                     ) : existing ? (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${existing.exceptionLabel ? "bg-red-100 text-red-600" : "bg-green-100 text-green-700"}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${!existing.exceptionLabel ? "bg-green-100 text-green-700" : isFailedResult(existing, selectedElement.exceptions) ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-600"}`}>
                         {existing.exceptionLabel ?? "✓ Sisestatud"}
                       </span>
                     ) : (
@@ -364,13 +369,14 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">— Sooritati normaalselt —</option>
                   {selectedElement.exceptions.map(ex => (
-                    <option key={ex.id} value={ex.label}>{ex.label} ({ex.penalty}p karistust)</option>
+                    <option key={ex.id} value={ex.label}>{exceptionOptionLabel(ex, selectedElement, "p karistust")}</option>
                   ))}
                 </select>
+                {failedSelected && <p className="mt-1 text-xs text-amber-800">Sisesta tulemus nagu tavaliselt. See salvestatakse koos märkega „{exceptionLabel}”.</p>}
               </div>
 
-              {/* Sisendväljad (ainult kui ei ole erandit) */}
-              {!exceptionLabel && inputFields.map(field => (
+              {/* Sisendväljad (erandita või ebaõnnestunud tulemusel) */}
+              {keepsValues && inputFields.map(field => (
                 <div key={field.id}>
                   <label className="text-sm font-medium text-gray-700 mb-1 block">
                     {field.label}

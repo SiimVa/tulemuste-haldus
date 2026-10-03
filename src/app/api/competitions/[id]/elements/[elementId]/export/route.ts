@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { computeFields } from "@/lib/calculators"
+import { resultKeepsValues } from "@/lib/exceptionKinds"
 import { canAccessCompetition, elementBelongsToCompetition } from "@/lib/competitionAccess"
 import * as XLSX from "xlsx"
 
@@ -29,6 +30,7 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
     where: { id: elementId },
     include: {
       fields: { orderBy: { order: "asc" } },
+      exceptions: { select: { label: true, kind: true } },
       scores: true,
       results: { include: { team: true } },
       competition: { select: { name: true, scoringMode: true } },
@@ -45,10 +47,10 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
     const result = element.results.find((r) => r.teamId === team.id)
     let fieldValues: Record<string, unknown> = {}
     let rawValues: Record<string, unknown> = {}
-    let exceptionLabel = ""
-    if (result?.exceptionLabel) {
-      exceptionLabel = result.exceptionLabel
-    } else if (result) {
+    const exceptionLabel = result?.exceptionLabel ?? ""
+    // Ebaõnnestunud tulemusel on väärtused koos märkega.
+    const showValues = !result || resultKeepsValues(result, element.exceptions)
+    if (result && showValues) {
       try { fieldValues = JSON.parse(result.values || "{}") } catch {}
       rawValues = { ...fieldValues }
       fieldValues = computeFields(fieldValues as Record<string, string | number>, element.fields)
@@ -62,12 +64,12 @@ async function handleGET(req: Request, { params }: { params: Promise<{ id: strin
       ...inputFields.flatMap((f) => {
         if (f.type === "ESTIMATION") {
           const config = readEstimation(f.meta)
-          if (exceptionLabel) return config.targets.map(() => "").concat(["", "", ""])
+          if (!showValues) return config.targets.map(() => "").concat(["", "", ""])
           const guesses = parseEstimates(rawValues[f.name])
           const summary = calculateEstimation(config, rawValues[f.name])
           return [...config.targets.map(t => guesses[t.id] ?? ""), ...(summary.complete ? [summary.points, summary.error, summary.errorPercent] : ["", "", ""])]
         }
-        return [exceptionLabel ? "" : f.type === "TIME_POINTS" ? rawValues[f.name] ?? "" : f.type === "POINTS_SELECT" ? pointFieldLabel(f, rawValues[f.name]) : fieldValues[f.name] ?? ""]
+        return [!showValues ? "" : f.type === "TIME_POINTS" ? rawValues[f.name] ?? "" : f.type === "POINTS_SELECT" ? pointFieldLabel(f, rawValues[f.name]) : fieldValues[f.name] ?? ""]
       }),
       exceptionLabel,
       score !== undefined ? score : "",

@@ -335,3 +335,14 @@ test("KP tabel loeb ebaõnnestumised eraldi ja need käisid KP-s", () => {
   ])
   assert.deepEqual([row.performed, row.failed, row.notPassed, row.visited], [1, 1, 1, 2])
 })
+
+test("ajakulu KP-s arvestab ebaõnnestunute aega, teiste erandite väärtusi mitte", () => {
+  const timed = element("t", 0, { exceptions: [{ label: "Ebaõnnestus", kind: "FAILED" }, { label: "Muu", kind: "OTHER" }] })
+  const [row] = timeSpentRows([timed], [
+    result("t", "a", 1, { values: { aeg: "10:00" } }),
+    result("t", "b", 1, { exceptionLabel: "Ebaõnnestus", values: { aeg: "20:00" } }),
+    result("t", "c", 1, { exceptionLabel: "Muu", values: { aeg: "30:00" } }),
+  ], [team("a"), team("b"), team("c")])
+  assert.equal(row.n, 2)
+  assert.equal(row.slowest.team.id, "b")
+})

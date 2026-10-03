@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { parseValidation, validateClockValue, validateFieldValue } from "@/lib/fieldValidation"
 import { recomputeElementScores } from "@/lib/recompute"
+import { resultKeepsValues } from "@/lib/exceptionKinds"
 import {
   canEnterElementResults,
   teamBelongsToCompetition,
@@ -98,19 +99,35 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Vigane erand" }, { status: 400 })
   }
 
-  // Valideeri sisendväljad (ainult kui ei ole erandit)
-  if (!exceptionLabel && values) {
-    const element = await prisma.scoringElement.findUnique({
-      where: { id: elementId },
-      include: { fields: true, sections: { include: { fields: true } } },
-    })
+  const element = await prisma.scoringElement.findUnique({
+    where: { id: elementId },
+    include: { fields: true, sections: { include: { fields: true } }, exceptions: true },
+  })
+
+  // Leia erandi karistus
+  let exceptionPenalty: number | null = null
+  if (exceptionLabel) {
+    const exc = element?.exceptions.find((item) => item.label === exceptionLabel)
+    if (!exc) return NextResponse.json({ error: "Tundmatu erand" }, { status: 422 })
+    exceptionPenalty = exc.penalty
+  }
+  // Ebaõnnestunud tulemusel on sooritus olemas: väljad valideeritakse ja
+  // salvestatakse. Teiste erandite korral väärtusi ei hoita.
+  const keepsValues = resultKeepsValues({ exceptionLabel }, element?.exceptions ?? [])
+  const storedValues = keepsValues ? (values ?? {}) : {}
+
+  // Valideeri sisendväljad. Ebaõnnestunul võib mõni väärtus puududa, seega
+  // kohustuslikke välju ei nõuta.
+  if (keepsValues && values) {
+    const failed = Boolean(exceptionLabel)
     const allFields = [
       ...(element?.fields ?? []),
       ...(element?.sections.flatMap(s => s.fields) ?? []),
     ]
     for (const field of allFields) {
       if (field.type === "COMPUTED") continue
-      const validation = parseValidation(field.validation)
+      const parsedValidation = parseValidation(field.validation)
+      const validation = failed ? { ...parsedValidation, required: false } : parsedValidation
       if (field.type === "TIME_RANGE") {
         const startError = validateClockValue(
           values[field.name + "_start"],
@@ -138,16 +155,6 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     }
   }
 
-  // Leia erandi karistus
-  let exceptionPenalty: number | null = null
-  if (exceptionLabel) {
-    const exc = await prisma.elementException.findFirst({
-      where: { elementId, label: exceptionLabel },
-    })
-    if (!exc) return NextResponse.json({ error: "Tundmatu erand" }, { status: 422 })
-    exceptionPenalty = exc.penalty
-  }
-
   // Kui erandit pole ja kõik lahtrid on tühjad → loe "sisestamata": kustuta kirje ja skoor
   const hasAnyValue = values && Object.values(values).some((v) => String(v ?? "").trim() !== "")
   if (!exceptionLabel && !hasAnyValue) {
@@ -162,14 +169,14 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     create: {
       elementId,
       teamId,
-      values: JSON.stringify(values ?? {}),
+      values: JSON.stringify(storedValues),
       exceptionLabel: exceptionLabel ?? null,
       exceptionPenalty,
       enteredByUserId,
       enteredByTokenId,
     },
     update: {
-      values: JSON.stringify(values ?? {}),
+      values: JSON.stringify(storedValues),
       exceptionLabel: exceptionLabel ?? null,
       exceptionPenalty,
       enteredByUserId,

@@ -66,6 +66,8 @@ export type TeamElementStat = {
   outOf: number
   classOutOf: number
   exceptionLabel: string | null
+  // Ebaõnnestus: tulemus on olemas ja seda näidatakse koos märkega.
+  failed?: boolean
   rawValues: Record<string, unknown>
   rawResultValue: string | number | null
   miscEntries?: { description: string; points: number }[]
@@ -213,7 +215,9 @@ export default function AnalysisView({
           if (sa === null && sb === null) return a.team.code.localeCompare(b.team.code)
           if (sa === null) return 1
           if (sb === null) return -1
-          return (isPlusMode ? sb - sa : sa - sb) || compareElementTimes(selectedElement?.fields ?? [], a.stat?.rawValues ?? {}, b.stat?.rawValues ?? {})
+          // Ebaõnnestunud jagavad viimast kohta, nende aeg viiki ei lahenda.
+          const tieValues = (stat: typeof a.stat) => (stat?.exceptionLabel ? {} : stat?.rawValues ?? {})
+          return (isPlusMode ? sb - sa : sa - sb) || compareElementTimes(selectedElement?.fields ?? [], tieValues(a.stat), tieValues(b.stat))
         })
     : []
 
@@ -447,7 +451,7 @@ export default function AnalysisView({
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right font-mono text-xs">
-                                {stat?.exceptionLabel ? (
+                                {stat?.exceptionLabel && !stat.failed ? (
                                   <span className="text-red-500">{stat.exceptionLabel}</span>
                                 ) : stat?.miscEntries && stat.miscEntries.length > 0 ? (
                                   <div className="space-y-0.5">
@@ -459,7 +463,10 @@ export default function AnalysisView({
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-gray-700">{formatRawValue(stat?.rawResultValue ?? null, el.fields.find(f => f.isResultField)?.type ?? null)}</span>
+                                  <>
+                                    <span className="text-gray-700">{formatRawValue(stat?.rawResultValue ?? null, el.fields.find(f => f.isResultField)?.type ?? null)}</span>
+                                    {stat?.failed && <span className="ml-1.5 font-sans text-amber-700">{stat.exceptionLabel}</span>}
+                                  </>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right font-mono text-xs">
@@ -661,7 +668,7 @@ export default function AnalysisView({
                               </td>
                               {kpFields.map((f) => (
                                 <td key={f.name} title={f.type === "TIME_POINTS" && readPointMeta(f.meta).timeTieBreak ? "Võrdsete ülesandepunktide korral on lühem aeg parem" : undefined} className={`px-4 py-3 text-right font-mono text-xs ${f.isResultField ? "font-semibold text-gray-800" : f.type === "COMPUTED" ? "text-indigo-600" : "text-gray-500"}`}>
-                                  {stat?.exceptionLabel ? (
+                                  {stat?.exceptionLabel && !stat.failed ? (
                                     <span className="text-gray-300">—</span>
                                   ) : (
                                     stat?.fieldDisplay?.[f.name] ?? formatRawValue(
@@ -673,7 +680,7 @@ export default function AnalysisView({
                               ))}
                               <td className="px-4 py-3 text-xs">
                                 {stat?.exceptionLabel ? (
-                                  <span className="text-red-500 font-medium">{stat.exceptionLabel}</span>
+                                  <span className={`font-medium ${stat.failed ? "text-amber-700" : "text-red-500"}`}>{stat.exceptionLabel}</span>
                                 ) : stat?.miscEntries && stat.miscEntries.length > 0 ? (
                                   <div className="space-y-0.5">
                                     {stat.miscEntries.map((m, mi) => (

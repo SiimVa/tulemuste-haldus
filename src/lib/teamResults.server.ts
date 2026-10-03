@@ -9,6 +9,7 @@ import {
   type RangeBucket,
 } from "@/lib/athletePoints"
 import { prisma } from "@/lib/prisma"
+import { isFailedResult } from "@/lib/exceptionKinds"
 import { getPublicFreeze } from "@/lib/leaderboardFreeze.server"
 
 export type TeamResultTotalBlock = {
@@ -101,6 +102,7 @@ export async function getTeamResultData(
             order: true,
             type: true,
             fields: { orderBy: { order: "asc" } },
+            exceptions: { select: { label: true, kind: true } },
             calcMethod: {
               select: { type: true, params: true, customFormula: true },
             },
@@ -280,6 +282,7 @@ export async function getTeamResultData(
           maxValue: element.maxValue ?? defaultMax,
           revealPointsToAthletes: !freeze && element.revealPointsToAthletes,
           exceptionLabel: null,
+          failed: false,
           realScore: freeze ? null : scoreByElement.get(element.id) ?? null,
           fields: [],
           inputFields: [],
@@ -318,6 +321,7 @@ export async function getTeamResultData(
         maxValue: element.maxValue ?? defaultMax,
         revealPointsToAthletes: !freeze && element.revealPointsToAthletes,
         exceptionLabel: result.exceptionLabel ?? null,
+        failed: Boolean(result.exceptionLabel) && isFailedResult(result, result.element.exceptions),
         realScore: freeze ? null : scoreByElement.get(element.id) ?? null,
         fields: result.element.fields.map((field) => ({
           name: field.name,

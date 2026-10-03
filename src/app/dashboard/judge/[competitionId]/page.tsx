@@ -54,6 +54,8 @@ export default async function AccountJudgePage({
     include: {
       fields: { orderBy: { order: "asc" } },
       exceptions: { orderBy: { order: "asc" } },
+      calcMethod: { select: { type: true } },
+      _count: { select: { sections: true } },
     },
   })
 
@@ -110,6 +112,8 @@ export default async function AccountJudgePage({
             order: element.order,
             fields: element.fields,
             exceptions: element.exceptions,
+            calcType: element.calcMethod?.type ?? null,
+            hasSections: element._count.sections > 0,
           }))}
           teams={teams.map((team) => ({
             id: team.id,

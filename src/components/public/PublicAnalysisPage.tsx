@@ -5,6 +5,7 @@ import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
 import AnalysisView, { AnalysisTeam, AnalysisElement, TeamElementStat, ElementStat } from "@/components/public/AnalysisView"
 import { parseTimeToSeconds, computeFields } from "@/lib/calculators"
+import { isFailedResult } from "@/lib/exceptionKinds"
 import { isAnalysisLinkToken } from "@/lib/analysisAccess"
 import { hashAnalysisLinkToken } from "@/lib/analysisAccess.server"
 import { auth } from "@/lib/auth"
@@ -122,7 +123,7 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
     prisma.scoringElement.findMany({
       where: { competitionId: id },
       orderBy: { order: "asc" },
-      include: { fields: { orderBy: { order: "asc" } }, calcMethod: true, sections: { include: { calcMethod: true } } },
+      include: { fields: { orderBy: { order: "asc" } }, calcMethod: true, sections: { include: { calcMethod: true } }, exceptions: { select: { label: true, kind: true } } },
     }),
     prisma.computedScore.findMany({ where: { element: { competitionId: id } } }),
     prisma.manualPenalty.findMany({ where: { competitionId: id } }),
@@ -308,17 +309,20 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
       const resultEntry = results.find((r) => r.teamId === team.id && r.elementId === el.id)
       let rawValues: Record<string, unknown> = {}
       try { rawValues = JSON.parse(resultEntry?.values ?? "{}") } catch {}
+      // Ebaõnnestunud tulemusel on väärtused koos märkega; statistikasse need ei lähe.
+      const failed = Boolean(resultEntry?.exceptionLabel) && isFailedResult(resultEntry!, el.exceptions)
+      const showValues = !resultEntry?.exceptionLabel || failed
 
       // Extract result field raw value for display
       let rawResultValue: string | number | null = null
-      if (resultField && !resultEntry?.exceptionLabel) {
+      if (resultField && showValues) {
         const v = rawValues[resultField.name]
         if (v !== undefined && v !== null && v !== "") rawResultValue = v as string | number
       }
 
       // Vormindatud väärtus iga välja kohta (sh arvutatud väljad)
       const fieldDisplay: Record<string, string> = {}
-      if (!resultEntry?.exceptionLabel && Object.keys(rawValues).length > 0) {
+      if (showValues && Object.keys(rawValues).length > 0) {
         const computedAll = computeFields(rawValues as Record<string, string | number>, el.fields as Parameters<typeof computeFields>[1])
         for (const f of el.fields) {
           fieldDisplay[f.name] = f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION" ? pointFieldLabel(f, rawValues[f.name]) : fmtFieldValue(computedAll[f.name], f.type)
@@ -335,7 +339,8 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
         outOf: elScores.length,
         classOutOf: !isHCteam(team) ? (classOutOfMap.get(team.id) ?? 0) : 0,
         exceptionLabel: resultEntry?.exceptionLabel ?? null,
-        rawValues: resultEntry?.exceptionLabel ? {} : rawValues,
+        failed,
+        rawValues: showValues ? rawValues : {},
         rawResultValue,
         fieldDisplay,
         miscEntries: el.type === "OTHER" ? (miscMap.get(`${el.id}:${team.id}`) ?? []) : undefined,

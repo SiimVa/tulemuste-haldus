@@ -56,6 +56,41 @@ export function isFailedResult(
   return resultExceptionKind(result.exceptionLabel, exceptions) === "FAILED"
 }
 
+// Ebaõnnestunud tulemusel on sooritus olemas: väljaväärtused sisestatakse ja
+// näidatakse koos märkega. Teiste erandite korral sooritust polnud ja väärtusi
+// ei hoita.
+export function resultKeepsValues(
+  result: { exceptionLabel?: string | null },
+  exceptions: { label: string; kind?: string | null }[]
+): boolean {
+  return !result.exceptionLabel || isFailedResult(result, exceptions)
+}
+
+// Meetodid, kus ebaõnnestunu jääb pingeritta viimaseks ja erandi karistust ei
+// kasutata.
+export const FAILED_RANKED_CALC_TYPES: readonly string[] = ["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"]
+
+// Pingereaga ja kombineeritud elemendis annab ebaõnnestumine viimase koha ja
+// erandi karistust ei kasutata.
+export function failedGetsLastPlace(
+  exception: { label: string; kind?: string | null },
+  element: { calcType?: string | null; hasSections?: boolean }
+): boolean {
+  return exceptionKind(exception) === "FAILED" &&
+    (Boolean(element.hasSections) || FAILED_RANKED_CALC_TYPES.includes(element.calcType ?? ""))
+}
+
+// Erandi valik sisestusvormis: karistus või ebaõnnestumisel viimane koht.
+export function exceptionOptionLabel(
+  exception: { label: string; penalty: number; kind?: string | null },
+  element: { calcType?: string | null; hasSections?: boolean },
+  penaltySuffix = "p"
+): string {
+  return failedGetsLastPlace(exception, element)
+    ? `${exception.label} (viimane koht)`
+    : `${exception.label} (${exception.penalty}${penaltySuffix})`
+}
+
 export const FAILED_EXCEPTION_LABEL = "Ebaõnnestus"
 
 // „Ebaõnnestus” karistust kasutatakse ainult ilma pingereata hindamisel:

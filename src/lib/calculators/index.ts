@@ -4,7 +4,7 @@ import { evaluateFormula } from "../formula"
 
 import { scopeKeyFor, type ClassGroup, type TeamCountScope } from "../classGroups"
 import { parseFixedRankingParams, registeredCountPoints } from "../fixedRanking"
-import { isFailedResult } from "../exceptionKinds"
+import { FAILED_RANKED_CALC_TYPES, isFailedResult } from "../exceptionKinds"
 
 // Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
 export type ScoreInput = {
@@ -48,9 +48,6 @@ export type CalculateOptions = {
   // halvima võimaliku tulemuse (kombineeritud elemendi osades).
   failedWithoutRanking?: "EXCEPTION_PENALTY" | "WORST"
 }
-
-// Meetodid, kus võistkonnad järjestatakse ja ebaõnnestunu jääb viimaseks.
-const RANKED_METHODS: CalcType[] = ["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"]
 
 interface CompetitionConfig {
   scoringMode: ScoringMode
@@ -208,10 +205,10 @@ export function calculateScores(
 
   // Ilma pingereata meetodis on ebaõnnestumine tavaline erand (kindel
   // karistus); kombineeritud elemendi osas halvim võimalik tulemus.
-  if (!RANKED_METHODS.includes(type) && options.failedWithoutRanking === "WORST") {
+  if (!FAILED_RANKED_CALC_TYPES.includes(type) && options.failedWithoutRanking === "WORST") {
     for (const entry of failed) entry.penaltyPoints = scoringMode === "PLUS" ? 0 : maxValue
   }
-  if (normal.length === 0 && (failed.length === 0 || !RANKED_METHODS.includes(type))) return entries
+  if (normal.length === 0 && (failed.length === 0 || !FAILED_RANKED_CALC_TYPES.includes(type))) return entries
 
   switch (type) {
     case "RELATIVE_RANKING":

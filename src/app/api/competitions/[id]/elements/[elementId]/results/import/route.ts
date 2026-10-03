@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import * as XLSX from "xlsx"
 import { recomputeElementScores } from "@/lib/recompute"
+import { isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
 import {
   canAccessCompetition,
   elementBelongsToCompetition,
@@ -214,10 +215,12 @@ async function handlePOST(
 
     foundTeamIds.add(team.id)
 
-    // Check exception column
+    // Check exception column. Ebaõnnestunud tulemuse väärtused imporditakse
+    // koos märkega; teiste erandite korral väärtusi ei loeta.
     const exceptionLabel = exceptionColIdx >= 0 ? rowData[exceptionColIdx] ?? "" : ""
+    const failed = Boolean(exceptionLabel) && isFailedResult({ exceptionLabel }, element.exceptions)
 
-    if (exceptionLabel) {
+    if (exceptionLabel && !failed) {
       rows.push({
         rowNum,
         teamCode: team.code,
@@ -275,7 +278,8 @@ async function handlePOST(
     }
 
     for (const field of inputFields.filter(f => f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION")) {
-      const error = validateFieldValue(values[field.name], field.name, field.label, field.type, parseValidation(field.validation), field.meta)
+      const validation = parseValidation(field.validation)
+      const error = validateFieldValue(values[field.name], field.name, field.label, field.type, failed ? { ...validation, required: false } : validation, field.meta)
       if (error) { hasError = true; errorMsg = error.message; break }
     }
     if (hasError) {
@@ -295,6 +299,7 @@ async function handlePOST(
       teamName: team.name,
       status: "ok",
       values,
+      ...(failed ? { exceptionLabel } : {}),
     })
   }
 
@@ -324,7 +329,7 @@ async function handlePOST(
     const team = teamByCode.get(row.teamCode.toLowerCase())
     if (!team) continue
 
-    const valuesJson = row.exceptionLabel ? "{}" : JSON.stringify(row.values ?? {})
+    const valuesJson = resultKeepsValues(row, element.exceptions) ? JSON.stringify(row.values ?? {}) : "{}"
     const exceptionLabel = row.exceptionLabel ?? null
 
     // Find exception penalty if applicable

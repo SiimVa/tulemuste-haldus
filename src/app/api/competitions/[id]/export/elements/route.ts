@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { computeFields } from "@/lib/calculators"
+import { resultKeepsValues } from "@/lib/exceptionKinds"
 import { canAccessCompetition } from "@/lib/competitionAccess"
 import * as XLSX from "xlsx"
 
@@ -23,6 +24,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
         orderBy: { order: "asc" },
         include: {
           fields: { orderBy: { order: "asc" } },
+          exceptions: { select: { label: true, kind: true } },
           scores: true,
           results: { include: { team: true } },
         },
@@ -49,10 +51,9 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
     const buildRow = (team: typeof teams[0], rowNum: number | string) => {
       const result = element.results.find((r) => r.teamId === team.id)
       let fieldValues: Record<string, unknown> = {}
-      let exceptionLabel = ""
-      if (result?.exceptionLabel) {
-        exceptionLabel = result.exceptionLabel
-      } else if (result) {
+      const exceptionLabel = result?.exceptionLabel ?? ""
+      // Ebaõnnestunud tulemusel on väärtused koos märkega.
+      if (result && resultKeepsValues(result, element.exceptions)) {
         try { fieldValues = JSON.parse(result.values || "{}") } catch {}
         fieldValues = computeFields(fieldValues as Record<string, string | number>, element.fields)
       }
@@ -62,7 +63,7 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
         team.code,
         team.name,
         team.class ?? "",
-        ...inputFields.map((f) => (exceptionLabel ? "" : (fieldValues[f.name] !== undefined ? fieldValues[f.name] : ""))),
+        ...inputFields.map((f) => (fieldValues[f.name] !== undefined ? fieldValues[f.name] : "")),
         exceptionLabel,
         score !== undefined ? score : "",
       ]

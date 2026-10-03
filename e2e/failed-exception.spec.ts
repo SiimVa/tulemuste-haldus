@@ -77,3 +77,89 @@ test("ebaõnnestunud võistkond on pingereas viimane ja teiste miinimum tõuseb"
   const after = await db.computedScore.findFirstOrThrow({ where: { elementId: element.id, teamId: teams.Gamma } })
   expect(after.penaltyPoints).toBe(10)
 })
+
+test("ebaõnnestunud tulemusel jääb sisestatud tulemus alles koos märkega", async ({ page }, testInfo) => {
+  const user = await db.user.create({ data: { email: `failed-values-${Date.now()}@example.com`, name: "Sisestaja", passwordHash: await bcrypt.hash("failed-values-password", 10) } })
+  const competition = await db.competition.create({ data: { name: "Ebaõnnestunud tulemusega võistlus", createdById: user.id, organizerId: user.id, scoringMode: "PLUS", defaultKPMaxValue: 30, defaultHigherIsBetter: true } })
+  const element = await db.scoringElement.create({ data: {
+    competitionId: competition.id, code: "KP1", name: "Esemete paigutus", maxValue: 30,
+    fields: { create: [
+      { name: "esemed", label: "Õigesti paigutatud esemete arv", type: "NUMBER", rankingPriority: 1, order: 0, meta: JSON.stringify({ higherIsBetter: true }) },
+      { name: "aeg", label: "Soorituse aeg", type: "TIME", order: 1 },
+    ] },
+    calcMethod: { create: { type: "RELATIVE_RANKING", params: JSON.stringify({ higherIsBetter: true, minPoints: 0 }) } },
+    exceptions: { create: [
+      { label: "Ei läbinud", penalty: 40, order: 0, kind: "NOT_PASSED" },
+      { label: "Ebaõnnestus", penalty: 10, order: 1, kind: "FAILED" },
+    ] },
+  } })
+  const teams: Record<string, string> = {}
+  for (const [code, name] of [["REG-001", "Osula sega"], ["REG-002", "Osula NK"], ["REG-003", "Valga KT"]]) {
+    teams[name] = (await db.team.create({ data: { competitionId: competition.id, code, name } })).id
+  }
+  await db.result.create({ data: { elementId: element.id, teamId: teams["Osula NK"], values: JSON.stringify({ esemed: "3", aeg: "2:00" }) } })
+  const judge = await db.accessToken.create({ data: { competitionId: competition.id, elementId: element.id, type: "JUDGE", name: "KP1 kohtunik" } })
+  const stored = async (teamName: string) => {
+    const result = await db.result.findUniqueOrThrow({ where: { elementId_teamId: { elementId: element.id, teamId: teams[teamName] } } })
+    return [JSON.parse(result.values), result.exceptionLabel]
+  }
+
+  await page.goto("/login")
+  await page.getByPlaceholder("admin@example.com").fill(user.email)
+  await page.locator('input[type="password"]').fill("failed-values-password")
+  await page.getByRole("button", { name: "Logi sisse" }).click()
+  await page.waitForURL("**/dashboard")
+
+  // Korraldaja tabel: väljad jäävad „Ebaõnnestus” valimisel alles.
+  await page.goto(`/dashboard/competitions/${competition.id}/elements/${element.id}`)
+  await expect(page.getByText("Ebaõnnestunud võistkond jääb pingerea viimasele kohale; sisestatud tulemus jääb alles.")).toBeVisible()
+  const row = page.getByRole("row").filter({ hasText: "Osula sega" })
+  await row.getByRole("button", { name: "Sisesta" }).click()
+  await expect(row.locator("select option", { hasText: "Ebaõnnestus" })).toHaveText("Ebaõnnestus (viimane koht)")
+  await row.locator("select").selectOption("Ebaõnnestus")
+  await row.locator('input[type="number"]').fill("1")
+  await row.getByPlaceholder("m:ss").fill("123")
+  await page.screenshot({ path: testInfo.outputPath("failed-result-editing.png") })
+  await row.getByRole("button", { name: "Salvesta" }).click()
+  await expect(row.getByRole("button", { name: "Muuda" })).toBeVisible()
+  // Veerud: koht, võistkond, esemed, aeg, erand, punktid.
+  const cells = row.getByRole("cell")
+  await expect(cells.nth(2)).toHaveText("1")
+  await expect(cells.nth(3)).toHaveText("1:23")
+  await expect(cells.nth(4)).toHaveText("Ebaõnnestus")
+  await page.screenshot({ path: testInfo.outputPath("failed-result-saved.png") })
+  expect(await stored("Osula sega")).toEqual([{ esemed: "1", aeg: "1:23" }, "Ebaõnnestus"])
+  const scores = Object.fromEntries((await db.computedScore.findMany({ where: { elementId: element.id } })).map((score) => [score.teamId, score.penaltyPoints]))
+  expect([scores[teams["Osula NK"]], scores[teams["Osula sega"]]]).toEqual([30, 0])
+
+  // Eksport näitab tulemust koos märkega.
+  const csv = await (await page.request.get(`/api/competitions/${competition.id}/elements/${element.id}/export?format=csv`)).text()
+  expect(csv.split("\n").find((line) => line.includes("Osula sega"))).toContain('"1","83","Ebaõnnestus","0"')
+
+  // Kohtuniku vaade: sama loogika ja vihje.
+  await page.goto(`/judge/${judge.token}`)
+  await page.getByRole("button", { name: /Valga KT/ }).click()
+  const form = page.locator("form")
+  await expect(form.locator("select option", { hasText: "Ebaõnnestus" })).toHaveText("Ebaõnnestus (viimane koht)")
+  await form.locator("select").selectOption("Ebaõnnestus")
+  await expect(form.getByText("Sisesta tulemus nagu tavaliselt. See salvestatakse koos märkega „Ebaõnnestus”.")).toBeVisible()
+  await form.locator('input[type="number"]').fill("2")
+  await form.getByPlaceholder("m:ss").fill("245")
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await form.screenshot({ path: testInfo.outputPath("failed-result-judge.png") })
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await form.getByRole("button", { name: "✓ Salvesta tulemus" }).click()
+  await expect(page.getByText(/Viimati salvestatud: Valga KT/)).toBeVisible()
+  await expect(page.getByRole("button", { name: /Valga KT/ })).toContainText("Ebaõnnestus")
+  expect(await stored("Valga KT")).toEqual([{ esemed: "2", aeg: "2:45" }, "Ebaõnnestus"])
+
+  // Teise erandi valimisel väärtusi ei hoita.
+  await page.goto(`/dashboard/competitions/${competition.id}/elements/${element.id}`)
+  await row.getByRole("button", { name: "Muuda" }).click()
+  await row.locator("select").selectOption("Ei läbinud")
+  await expect(row.locator('input[type="number"]')).toHaveCount(0)
+  await row.getByRole("button", { name: "Salvesta" }).click()
+  await expect(row.getByRole("button", { name: "Muuda" })).toBeVisible()
+  expect(await stored("Osula sega")).toEqual([{}, "Ei läbinud"])
+})

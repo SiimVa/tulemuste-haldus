@@ -16,6 +16,7 @@ import { ElementSectionsManager } from "@/components/competition/ElementSections
 import { ResultsImportTrigger } from "@/components/competition/ResultsImportTrigger"
 import { RecalcButton } from "@/components/competition/RecalcButton"
 import { explainElementScores } from "@/lib/scoreExplainer"
+import { failedGetsLastPlace } from "@/lib/exceptionKinds"
 import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
 import { Card } from "@/components/ui/card"
 import { parseClassGroups } from "@/lib/classGroups"
@@ -72,6 +73,8 @@ export default async function ElementPage({
     orderBy: { order: "asc" },
   })
 
+  // Ebaõnnestumise kuvamiseks: pingereaga või kombineeritud element annab viimase koha.
+  const exceptionContext = { calcType: element.calcMethod?.type ?? null, hasSections: element.sections.length > 0 }
   const breakdowns = explainElementScores(
     {
       type: element.type,
@@ -313,9 +316,13 @@ export default async function ElementPage({
               return (
                 <div key={ex.id} className="flex items-center justify-between text-sm">
                   <span className="text-gray-700">{ex.label}</span>
-                  <span className="font-mono text-red-600">
-                    {isPlus ? `−${magnitude}p` : `+${magnitude}p`}
-                  </span>
+                  {failedGetsLastPlace(ex, exceptionContext) ? (
+                    <span className="text-amber-700">viimane koht</span>
+                  ) : (
+                    <span className="font-mono text-red-600">
+                      {isPlus ? `−${magnitude}p` : `+${magnitude}p`}
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -325,6 +332,9 @@ export default async function ElementPage({
               ? "Erandid lahutavad punkte kogusummast"
               : "Erandid lisavad karistuspunkte kogusummale"}
           </p>
+          {element.exceptions.some((ex) => failedGetsLastPlace(ex, exceptionContext)) && (
+            <p className="text-xs text-gray-400 mt-1">Ebaõnnestunud võistkond jääb pingerea viimasele kohale; sisestatud tulemus jääb alles.</p>
+          )}
         </Card>
       </div>
 
@@ -457,6 +467,8 @@ export default async function ElementPage({
           directPointsEntry: element.directPointsEntry,
           order: element.order,
           scoringMode: element.competition.scoringMode as "PENALTY" | "PLUS",
+          calcType: exceptionContext.calcType,
+          hasSections: exceptionContext.hasSections,
           results: element.results.map(r => {
             let rawValues: Record<string, unknown> = {}
             try { rawValues = JSON.parse(r.values || "{}") } catch {}
