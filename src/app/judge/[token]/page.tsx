@@ -14,6 +14,8 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
         include: {
           fields: { orderBy: { order: "asc" } },
           exceptions: { orderBy: { order: "asc" } },
+          calcMethod: { select: { type: true } },
+          _count: { select: { sections: true } },
         },
       },
     },
@@ -37,6 +39,8 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
       include: {
         fields: { orderBy: { order: "asc" } },
         exceptions: { orderBy: { order: "asc" } },
+        calcMethod: { select: { type: true } },
+        _count: { select: { sections: true } },
       },
     })
   }
@@ -82,6 +86,8 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
             order: el.order,
             fields: el.fields,
             exceptions: el.exceptions,
+            calcType: el.calcMethod?.type ?? null,
+            hasSections: el._count.sections > 0,
           }))}
           teams={teams.map(t => ({ id: t.id, name: t.name, code: t.code, class: t.class, dnfFromElementOrder: t.dnfFromElementOrder }))}
           existingResults={results}

@@ -40,6 +40,26 @@ viimane õnnestunu 0 punkti.
 
 „Ebaõnnestus” erandi karistust kasutatakse ainult ilma pingereata hindamisel.
 Vaikimisi on see punktisüsteemis 0 ja karistuspunktides KP maksimum.
+Pingereaga ja kombineeritud elemendis on sisestusvormi valikus karistuse asemel
+„viimane koht”.
+
+### Tulemus jääb alles
+
+Ebaõnnestunud võistkonnal on sooritus olemas, seega sisestatakse tulemus nagu
+tavaliselt ja lisaks valitakse erand „Ebaõnnestus”. Väljad jäävad
+korraldaja tabelis ja kohtuniku vormis nähtavaks. Kohustuslikke välju ei nõuta,
+sest katkenud soorituse puhul võib mõni väärtus puududa. Tulemus on näha koos
+märkega:
+
+- elemendi tulemuste tabelis ja kohtuniku vaates;
+- Exceli ja CSV ekspordis ning prinditavates tulemustes;
+- võistleja tulemustes ja avalikus analüüsis.
+
+Exceli impordis loetakse ebaõnnestunud rea väärtused samuti sisse.
+
+Sisestatud tulemus punkte ei mõjuta: ebaõnnestunud jagavad viimast kohta ka
+siis, kui nende tulemus oleks parem, ja nende aeg viiki ei lahenda. Teiste
+erandite valimisel väärtusi ei salvestata.
 
 Arvestusvälised võistkonnad ei muuda arvestuses olevate võistkondade kohti.
 Arvestusväline ebaõnnestunu saab viimase koha punktid kõigi võistkondade
@@ -64,4 +84,5 @@ kehtib ka vanema liigita erandi kohta, mille nimi algab sõnaga „Ebaõnnestu�
 
 KP tabelis on veerg „Ebaõnnestus”. Ebaõnnestunud võistkonnad loetakse KP-s
 käinuteks. Raskusaste näitab ebaõnnestunute osakaalu eraldi sooritamata
-tulemustest.
+tulemustest. Ajakulu KP-s arvestab ka ebaõnnestunute aega. Avaliku analüüsi
+parima, keskmise ja halvima tulemuse arvutusse ebaõnnestunud ei lähe.

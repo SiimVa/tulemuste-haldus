@@ -19,6 +19,8 @@ export type ResultCard = {
   revealPointsToAthletes: boolean
   // tavaline element
   exceptionLabel: string | null
+  // Ebaõnnestus: tulemus on olemas ja seda näidatakse koos märkega.
+  failed?: boolean
   realScore: number | null
   fields: SimField[]
   inputFields: InputField[]
@@ -169,14 +171,14 @@ export function AthleteResultCards({ cards, scoringMode, pointsMode, pointsRange
                     <span className="text-sm font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{realLabel}</span>
                   ) : null}
                   {card.exceptionLabel && (
-                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">{card.exceptionLabel}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${card.failed ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-700"}`}>{card.exceptionLabel}</span>
                   )}
                 </div>
               </div>
 
               {reason && <p className="text-xs text-gray-400 mb-2">Ei saa simuleerida ({reason})</p>}
 
-              {!card.exceptionLabel && card.inputFields.map((field) => {
+              {(!card.exceptionLabel || card.failed) && card.inputFields.map((field) => {
                 if (field.type === "TIME_RANGE") {
                   return (
                     <div key={field.name} className="py-1 border-t first:border-t-0">

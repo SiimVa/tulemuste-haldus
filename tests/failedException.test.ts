@@ -3,7 +3,7 @@ import test from "node:test"
 import type { CalcMethod, FieldDefinition } from "@prisma/client"
 import { calculateScores, type ScoreInput } from "../src/lib/calculators"
 import { computeAllScores, type ComputeElement, type ComputeResult } from "../src/lib/scoreCompute"
-import { inferExceptionKind } from "../src/lib/exceptionKinds"
+import { exceptionOptionLabel, inferExceptionKind, resultKeepsValues } from "../src/lib/exceptionKinds"
 
 const field = {
   id: "f1", name: "punktid", label: "Punktid", type: "NUMBER",
@@ -133,4 +133,32 @@ test("kombineeritud element: ebaõnnestunu on igas osas viimane, teised erandid 
     row("f", {}, "Ebaõnnestus", 0), row("x", {}, "Muu", 25),
   ], { scoringMode: "PENALTY", defaultKPMaxValue: 30, defaultPKMaxValue: 15 }).get("combo")!
   assert.deepEqual([scores.get("a"), scores.get("b"), scores.get("f"), scores.get("x")], [5, 5, 20, 25])
+
+  // Ebaõnnestunu sisestatud tulemus ei muuda kellegi punkte.
+  const withValues = computeAllScores([element], [
+    row("a", { osa1: 10, osa2: 1 }), row("b", { osa1: 5, osa2: 8 }),
+    row("f", { osa1: 99, osa2: 99 }, "Ebaõnnestus", 0), row("x", {}, "Muu", 25),
+  ], { scoringMode: "PENALTY", defaultKPMaxValue: 30, defaultPKMaxValue: 15 }).get("combo")!
+  assert.deepEqual([...withValues.entries()].sort(), [...scores.entries()].sort())
+})
+
+test("ebaõnnestunu tulemus säilib, kuid ei muuda pingerida", () => {
+  const empty = pointsOf(calculateScores(element("RELATIVE_RANKING", { higherIsBetter: true }), results(tenTeams), plus))
+  const withValues = results(tenTeams).map((row) => row.exceptionLabel ? { ...row, values: JSON.stringify({ punktid: 999 }) } : row)
+  assert.deepEqual(pointsOf(calculateScores(element("RELATIVE_RANKING", { higherIsBetter: true }), withValues, plus)), empty)
+
+  assert.equal(resultKeepsValues({ exceptionLabel: null }, exceptions), true)
+  assert.equal(resultKeepsValues({ exceptionLabel: "Kriteerium täitmata" }, exceptions), true)
+  assert.equal(resultKeepsValues({ exceptionLabel: "Ebaõnnestunud" }, []), true)
+  assert.equal(resultKeepsValues({ exceptionLabel: "Ei läbinud" }, exceptions), false)
+  assert.equal(resultKeepsValues({ exceptionLabel: "Muu" }, exceptions), false)
+})
+
+test("erandi valikus näidatakse ebaõnnestumisel pingereaga hindamisel viimast kohta", () => {
+  const [notPassed, failed] = exceptions
+  assert.equal(exceptionOptionLabel(failed, { calcType: "RELATIVE_RANKING" }), "Kriteerium täitmata (viimane koht)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "FIXED_RANKING" }), "Kriteerium täitmata (viimane koht)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "ABSOLUTE_POINTS", hasSections: true }), "Kriteerium täitmata (viimane koht)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "ABSOLUTE_POINTS" }), "Kriteerium täitmata (0p)")
+  assert.equal(exceptionOptionLabel(notPassed, { calcType: "RELATIVE_RANKING" }, "p karistust"), "Ei läbinud (40p karistust)")
 })

@@ -1,9 +1,7 @@
 import { compareElementTimes, pointFieldLabel, readPointMeta } from "./pointFields"
 import { calculateScores, parseTimeToSeconds, computeFields } from "@/lib/calculators"
 import { scopeKeyFor, TEAM_COUNT_SCOPES, type ClassGroup } from "@/lib/classGroups"
-import { isFailedResult } from "@/lib/exceptionKinds"
-
-const RANKED_METHODS = ["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"]
+import { FAILED_RANKED_CALC_TYPES, isFailedResult } from "@/lib/exceptionKinds"
 
 export interface TeamBreakdown {
   teamId: string
@@ -299,7 +297,7 @@ export function explainElementScores(
   const hasSections = (element.sections?.length ?? 0) > 0
   const exceptions = element.exceptions ?? []
   const isFailed = (result: ResultDef) => Boolean(result.exceptionLabel) && isFailedResult(result, exceptions)
-  const rankedMethod = RANKED_METHODS.includes(element.calcMethod?.type ?? "")
+  const rankedMethod = FAILED_RANKED_CALC_TYPES.includes(element.calcMethod?.type ?? "")
   const failedCount = results.filter(isFailed).length
 
   // Kõikide tiimide raw values (tulemusvälja jaoks)

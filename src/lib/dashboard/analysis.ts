@@ -1,4 +1,4 @@
-import { resultExceptionKind } from "../exceptionKinds"
+import { resultExceptionKind, resultKeepsValues } from "../exceptionKinds"
 import type { StandingRow } from "./standings"
 import { ROUTE_ELEMENT_TYPES, round2, type DashElement, type DashPenalty, type DashResult, type DashScore, type ScoringMode } from "./types"
 
@@ -196,7 +196,8 @@ export function timeSpentRows(elements: DashElement[], results: DashResult[], te
     const durations: { team: TeamRef; seconds: number }[] = []
     const intervals: [number, number][] = []
     for (const result of results) {
-      if (result.elementId !== element.id || result.exceptionLabel) continue
+      // Ebaõnnestunud tegid ülesande, seega nende aeg loeb.
+      if (result.elementId !== element.id || !resultKeepsValues(result, element.exceptions)) continue
       const team = teamById.get(result.teamId)
       if (!team) continue
       if (field.type === "TIME_RANGE") {

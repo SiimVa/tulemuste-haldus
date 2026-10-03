@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { naturalCompare } from "@/lib/utils"
 import { notFound } from "next/navigation"
 import { computeFields } from "@/lib/calculators"
+import { resultKeepsValues } from "@/lib/exceptionKinds"
 import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentHeading"
 import { ProtocolPrintToolbar } from "@/components/protocol/ProtocolPrintToolbar"
 
@@ -45,9 +46,9 @@ export default async function ElementResultsPrintPage({
     let exceptionLabel: string | null = null
 
     if (result) {
-      if (result.exceptionLabel) {
-        exceptionLabel = result.exceptionLabel
-      } else {
+      exceptionLabel = result.exceptionLabel
+      // Ebaõnnestunud tulemusel on väärtused koos märkega.
+      if (resultKeepsValues(result, element.exceptions)) {
         try { fieldValues = JSON.parse(result.values || "{}") } catch {}
         fieldValues = computeFields(fieldValues as Record<string, string | number>, element.fields)
       }
@@ -123,7 +124,7 @@ export default async function ElementResultsPrintPage({
                 <td style={{ textAlign: "center", fontSize: 10 }}>{row.team.class ?? ""}</td>
                 {inputFields.map((f) => (
                   <td key={f.id} style={{ textAlign: "right", fontFamily: "monospace" }}>
-                    {row.exceptionLabel ? "–" : (row.fieldValues[f.name] !== undefined ? String(row.fieldValues[f.name]) : "–")}
+                    {row.fieldValues[f.name] !== undefined ? String(row.fieldValues[f.name]) : "–"}
                   </td>
                 ))}
                 <td style={{ fontSize: 10, color: "#b45309" }}>
@@ -150,7 +151,7 @@ export default async function ElementResultsPrintPage({
                     <td style={{ textAlign: "center", fontSize: 10 }}>{row.team.class ?? ""}</td>
                     {inputFields.map((f) => (
                       <td key={f.id} style={{ textAlign: "right", fontFamily: "monospace" }}>
-                        {row.exceptionLabel ? "–" : (row.fieldValues[f.name] !== undefined ? String(row.fieldValues[f.name]) : "–")}
+                        {row.fieldValues[f.name] !== undefined ? String(row.fieldValues[f.name]) : "–"}
                       </td>
                     ))}
                     <td style={{ fontSize: 10, color: "#b45309" }}>{row.exceptionLabel ?? "–"}</td>
