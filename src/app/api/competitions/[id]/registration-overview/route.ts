@@ -12,5 +12,7 @@ export const GET = withSecurityRoute("/api/competitions/[id]/registration-overvi
   if (phase !== "REGISTRATION" && phase !== "MANDATE") return Response.json({ error: "Vigane etapp" }, { status: 400 })
   const report = await getRegistrationReport(id, phase)
   if (!report) return Response.json({ error: "Võistlust ei leitud" }, { status: 404 })
-  return Response.json(report, { headers: { "Cache-Control": "private, no-store" } })
+  // Ülevaade vajab ainult koondveerge; liikmete kontaktid jäävad ekspordi jaoks serverisse.
+  const rows = report.rows.map(row => ({ id: row.id, status: row.status, className: row.className, cells: row.cells }))
+  return Response.json({ ...report, rows }, { headers: { "Cache-Control": "private, no-store" } })
 })
