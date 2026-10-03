@@ -33,6 +33,7 @@ export function CompetitionNav({ competitionId }: { competitionId: string }) {
       items: [
         { href: `${base}/leaderboard`, label: "Pingerida" },
         { href: `${base}/overview`, label: "Statistika" },
+        { href: `${base}/map`, label: "Kaart" },
       ],
     },
     {

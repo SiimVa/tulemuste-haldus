@@ -1,3 +1,4 @@
+import { parseExceptionKind } from "@/lib/exceptionKinds"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -98,10 +99,11 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
           : undefined,
         exceptions: Array.isArray(exceptions) && exceptions.length > 0
           ? {
-              create: exceptions.map((e: { label: string; penalty: number; order?: number }, i: number) => ({
+              create: exceptions.map((e: { label: string; penalty: number; order?: number; kind?: unknown }, i: number) => ({
                 label: e.label,
                 penalty: e.penalty,
                 order: e.order ?? i,
+                kind: parseExceptionKind(e.kind, String(e.label ?? "")),
               })),
             }
           : undefined,

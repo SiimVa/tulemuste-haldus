@@ -4,6 +4,8 @@ import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { isAnalysisAccessMode, type AnalysisAccessMode } from "@/lib/analysisAccess"
 import { AnalysisAccessSettings } from "@/components/competition/AnalysisAccessSettings"
+import { LeaderboardFreezeSettings } from "@/components/competition/LeaderboardFreezeSettings"
+import { getFreezeState } from "@/lib/leaderboardFreeze.server"
 
 export const dynamic = "force-dynamic"
 
@@ -11,10 +13,13 @@ export default async function PublicViewPage({ params }: { params: Promise<{ id:
   const { id } = await params
   await requireCompetitionManager(id)
 
-  const competition = await prisma.competition.findUnique({
-    where: { id },
-    select: { id: true, name: true, analysisAccessMode: true, analysisTokenHash: true },
-  })
+  const [competition, freeze] = await Promise.all([
+    prisma.competition.findUnique({
+      where: { id },
+      select: { id: true, name: true, analysisAccessMode: true, analysisTokenHash: true },
+    }),
+    getFreezeState(id),
+  ])
   if (!competition) notFound()
 
   const mode: AnalysisAccessMode = isAnalysisAccessMode(competition.analysisAccessMode)
@@ -35,6 +40,11 @@ export default async function PublicViewPage({ params }: { params: Promise<{ id:
         competitionId={id}
         initialMode={mode}
         initialHasLink={Boolean(competition.analysisTokenHash)}
+      />
+
+      <LeaderboardFreezeSettings
+        competitionId={id}
+        initial={freeze ? { freezeAt: freeze.freezeAt.toISOString(), frozen: freeze.frozen } : { freezeAt: null, frozen: false }}
       />
     </div>
   )

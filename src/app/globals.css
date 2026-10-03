@@ -71,3 +71,16 @@
     padding: 0 !important;
   }
 }
+
+/* Statistika ekraanirežiim: suurel ekraanil loetavam kiri ja graafika. */
+@media (min-width: 1280px) {
+  .screen-zoom {
+    zoom: 1.25;
+  }
+}
+
+@media (min-width: 1800px) {
+  .screen-zoom {
+    zoom: 1.6;
+  }
+}

@@ -13,6 +13,8 @@ import { CopyButton } from "@/components/CopyButton"
 import { ExportMenu } from "@/components/ExportMenu"
 import { MiscScoreCell } from "@/components/competition/MiscScoreCell"
 import { Card } from "@/components/ui/card"
+import { getFreezeState } from "@/lib/leaderboardFreeze.server"
+import { formatFreezeTime } from "@/lib/leaderboardFreeze"
 
 export const dynamic = "force-dynamic"
 
@@ -24,6 +26,7 @@ export default async function LeaderboardPage({ params, searchParams }: { params
   if (!competition) notFound()
 
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
+  const freeze = await getFreezeState(id)
 
   const headersList = await headers()
   const host = headersList.get("host") ?? "localhost:3000"
@@ -228,6 +231,15 @@ export default async function LeaderboardPage({ params, searchParams }: { params
         Pingerida · {visibleInCompRows.length} võistkonda
         {visibleHorsCompRows.length > 0 && ` + ${visibleHorsCompRows.length} arvestusvälised`}
       </p>
+
+      {freeze && (
+        <p role="status" className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {freeze.frozen
+            ? `Avalik pingerida on külmutatud seisuga ${formatFreezeTime(freeze.freezeAt)}. Siin näed jooksvat seisu.`
+            : `Avalik pingerida külmutatakse ${formatFreezeTime(freeze.freezeAt)}.`}{" "}
+          <Link href={`/dashboard/competitions/${id}/public-view`} className="font-medium underline">Muuda</Link>
+        </p>
+      )}
 
       <LeaderboardClassFilter classes={classes} />
       <Card className="overflow-hidden">

@@ -8,7 +8,10 @@ import { parseTimeToSeconds, computeFields } from "@/lib/calculators"
 import { isAnalysisLinkToken } from "@/lib/analysisAccess"
 import { hashAnalysisLinkToken } from "@/lib/analysisAccess.server"
 import { auth } from "@/lib/auth"
-import { canViewCompetition } from "@/lib/competitionAccess"
+import { canAccessCompetition, canViewCompetition } from "@/lib/competitionAccess"
+import { getPublicFreeze } from "@/lib/leaderboardFreeze.server"
+import { formatFreezeTime } from "@/lib/leaderboardFreeze"
+import Link from "next/link"
 
 // Vormindab välja väärtuse kuvamiseks (TIME → h:mm:ss, arvud korralikult)
 function fmtFieldValue(v: unknown, type: string): string {
@@ -65,6 +68,12 @@ async function canViewAsMember(competitionId: string) {
   })
 }
 
+async function canManage(competitionId: string) {
+  const session = await auth()
+  if (!session?.user?.id) return false
+  return canAccessCompetition(competitionId, { id: session.user.id, role: session.user.role })
+}
+
 export async function analysisPageMetadata(access: AnalysisPageAccess) {
   if (access.type === "LINK_ONLY" && !isAnalysisLinkToken(access.analysisLinkToken)) {
     return { title: "Analüüs" }
@@ -88,6 +97,22 @@ export async function PublicAnalysisPage({ access }: { access: AnalysisPageAcces
   if (!competition) notFound()
 
   const id = competition.id
+
+  // Külmutatud tulemuste ajal paljastaks analüüs jooksva seisu.
+  const freeze = await getPublicFreeze(id)
+  if (freeze && !(await canManage(id))) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-3xl px-4 py-12">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{competition.name}</h1>
+          <p role="status" className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Tulemused on külmutatud seisuga {formatFreezeTime(freeze.freezeAt)}. Analüüs avaneb pärast tulemuste avalikustamist.
+          </p>
+          {access.type === "PUBLIC" && <Link href={`/public/${id}/leaderboard`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">← Pingerida</Link>}
+        </div>
+      </div>
+    )
+  }
 
   const scoringMode = competition.scoringMode as "PENALTY" | "PLUS"
   const isPlusMode = scoringMode === "PLUS"

@@ -1,6 +1,7 @@
 import { TieBreakReason } from "@/components/leaderboard/TieBreakReason"
 import { AthleteResultCards } from "@/components/athlete/AthleteResultCards"
 import type { TeamResultData } from "@/lib/teamResults.server"
+import { formatFreezeTime } from "@/lib/leaderboardFreeze"
 
 export function TeamResultsView({ data }: { data: TeamResultData }) {
   const {
@@ -31,6 +32,12 @@ export function TeamResultsView({ data }: { data: TeamResultData }) {
             .join(", ")}
         </p>
       </div>
+
+      {data.frozenAt && (
+        <p role="status" className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          Tulemused on külmutatud seisuga {formatFreezeTime(data.frozenAt)}. Punktid ja kohad avalikustatakse autasustamisel.
+        </p>
+      )}
 
       {totalBlock && (
         <div className="bg-blue-600 text-white rounded-xl p-5">
