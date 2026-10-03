@@ -23,8 +23,8 @@ Järjekord on mõlemas vaates sama.
 | Õiglane vahepingerida | ühiste KP-de summa ja keskmine läbitud KP kohta | lubatud |
 | Tihedad heitlused | poodiumikohad, mille vahe on alla piiri | lubatud |
 | KP võitjad | iga KP parim üld ja klassiti | lubatud |
-| KP tabel | sooritanud, erandid liigiti, andmete täielikkus | lubatud |
-| Raskusaste | keskmine kaotus parimast (% maksimumist), sooritamata % | lubatud |
+| KP tabel | sooritanud, ebaõnnestunud, erandid liigiti, andmete täielikkus | lubatud |
+| Raskusaste | keskmine kaotus parimast (% maksimumist), ebaõnnestunud ja sooritamata % | lubatud |
 | Eristusvõime | punktide hajuvus ja Spearmani seos ülejäänud tulemusega | lubatud |
 | Klasside võrdlus | klasside keskmine KP kaupa | lubatud |
 | Ajakulu KP-s | kestus ajavahemiku või aja väljast, samaaegsed võistkonnad | lubatud |
@@ -58,10 +58,12 @@ pole nähtud ühestki KP-st, kuigi esimesest sisestusest on see aeg möödas.
 
 ## Erandite liik
 
-Erandil on liik: **Ei läbinud**, **Läbis, aga ei sooritanud** või **Muu
-erand**. KP tabel, raskusaste ja asukoht kasutavad liiki, mitte nime. Vanematel
-eranditel liik puudub ja see tuletatakse nimest („Ei läbinud…” ja „Läbis aga
-ei sooritanud…”). Liiki saab muuta elemendi loomise ja muutmise vormis.
+Erandil on liik: **Ei läbinud**, **Läbis, aga ei sooritanud**,
+**Ebaõnnestus** või **Muu erand**. KP tabel, raskusaste ja asukoht kasutavad
+liiki, mitte nime. Ebaõnnestunud võistkond käis KP-s. Vanematel eranditel liik
+puudub ja see tuletatakse nimest („Ei läbinud…”, „Läbis aga ei sooritanud…” ja
+„Ebaõnnestu…”). Liiki saab muuta elemendi loomise ja muutmise vormis. Liik
+„Ebaõnnestus” mõjutab ka punkte, vt [exceptions.md](exceptions.md).
 
 ## Kaart
 

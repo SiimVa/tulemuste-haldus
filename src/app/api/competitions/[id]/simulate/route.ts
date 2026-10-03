@@ -52,6 +52,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
         fields: true,
         calcMethod: true,
         miscEntries: { select: { teamId: true, points: true } },
+        exceptions: { select: { label: true, kind: true } },
         sections: { include: { fields: { orderBy: { order: "asc" } }, calcMethod: true }, orderBy: { order: "asc" } },
       },
     }),

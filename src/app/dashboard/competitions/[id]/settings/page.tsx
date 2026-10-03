@@ -79,7 +79,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
   const [fixedRankingPoints, setFixedRankingPoints] = useState<string[]>([])
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([])
   const [applying, setApplying] = useState(false)
-  const [applyResult, setApplyResult] = useState<{ maxValues: number; exceptions: number; calcMethods: number } | null>(null)
+  const [applyResult, setApplyResult] = useState<{ maxValues: number; exceptions: number; addedExceptions?: number; markedFailedExceptions?: number; calcMethods: number } | null>(null)
   const [applyError, setApplyError] = useState("")
 
   useEffect(() => {
@@ -183,7 +183,8 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
       "Rakendad hetkel salvestatud vaikeväärtused KÕIGILE elementidele:\n" +
       "• KP maksimum → kõik kontrollpunktid\n" +
       "• PK maksimum → kõik postkastid\n" +
-      "• Erandite karistused (Ei läbinud / Läbis aga ei sooritanud)\n" +
+      "• Erandite karistused (Ei läbinud / Läbis aga ei sooritanud / Ebaõnnestus)\n" +
+      "• Kontrollpunktidele lisatakse erand „Ebaõnnestus”, kui seda veel pole (samanimeline erand saab liigi „Ebaõnnestus”)\n" +
       "• Arvutusmeetod → KP ja PK elemendid\n\n" +
       "Skoorid arvutatakse automaatselt ümber. Käsitsi tehtud erisused kirjutatakse üle.\n\nJätka?"
     )) return
@@ -581,7 +582,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             <ul className="mt-2 text-xs text-gray-400 space-y-0.5 list-disc list-inside">
               <li>KP maks → kõik kontrollpunktid</li>
               <li>PK maks → kõik postkastid</li>
-              <li>Erandid: <em>Ei läbinud</em> ja <em>Läbis aga ei sooritanud</em></li>
+              <li>Erandid: <em>Ei läbinud</em>, <em>Läbis aga ei sooritanud</em> ja <em>Ebaõnnestus</em> (KP-le lisatakse puudumisel)</li>
               <li>Arvutusmeetod + parameetrid (KP/PK)</li>
             </ul>
           </div>
@@ -597,7 +598,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
 
         {applyResult && (
           <div className="mt-4 bg-green-50 border border-green-100 rounded-lg px-4 py-3 text-sm text-green-800">
-            ✓ Valmis — uuendatud: {applyResult.maxValues} max väärtust, {applyResult.exceptions} erandi karistust, {applyResult.calcMethods} arvutusmeetodit. Skoorid arvutati ümber.
+            ✓ Valmis — uuendatud: {applyResult.maxValues} max väärtust, {applyResult.exceptions} erandi karistust, {applyResult.calcMethods} arvutusmeetodit{applyResult.addedExceptions ? `, lisatud ${applyResult.addedExceptions} erandit „Ebaõnnestus”` : ""}{applyResult.markedFailedExceptions ? `, ${applyResult.markedFailedExceptions} olemasolevale erandile määrati liik „Ebaõnnestus”` : ""}. Skoorid arvutati ümber.
           </div>
         )}
         {applyError && (

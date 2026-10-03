@@ -767,13 +767,13 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
             <button type="button" onClick={addException}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Lisa erand</button>
           </div>
-          <p className="text-xs text-gray-500">Liik määrab, kuidas erandit statistikas loetakse (nt „Ei läbinud” ei ole KP-s käimine).</p>
+          <p className="text-xs text-gray-500">Liik määrab, kuidas erandit hinnatakse ja statistikas loetakse. „Ebaõnnestus” (tegi, kuid mitte kriteeriumite järgi) jääb pingereaga hindamisel pingeritta viimaseks halvima tulemusega ja teised paigutatakse temast ettepoole; karistust kasutatakse ainult ilma pingereata hindamisel. Teised erandid saavad kindla karistuse ja jäävad pingereast välja.</p>
           {exceptions.map((ex, i) => (
             <div key={i} className="flex flex-wrap gap-2 items-center">
               <Input type="text" value={ex.label} onChange={e => updateException(i, "label", e.target.value)}
                 placeholder="Erand (nt Ei läbinud)"
                 className="min-w-40 flex-1 focus:ring-1" />
-              <Select aria-label="Erandi liik statistikas" value={ex.kind ?? inferExceptionKind(ex.label)}
+              <Select aria-label="Erandi liik" value={ex.kind ?? inferExceptionKind(ex.label)}
                 onChange={e => updateExceptionKind(i, e.target.value as ExceptionKind)} className="w-auto focus:ring-1">
                 {EXCEPTION_KINDS.map(kind => <option key={kind} value={kind}>{EXCEPTION_KIND_LABELS[kind]}</option>)}
               </Select>

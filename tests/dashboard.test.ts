@@ -324,3 +324,14 @@ test("analysis: difficulty, discrimination, class comparison, time spent and pen
   assert.equal(summary.elements[0].teamsAffected, 1)
   assert.deepEqual(summary.manual.byDescription.map((item) => [item.description, item.count, item.points]), [["Prügi", 2, 10], ["Kirjelduseta", 1, 2]])
 })
+
+test("KP tabel loeb ebaõnnestumised eraldi ja need käisid KP-s", () => {
+  const elements = [element("e1", 0)]
+  const teams = [team("a"), team("b"), team("c")]
+  const [row] = elementTableRows(elements, teams, [
+    result("e1", "a", 3),
+    result("e1", "b", 2, { exceptionLabel: "Ebaõnnestus" }),
+    result("e1", "c", 1, { exceptionLabel: "Ei läbinud" }),
+  ])
+  assert.deepEqual([row.performed, row.failed, row.notPassed, row.visited], [1, 1, 1, 2])
+})

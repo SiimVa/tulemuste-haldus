@@ -25,7 +25,9 @@ export type DifficultyRow = ElementRef & {
   averageLoss: number
   maxValue: number | null
   lossPct: number | null
+  // Erandiga (ei läbinud, ei sooritanud, muu) ja ebaõnnestunud eraldi.
   notDonePct: number | null
+  failedPct: number | null
 }
 
 export function difficultyRows(
@@ -43,7 +45,9 @@ export function difficultyRows(
     const averageLoss = mean(scores.map((points) => Math.abs(points - best)))
     const maxValue = element.maxValue ?? (element.type === "PENALTY_BOX" ? defaults.pkMax : defaults.kpMax)
     const elementResults = results.filter((result) => result.elementId === element.id && eligible.has(result.teamId))
-    const notDone = elementResults.filter((result) => resultExceptionKind(result.exceptionLabel, element.exceptions) != null).length
+    const kinds = elementResults.map((result) => resultExceptionKind(result.exceptionLabel, element.exceptions))
+    const notDone = kinds.filter((kind) => kind != null && kind !== "FAILED").length
+    const failed = kinds.filter((kind) => kind === "FAILED").length
     return [{
       ...ref(element),
       n: scores.length,
@@ -53,6 +57,7 @@ export function difficultyRows(
       maxValue: maxValue > 0 ? maxValue : null,
       lossPct: maxValue > 0 ? round2(Math.min(100, (averageLoss / maxValue) * 100)) : null,
       notDonePct: elementResults.length ? round2((notDone / elementResults.length) * 100) : null,
+      failedPct: elementResults.length ? round2((failed / elementResults.length) * 100) : null,
     }]
   }).sort((a, b) => (b.lossPct ?? -1) - (a.lossPct ?? -1) || b.averageLoss - a.averageLoss)
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { calculateScores, withEffectiveHC } from "@/lib/calculators"
+import { isFailedResult } from "@/lib/exceptionKinds"
 import { parseClassGroups, scopeKeyFor, TEAM_COUNT_SCOPES } from "@/lib/classGroups"
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
@@ -121,8 +122,9 @@ export async function recomputeElementScores(elementId: string): Promise<number>
 
   if (element.sections.length > 0) {
     // Kombineeritud hindamine: iga sektsiooni skoor eraldi ja summeeri
-    const exceptionResults = activeResults.filter((r) => r.exceptionLabel)
-    const normalResults = activeResults.filter((r) => !r.exceptionLabel)
+    // Ebaõnnestunud jäävad iga osa pingeritta viimaseks; teised erandid saavad kindla karistuse.
+    const exceptionResults = activeResults.filter((r) => r.exceptionLabel && !isFailedResult(r, element.exceptions))
+    const normalResults = activeResults.filter((r) => !r.exceptionLabel || isFailedResult(r, element.exceptions))
     const teamScores = new Map<string, number>()
 
     for (const r of exceptionResults) {
@@ -142,10 +144,10 @@ export async function recomputeElementScores(elementId: string): Promise<number>
           customFormula: section.calcMethod.customFormula,
         },
         fields: section.fields,
-        exceptions: [] as { label: string; penalty: number }[],
+        exceptions: element.exceptions,
         maxValue: section.maxValue,
       }
-      const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), config)
+      const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), config, { failedWithoutRanking: "WORST" })
       for (const s of sectionScored) {
         teamScores.set(s.teamId, round3((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints))
       }

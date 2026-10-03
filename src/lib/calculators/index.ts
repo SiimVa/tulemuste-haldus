@@ -4,6 +4,7 @@ import { evaluateFormula } from "../formula"
 
 import { scopeKeyFor, type ClassGroup, type TeamCountScope } from "../classGroups"
 import { parseFixedRankingParams, registeredCountPoints } from "../fixedRanking"
+import { isFailedResult } from "../exceptionKinds"
 
 // Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
 export type ScoreInput = {
@@ -29,15 +30,27 @@ export interface ScoredEntry {
   penaltyPoints: number
   isHorsDeCompetition?: boolean
   teamClass?: string | null
+  // Ebaõnnestus: tegi ülesande, kuid mitte kriteeriumite järgi.
+  failed?: boolean
 }
 
 interface ElementWithConfig {
   id: string
   calcMethod: CalcMethod | null
   fields: FieldDefinition[]
-  exceptions: { label: string; penalty: number }[]
+  // kind määrab ebaõnnestumise; puuduv kind tuletatakse nimest.
+  exceptions: { label: string; penalty?: number; kind?: string | null }[]
   maxValue?: number | null
 }
+
+export type CalculateOptions = {
+  // Ilma pingereata meetodis saab ebaõnnestunu kas erandi karistuse või
+  // halvima võimaliku tulemuse (kombineeritud elemendi osades).
+  failedWithoutRanking?: "EXCEPTION_PENALTY" | "WORST"
+}
+
+// Meetodid, kus võistkonnad järjestatakse ja ebaõnnestunu jääb viimaseks.
+const RANKED_METHODS: CalcType[] = ["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"]
 
 interface CompetitionConfig {
   scoringMode: ScoringMode
@@ -137,7 +150,8 @@ export function computeFields(
 export function calculateScores(
   element: ElementWithConfig,
   results: ScoreInput[],
-  competition: CompetitionConfig = { scoringMode: "PENALTY", defaultKPMaxValue: 30, defaultPKMaxValue: 30 }
+  competition: CompetitionConfig = { scoringMode: "PENALTY", defaultKPMaxValue: 30, defaultPKMaxValue: 30 },
+  options: CalculateOptions = {}
 ): ScoredEntry[] {
   const { scoringMode } = competition
   const fields = element.fields
@@ -150,8 +164,9 @@ export function calculateScores(
 
   const entries: ScoredEntry[] = results.map((r) => {
     const isHC = r.team.isHorsDeCompetition ?? false
-    if (r.exceptionLabel !== null && r.exceptionPenalty !== null) {
-      const magnitude = Math.abs(r.exceptionPenalty)
+    const failed = r.exceptionLabel !== null && isFailedResult(r, element.exceptions)
+    if (r.exceptionLabel !== null && (r.exceptionPenalty !== null || failed)) {
+      const magnitude = Math.abs(r.exceptionPenalty ?? 0)
       const stored = scoringMode === "PLUS" ? -magnitude : magnitude
       return {
         teamId: r.teamId,
@@ -161,6 +176,7 @@ export function calculateScores(
         penaltyPoints: stored,
         isHorsDeCompetition: isHC,
         teamClass: r.team.class ?? null,
+        failed,
       }
     }
 
@@ -186,27 +202,22 @@ export function calculateScores(
   if (!calcMethod) return entries
 
   const normal = entries.filter((e) => e.rawValue !== null)
-  const exceptions = entries.filter((e) => e.exceptionPenalty !== null)
+  const failed = entries.filter((e) => e.failed)
+  const exceptions = entries.filter((e) => e.exceptionPenalty !== null && !e.failed)
+  const type = calcMethod.type as CalcType
 
-  if (normal.length === 0) return entries
+  // Ilma pingereata meetodis on ebaõnnestumine tavaline erand (kindel
+  // karistus); kombineeritud elemendi osas halvim võimalik tulemus.
+  if (!RANKED_METHODS.includes(type) && options.failedWithoutRanking === "WORST") {
+    for (const entry of failed) entry.penaltyPoints = scoringMode === "PLUS" ? 0 : maxValue
+  }
+  if (normal.length === 0 && (failed.length === 0 || !RANKED_METHODS.includes(type))) return entries
 
-  switch (calcMethod.type as CalcType) {
-    case "RELATIVE_RANKING": {
-      const inComp = normal.filter((e) => !e.isHorsDeCompetition)
-      const horsComp = normal.filter((e) => e.isHorsDeCompetition)
-      if (horsComp.length > 0) {
-        if (inComp.length > 0) applyRelativeRanking(inComp, calcMethod.params, maxValue, scoringMode, fields)
-        const allCopy = normal.map((e) => ({ ...e }))
-        applyRelativeRanking(allCopy, calcMethod.params, maxValue, scoringMode, fields)
-        for (const hc of horsComp) {
-          const scored = allCopy.find((e) => e.teamId === hc.teamId)
-          if (scored) hc.penaltyPoints = scored.penaltyPoints
-        }
-      } else {
-        applyRelativeRanking(normal, calcMethod.params, maxValue, scoringMode, fields)
-      }
+  switch (type) {
+    case "RELATIVE_RANKING":
+      rankWithHorsConcours(normal, failed, (scored, failedHere) =>
+        applyRelativeRanking(scored, calcMethod.params, maxValue, scoringMode, fields, failedHere))
       break
-    }
     case "ABSOLUTE_TIME":
       applyAbsoluteTime(normal, scoringMode)
       break
@@ -219,36 +230,17 @@ export function calculateScores(
     case "ABSOLUTE_PENALTY":
       applyAbsolutePenalty(normal, calcMethod.customFormula || "result", scoringMode)
       break
-    case "FIXED_RANKING": {
-      const inComp = normal.filter((e) => !e.isHorsDeCompetition)
-      const horsComp = normal.filter((e) => e.isHorsDeCompetition)
-      if (horsComp.length > 0) {
-        if (inComp.length > 0) applyFixedRanking(inComp, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups })
-        const allCopy = normal.map((e) => ({ ...e }))
-        applyFixedRanking(allCopy, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups })
-        for (const hc of horsComp) {
-          const scored = allCopy.find((e) => e.teamId === hc.teamId)
-          if (scored) hc.penaltyPoints = scored.penaltyPoints
-        }
-      } else {
-        applyFixedRanking(normal, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups })
-      }
+    case "FIXED_RANKING":
+      rankWithHorsConcours(normal, failed, (scored, failedHere) =>
+        applyFixedRanking(scored, calcMethod.params, maxValue, scoringMode, fields, { registeredCounts: competition.registeredCounts, classGroups: competition.classGroups }, failedHere))
       break
-    }
     case "VALUE_BASED": {
-      const inComp = normal.filter((e) => !e.isHorsDeCompetition)
-      const horsComp = normal.filter((e) => e.isHorsDeCompetition)
-      if (horsComp.length > 0) {
-        if (inComp.length > 0) applyValueBased(inComp, calcMethod.params, maxValue, scoringMode, fields)
-        const allCopy = normal.map((e) => ({ ...e }))
-        applyValueBased(allCopy, calcMethod.params, maxValue, scoringMode, fields)
-        for (const hc of horsComp) {
-          const scored = allCopy.find((e) => e.teamId === hc.teamId)
-          if (scored) hc.penaltyPoints = scored.penaltyPoints
-        }
-      } else {
-        applyValueBased(normal, calcMethod.params, maxValue, scoringMode, fields)
-      }
+      rankWithHorsConcours(normal, failed, (scored) => {
+        if (scored.length > 0) applyValueBased(scored, calcMethod.params, maxValue, scoringMode, fields)
+      })
+      // Väärtusepõhises skaalas on ebaõnnestunul halvim võimalik tulemus.
+      const minPoints = (() => { try { return Number(JSON.parse(calcMethod.params || "{}").minPoints ?? 0) || 0 } catch { return 0 } })()
+      for (const entry of failed) entry.penaltyPoints = scoringMode === "PLUS" ? minPoints : maxValue
       break
     }
     case "PERFORMANCE_BASED":
@@ -261,7 +253,37 @@ export function calculateScores(
       break
   }
 
-  return [...normal, ...exceptions]
+  return [...normal, ...failed, ...exceptions]
+}
+
+// Arvestusvälised võistkonnad ei mõjuta arvestuses olevate kohti, kuid saavad
+// punktid nii, nagu oleksid nad kõigiga koos järjestatud. Ebaõnnestunud on
+// mõlemas järjestuses viimastel kohtadel.
+function rankWithHorsConcours(
+  normal: ScoredEntry[],
+  failed: ScoredEntry[],
+  apply: (scored: ScoredEntry[], failed: ScoredEntry[]) => void
+) {
+  const horsComp = normal.filter((e) => e.isHorsDeCompetition)
+  const failedHorsComp = failed.filter((e) => e.isHorsDeCompetition)
+  if (horsComp.length === 0 && failedHorsComp.length === 0) {
+    apply(normal, failed)
+    return
+  }
+  const inComp = normal.filter((e) => !e.isHorsDeCompetition)
+  const failedInComp = failed.filter((e) => !e.isHorsDeCompetition)
+  if (inComp.length > 0 || failedInComp.length > 0) apply(inComp, failedInComp)
+  const allCopy = normal.map((e) => ({ ...e }))
+  const failedCopy = failed.map((e) => ({ ...e }))
+  apply(allCopy, failedCopy)
+  for (const hc of horsComp) {
+    const scored = allCopy.find((e) => e.teamId === hc.teamId)
+    if (scored) hc.penaltyPoints = scored.penaltyPoints
+  }
+  for (const hc of failedHorsComp) {
+    const scored = failedCopy.find((e) => e.teamId === hc.teamId)
+    if (scored) hc.penaltyPoints = scored.penaltyPoints
+  }
 }
 
 // ─── Viigi lahendaja sort ─────────────────────────────────────────────────────
@@ -331,7 +353,8 @@ function applyRelativeRanking(
   paramsJson: string,
   maxValue: number,
   scoringMode: ScoringMode,
-  fields: FieldDefinition[] = []
+  fields: FieldDefinition[] = [],
+  failed: ScoredEntry[] = []
 ) {
   const params: { higherIsBetter?: boolean; minPoints?: number } = (() => {
     try { return JSON.parse(paramsJson) } catch { return {} }
@@ -340,7 +363,11 @@ function applyRelativeRanking(
   const minPoints = params.minPoints ?? 0
   const higherIsBetter = params.higherIsBetter ?? false
 
-  const n = entries.length
+  // Ebaõnnestunud täidavad skaala viimased kohad halvima tulemusega; õnnestunud
+  // jaotatakse ülejäänud kohtadele, nii et nende halvim tulemus paraneb.
+  for (const entry of failed) entry.penaltyPoints = scoringMode === "PLUS" ? minPoints : maxValue
+  const n = entries.length + failed.length
+  if (entries.length === 0) return
   if (n <= 1) {
     entries.forEach((e) => (e.penaltyPoints = scoringMode === "PLUS" ? maxValue : minPoints))
     return
@@ -418,26 +445,35 @@ function applyTeamCountRanking(
   base: number,
   step: number,
   fields: FieldDefinition[],
-  ctx: FixedRankingContext
+  ctx: FixedRankingContext,
+  failed: ScoredEntry[] = []
 ) {
   const groups = ctx.classGroups ?? []
-  const buckets = new Map<string, ScoredEntry[]>()
-  for (const entry of entries) {
+  const buckets = new Map<string, { scored: ScoredEntry[]; failed: ScoredEntry[] }>()
+  const bucketFor = (entry: ScoredEntry) => {
     const key = scopeKeyFor(scope, entry.teamClass, groups)
-    const bucket = buckets.get(key)
-    if (bucket) bucket.push(entry)
-    else buckets.set(key, [entry])
+    const bucket = buckets.get(key) ?? { scored: [], failed: [] }
+    buckets.set(key, bucket)
+    return bucket
   }
+  for (const entry of entries) bucketFor(entry).scored.push(entry)
+  for (const entry of failed) bucketFor(entry).failed.push(entry)
 
   for (const [key, bucket] of buckets) {
     // N tuleb registreerunute arvust, mitte selles elemendis tulemuse saanutest.
     // Kui arvu pole kaasa antud, taandub see kohalolijate arvule.
-    const n = Math.max(1, ctx.registeredCounts?.get(key) ?? bucket.length)
-    const { rankMap } = sortByRankingFields(bucket, fields, higherIsBetter)
-    for (const entry of bucket) {
-      const r = rankMap.get(entry.teamId) ?? 1
-      entry.penaltyPoints = registeredCountPoints(r, n, scoringMode, base, step)
+    const present = bucket.scored.length + bucket.failed.length
+    const n = Math.max(1, ctx.registeredCounts?.get(key) ?? present)
+    if (bucket.scored.length > 0) {
+      const { rankMap } = sortByRankingFields(bucket.scored, fields, higherIsBetter)
+      for (const entry of bucket.scored) {
+        const r = rankMap.get(entry.teamId) ?? 1
+        entry.penaltyPoints = registeredCountPoints(r, n, scoringMode, base, step)
+      }
     }
+    // Ebaõnnestunud saavad skoobi viimase koha punktid.
+    const lastPlace = Math.max(n, present)
+    for (const entry of bucket.failed) entry.penaltyPoints = registeredCountPoints(lastPlace, lastPlace, scoringMode, base, step)
   }
 }
 
@@ -447,7 +483,8 @@ function applyFixedRanking(
   maxValue: number,
   scoringMode: ScoringMode,
   fields: FieldDefinition[] = [],
-  ctx: FixedRankingContext = {}
+  ctx: FixedRankingContext = {},
+  failed: ScoredEntry[] = []
 ) {
   const params = parseFixedRankingParams(paramsJson)
 
@@ -460,7 +497,8 @@ function applyFixedRanking(
       params.teamCountBase,
       params.teamCountStep,
       fields,
-      ctx
+      ctx,
+      failed
     )
     return
   }
@@ -469,38 +507,41 @@ function applyFixedRanking(
   const minPoints = params.minPoints
   const higherIsBetter = params.higherIsBetter
 
-  const n = entries.length
-  const { rankMap } = sortByRankingFields(entries, fields, higherIsBetter)
+  // Ebaõnnestunud on viimastel kohtadel, seega kohti on kokku rohkem.
+  const n = entries.length + failed.length
 
-  for (const entry of entries) {
-    const r = rankMap.get(entry.teamId) ?? 1
-    let pts: number
-
+  const pointsAt = (r: number): number => {
     if (fixedPoints.length === 0) {
       // Puhtalt valemiga (nagu RELATIVE_RANKING)
       const range = maxValue - minPoints
       const step = n > 1 ? range / (n - 1) : 0
-      pts = scoringMode === "PLUS" ? maxValue - (r - 1) * step : minPoints + (r - 1) * step
-    } else if (r <= fixedPoints.length) {
-      pts = fixedPoints[r - 1]
-    } else if (params.fixedRankingMode === "MANUAL_ALL") {
+      return scoringMode === "PLUS" ? maxValue - (r - 1) * step : minPoints + (r - 1) * step
+    }
+    if (r <= fixedPoints.length) return fixedPoints[r - 1]
+    if (params.fixedRankingMode === "MANUAL_ALL") {
       // Käsitsi režiimis valemit ei kasutata. Kui registreerunuid on pärast
       // seadistamist lisandunud, saab üleliigne koht viimase määratud väärtuse.
-      pts = fixedPoints[fixedPoints.length - 1]
-    } else {
-      // Valem: viimasest fikseeritud väärtusest → minPoints
-      const lastFixed = fixedPoints[fixedPoints.length - 1]
-      const remainingPositions = n - fixedPoints.length
-      if (remainingPositions <= 0) {
-        pts = minPoints
-      } else {
-        const range = lastFixed - minPoints
-        const step = range / remainingPositions
-        pts = lastFixed - (r - fixedPoints.length) * step
-      }
+      return fixedPoints[fixedPoints.length - 1]
     }
+    // Valem: viimasest fikseeritud väärtusest → minPoints
+    const lastFixed = fixedPoints[fixedPoints.length - 1]
+    const remainingPositions = n - fixedPoints.length
+    if (remainingPositions <= 0) return minPoints
+    const step = (lastFixed - minPoints) / remainingPositions
+    return lastFixed - (r - fixedPoints.length) * step
+  }
 
-    entry.penaltyPoints = Math.round(pts * 1000) / 1000
+  // Ainult ebaõnnestunud: valemis halvim väärtus, tabelis viimase koha punktid.
+  const failedPoints = entries.length === 0 && fixedPoints.length === 0
+    ? (scoringMode === "PLUS" ? minPoints : maxValue)
+    : pointsAt(n)
+  for (const entry of failed) entry.penaltyPoints = Math.round(failedPoints * 1000) / 1000
+  if (entries.length === 0) return
+
+  const { rankMap } = sortByRankingFields(entries, fields, higherIsBetter)
+  for (const entry of entries) {
+    const r = rankMap.get(entry.teamId) ?? 1
+    entry.penaltyPoints = Math.round(pointsAt(r) * 1000) / 1000
   }
 }
 

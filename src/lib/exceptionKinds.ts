@@ -1,13 +1,18 @@
-// Erandi liik statistika jaoks. Erandi nimi on korraldaja vabatekst, seega
-// „Ei läbinud” ja „Läbis aga ei sooritanud” tuvastamiseks hoitakse liiki
+// Erandi liik. Erandi nimi on korraldaja vabatekst, seega „Ei läbinud”,
+// „Läbis aga ei sooritanud” ja „Ebaõnnestus” tuvastamiseks hoitakse liiki
 // eraldi. Vanematel eranditel liik puudub ja see tuletatakse nimest.
+//
+// „Ebaõnnestus” (FAILED) mõjutab ka hindamist: pingereaga meetodites jääb
+// võistkond pingeritta viimasele kohale halvima tulemusega, teised erandid
+// saavad kindla karistuse ja jäävad pingereast välja.
 
-export const EXCEPTION_KINDS = ["NOT_PASSED", "PASSED_NOT_DONE", "OTHER"] as const
+export const EXCEPTION_KINDS = ["NOT_PASSED", "PASSED_NOT_DONE", "FAILED", "OTHER"] as const
 export type ExceptionKind = (typeof EXCEPTION_KINDS)[number]
 
 export const EXCEPTION_KIND_LABELS: Record<ExceptionKind, string> = {
   NOT_PASSED: "Ei läbinud",
   PASSED_NOT_DONE: "Läbis, aga ei sooritanud",
+  FAILED: "Ebaõnnestus",
   OTHER: "Muu erand",
 }
 
@@ -19,6 +24,7 @@ export function inferExceptionKind(label: string): ExceptionKind {
   const normalized = label.toLocaleLowerCase("et").replace(/[,.]/g, " ").replace(/\s+/g, " ").trim()
   if (/^ei läbinud( |$)/.test(normalized)) return "NOT_PASSED"
   if (/^läbis aga ei sooritanud( |$)/.test(normalized)) return "PASSED_NOT_DONE"
+  if (/^ebaõnnestu/.test(normalized)) return "FAILED"
   return "OTHER"
 }
 
@@ -40,4 +46,20 @@ export function resultExceptionKind(
 // Kliendi saadetud liik; tundmatu väärtus tähendab, et liik tuletatakse nimest.
 export function parseExceptionKind(value: unknown, label: string): ExceptionKind {
   return isExceptionKind(value) ? value : inferExceptionKind(label)
+}
+
+// Ebaõnnestunud sooritus: võistkond tegi ülesande, kuid mitte kriteeriumite järgi.
+export function isFailedResult(
+  result: { exceptionLabel?: string | null },
+  exceptions: { label: string; kind?: string | null }[]
+): boolean {
+  return resultExceptionKind(result.exceptionLabel, exceptions) === "FAILED"
+}
+
+export const FAILED_EXCEPTION_LABEL = "Ebaõnnestus"
+
+// „Ebaõnnestus” karistust kasutatakse ainult ilma pingereata hindamisel:
+// punktisüsteemis 0 punkti, karistuspunktides KP maksimum.
+export function failedExceptionPenalty(scoringMode: string, kpMaxValue: number): number {
+  return scoringMode === "PLUS" ? 0 : kpMaxValue
 }

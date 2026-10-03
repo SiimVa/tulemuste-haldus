@@ -577,7 +577,7 @@ model ElementException {
   label     String
   penalty   Float
   order     Int            @default(0)
-  // Statistika jaoks: "NOT_PASSED" | "PASSED_NOT_DONE" | "OTHER".
+  // Hindamise ja statistika jaoks: "NOT_PASSED" | "PASSED_NOT_DONE" | "FAILED" | "OTHER".
   // null = vanem kirje, liik tuletatakse nimest.
   kind      String?
 }
