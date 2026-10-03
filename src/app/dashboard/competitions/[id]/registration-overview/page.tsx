@@ -105,6 +105,7 @@ export default function RegistrationOverviewPage({ params }: { params: Promise<{
             <option value="">Vali koondamise alus</option>
             <optgroup label="Vormiväljad">{data.columns.filter(column => column.group === "form").map(column => <option key={column.key} value={column.key}>{column.label}</option>)}</optgroup>
             <optgroup label="Põhiandmed">{data.columns.filter(column => column.group === "basic").map(column => <option key={column.key} value={column.key}>{column.label}</option>)}</optgroup>
+            <optgroup label="Liikmed">{data.columns.filter(column => column.group === "members").map(column => <option key={column.key} value={column.key}>{column.label}</option>)}</optgroup>
           </select>
           <p className="mt-2 text-sm text-ink-muted">Vali näiteks „Maakond”, et näha iga maakonna võistkondade arvu. Mitme välja järgi koondamiseks märgi allpool vajalikud väljad.</p>
         </div>}
@@ -115,8 +116,8 @@ export default function RegistrationOverviewPage({ params }: { params: Promise<{
           <Button type="button" size="sm" variant="secondary" onClick={() => select(data.columns.map(column => column.key))}>Vali kõik</Button>
           <Button type="button" size="sm" variant="secondary" onClick={() => select([])}>Tühjenda valik</Button>
         </div>
-        {(["basic", "form"] as const).map(group => <fieldset key={group} className="mt-4">
-          <legend className="text-sm font-medium text-ink-muted">{group === "basic" ? "Põhiandmed" : "Vormiväljad"}</legend>
+        {(["basic", "members", "form"] as const).map(group => <fieldset key={group} className="mt-4">
+          <legend className="text-sm font-medium text-ink-muted">{group === "basic" ? "Põhiandmed" : group === "members" ? "Liikmed" : "Vormiväljad"}</legend>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {data.columns.filter(column => column.group === group).map(column => <label key={column.key} className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-0.5" checked={activeSelection.includes(column.key)} onChange={event => select(event.target.checked ? [...activeSelection, column.key] : activeSelection.filter(key => key !== column.key))} />

@@ -10,11 +10,11 @@ export function RegistrationExportButtons({ competitionId, phase, columns, filte
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
-  async function download(format: "csv" | "xlsx") {
+  async function download(format: "csv" | "xlsx", exportView: ReportView = view) {
     setBusy(true)
     setError("")
     try {
-      const query = new URLSearchParams({ phase, format, view })
+      const query = new URLSearchParams({ phase, format, view: exportView })
       columns?.forEach(column => query.append("column", column))
       if (filters.status) query.set("status", filters.status)
       if (filters.className !== undefined) query.set("class", filters.className)
@@ -43,7 +43,9 @@ export function RegistrationExportButtons({ competitionId, phase, columns, filte
     <div className="flex flex-wrap gap-2">
       <Button type="button" variant="secondary" size="sm" disabled={disabled || busy || columns?.length === 0} onClick={() => download("xlsx")}>{busy ? "Ekspordin…" : "Ekspordi Excel"}</Button>
       <Button type="button" variant="secondary" size="sm" disabled={disabled || busy || columns?.length === 0} onClick={() => download("csv")}>Ekspordi CSV</Button>
+      {view === "teams" && <Button type="button" variant="secondary" size="sm" disabled={disabled || busy} onClick={() => download("csv", "members")}>Liikmed CSV</Button>}
     </div>
+    {view === "teams" && <p className="mt-1 text-xs text-ink-muted">Excelis on liikmed eraldi lehel, iga liige oma real.</p>}
     {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
   </div>
 }

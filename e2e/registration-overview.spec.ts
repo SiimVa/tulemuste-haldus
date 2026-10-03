@@ -16,6 +16,12 @@ test("organizer selects report fields, filters and exports registration and mand
   const privateCompetition = await db.competition.create({ data: { name: "Privaatne", createdById: other.id, organizerId: other.id } })
   const county = await db.competitionFormField.create({ data: { competitionId: competition.id, key: "county", label: "Maakond", type: "TEXT" } })
   const food = await db.competitionFormField.create({ data: { competitionId: competition.id, key: "food", label: "Toidueelistus", type: "TEXT", showInRegistration: false, showInMandate: true } })
+  // Esindaja süsteemiväljad ja liikmete loend, mis varem eksporditi topelt ja ühte lahtrisse.
+  const representativeFields: { id: string }[] = []
+  for (const [index, [key, label, type]] of [["system_representative_name", "Esindaja nimi", "TEXT"], ["system_representative_email", "Esindaja e-post", "EMAIL"], ["system_representative_phone", "Esindaja telefon", "PHONE"]].entries()) {
+    representativeFields.push(await db.competitionFormField.create({ data: { competitionId: competition.id, key, label, type, order: 10 + index } }))
+  }
+  const memberList = await db.competitionFormField.create({ data: { competitionId: competition.id, key: "members", label: "Võistkonna liikmed", type: "MEMBER_LIST", memberFields: JSON.stringify(["name", "email", "phone", "birthDate"]), showInMandate: false, order: 20 } })
   const team = await db.team.create({ data: {
     competitionId: competition.id, code: "01", name: "Öökullid", class: "Noored", registrationStatus: "APPROVED", mandateStatus: "SUBMITTED",
     formValues: { create: [{ fieldId: county.id, value: JSON.stringify("Harju") }, { fieldId: food.id, value: JSON.stringify("Taimne") }] },
@@ -23,7 +29,11 @@ test("organizer selects report fields, filters and exports registration and mand
   } })
   await db.registrationApplication.create({ data: {
     competitionId: competition.id, submittedById: user.id, teamName: team.name, teamId: team.id, status: "CONFIRMED", submittedAt: new Date(),
-    fieldValues: { create: { fieldId: county.id, value: JSON.stringify("Tartu") } },
+    fieldValues: { create: [
+      { fieldId: county.id, value: JSON.stringify("Tartu") },
+      ...["Robi Abel", "robi.abel@example.com", "5555 1234"].map((value, index) => ({ fieldId: representativeFields[index].id, value: JSON.stringify(value) })),
+      { fieldId: memberList.id, value: JSON.stringify([{ name: "Katrin Liidlein", email: "katrin@example.com", phone: "5841234", birthDate: "2010-03-04", isCaptain: true }, { name: "Selena Suurmaa", email: "selena@example.com" }]) },
+    ] },
   } })
   await db.registrationApplication.create({ data: {
     competitionId: competition.id, submittedById: user.id, teamName: "Ootel tiim", status: "WAITLISTED", waitlistPosition: 1,
@@ -78,7 +88,28 @@ test("organizer selects report fields, filters and exports registration and mand
   const mandateRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(mandateWorkbook.Sheets.Mandaat)
   expect(mandateRows).toHaveLength(1)
   expect(mandateRows[0].Maakond).toBe("Harju")
-  expect(mandateRows[0]["Mandaadi koosseis"]).toContain("Mari · mari@example.com · Võistleja · Kapten · Navigeerija")
+  expect(mandateRows[0].Liikmed).toBe("Mari (kapten)")
+  expect(XLSX.utils.sheet_to_json(mandateWorkbook.Sheets.Liikmed, { defval: "" })).toEqual([
+    { Tähis: "01", Võistkond: "Öökullid", Klass: "Noored", "Mandaadi staatus": "Esitatud", Nr: 1, Nimi: "Mari", "E-post": "mari@example.com", Kapten: "Jah", Ülesanne: "Navigeerija", Roll: "Võistleja" },
+  ])
+
+  // Kogu registreerimise eksport: esindaja üks kord, liikmed eraldi lehel.
+  const full = XLSX.read(await (await page.request.get(`${endpoint}/registrations/export?format=xlsx`)).body(), { type: "buffer" })
+  expect(full.SheetNames).toEqual(["Registreerimine", "Liikmed"])
+  const header = XLSX.utils.sheet_to_json<unknown[]>(full.Sheets.Registreerimine, { header: 1 })[0]
+  expect(header).toEqual(expect.arrayContaining(["Esindaja", "Esindaja e-post", "Esindaja telefon", "Liikmete arv", "Liikmed"]))
+  for (const duplicate of ["Esitaja / esindaja", "E-post", "Esindaja nimi", "Võistkonna liikmed"]) expect(header).not.toContain(duplicate)
+  const registered = XLSX.utils.sheet_to_json<Record<string, unknown>>(full.Sheets.Registreerimine, { defval: "" }).find(row => row.Võistkond === "Öökullid")!
+  expect([registered.Esindaja, registered["Esindaja e-post"], registered["Esindaja telefon"], registered["Liikmete arv"], registered.Liikmed])
+    .toEqual(["Robi Abel", "robi.abel@example.com", "5555 1234", 2, "Katrin Liidlein (kapten), Selena Suurmaa"])
+  expect(XLSX.utils.sheet_to_json(full.Sheets.Liikmed, { defval: "" })).toEqual([
+    { Tähis: "01", Võistkond: "Öökullid", Klass: "", "Registreerimise staatus": "Registreeritud", Nr: 1, Nimi: "Katrin Liidlein", "E-post": "katrin@example.com", Telefon: "5841234", Sünniaeg: "04.03.2010", Kapten: "Jah" },
+    { Tähis: "01", Võistkond: "Öökullid", Klass: "", "Registreerimise staatus": "Registreeritud", Nr: 2, Nimi: "Selena Suurmaa", "E-post": "selena@example.com", Telefon: "", Sünniaeg: "", Kapten: "" },
+  ])
+  // Ülevaate API ei saada liikmete kontakte brauserisse.
+  const overview = await (await page.request.get(`${endpoint}/registration-overview`)).json()
+  expect(overview.rows.every((row: Record<string, unknown>) => !("members" in row))).toBe(true)
+  expect(JSON.stringify(overview)).not.toContain("5841234")
   const csv = await page.request.get(`${endpoint}/registrations/export?format=csv&status=WAITLISTED&column=name&column=waitlist`)
   expect(await csv.text()).toContain('"Ootel tiim","1"')
   expect(await csv.text()).not.toContain("Öökullid")
@@ -86,6 +117,11 @@ test("organizer selects report fields, filters and exports registration and mand
   await page.goto(`/dashboard/competitions/${competition.id}/registrations`)
   await expect(page.getByRole("region", { name: "Registreerimise eksport" }).getByRole("button", { name: "Ekspordi Excel" })).toBeVisible()
   await expect(page.getByRole("region", { name: "Mandaadi eksport" }).getByRole("button", { name: "Ekspordi CSV" })).toBeVisible()
+  const membersCsv = page.waitForEvent("download")
+  await page.getByRole("region", { name: "Registreerimise eksport" }).getByRole("button", { name: "Liikmed CSV" }).click()
+  const membersCsvText = (await import("node:fs")).readFileSync((await (await membersCsv).path())!, "utf8")
+  expect(membersCsvText).toContain('"01","Öökullid","","Registreeritud","1","Katrin Liidlein","katrin@example.com","5841234","04.03.2010","Jah"')
+  expect((await membersCsv).suggestedFilename()).toContain("_liikmed.csv")
   await db.registrationApplicationFieldValue.deleteMany({ where: { fieldId: county.id } })
   const purged = await page.request.get(`${endpoint}/registrations/export?format=csv&column=field:${county.id}`)
   expect(await purged.text()).not.toContain("Tartu")
