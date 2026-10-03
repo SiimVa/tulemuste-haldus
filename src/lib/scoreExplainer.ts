@@ -1,6 +1,9 @@
 import { compareElementTimes, pointFieldLabel, readPointMeta } from "./pointFields"
 import { calculateScores, parseTimeToSeconds, computeFields } from "@/lib/calculators"
 import { scopeKeyFor, TEAM_COUNT_SCOPES, type ClassGroup } from "@/lib/classGroups"
+import { isFailedResult } from "@/lib/exceptionKinds"
+
+const RANKED_METHODS = ["RELATIVE_RANKING", "FIXED_RANKING", "VALUE_BASED"]
 
 export interface TeamBreakdown {
   teamId: string
@@ -56,6 +59,7 @@ interface ElementDef {
   fields: FieldDef[]
   calcMethod?: CalcMethodDef | null
   sections?: SectionDef[]
+  exceptions?: { label: string; kind?: string | null }[]
 }
 
 interface ResultDef {
@@ -121,7 +125,9 @@ function explainCalc(
   fields: FieldDef[],
   resultField: FieldDef | undefined,
   teamComputed?: Record<string, string | number>,
-  overrideRank?: number
+  overrideRank?: number,
+  // Ebaõnnestunud võistkonnad, kes on pingerea viimastel kohtadel.
+  failedPlaces = 0
 ): { explanation: string; rank?: number; totalTeams?: number } {
   const params: Record<string, unknown> = (() => {
     try { return JSON.parse(calcMethod.params) } catch { return {} }
@@ -161,10 +167,12 @@ function explainCalc(
       const tbStr = tiebreakers.length > 0 && teamComputed
         ? ` | Viik: ${tiebreakers.map(f => `${f.label} ${fmt(teamComputed[f.name], f.type)}`).join(", ")}`
         : ""
+      const total = n + failedPlaces
+      const failedNote = failedPlaces > 0 ? ` | ${failedPlaces} ebaõnnestunut viimastel kohtadel` : ""
       return {
         rank,
-        totalTeams: n,
-        explanation: `Koht ${rank}/${n} | ${resultField?.label ?? "Tulemus"}: ${fmt(rawValue, fieldType)} (parim: ${fmt(bestVal, fieldType)}, halvim: ${fmt(worstVal, fieldType)})${tbStr} → ${score}p`,
+        totalTeams: total,
+        explanation: `Koht ${rank}/${total} | ${resultField?.label ?? "Tulemus"}: ${fmt(rawValue, fieldType)} (parim: ${fmt(bestVal, fieldType)}, halvim: ${fmt(worstVal, fieldType)})${tbStr}${failedNote} → ${score}p`,
       }
     }
 
@@ -226,7 +234,8 @@ function computeSectionScores(
   fields: FieldDef[],
   maxValue: number,
   teams: TeamDef[],
-  calculatorConfig: NonNullable<Parameters<typeof calculateScores>[2]>
+  calculatorConfig: NonNullable<Parameters<typeof calculateScores>[2]>,
+  exceptions: { label: string; kind?: string | null }[] = []
 ): Map<string, number> {
   const teamMap = new Map(teams.map(team => [team.id, team]))
   const scoreInputs = results.flatMap(result => {
@@ -250,11 +259,12 @@ function computeSectionScores(
       id: "section-score-explanation",
       calcMethod: calcMethod as Parameters<typeof calculateScores>[0]["calcMethod"],
       fields: fields as Parameters<typeof calculateScores>[0]["fields"],
-      exceptions: [],
+      exceptions,
       maxValue,
     },
     scoreInputs,
-    calculatorConfig
+    calculatorConfig,
+    { failedWithoutRanking: "WORST" }
   )
   return new Map(calculated.map(entry => [entry.teamId, entry.penaltyPoints]))
 }
@@ -287,6 +297,10 @@ export function explainElementScores(
   }
 
   const hasSections = (element.sections?.length ?? 0) > 0
+  const exceptions = element.exceptions ?? []
+  const isFailed = (result: ResultDef) => Boolean(result.exceptionLabel) && isFailedResult(result, exceptions)
+  const rankedMethod = RANKED_METHODS.includes(element.calcMethod?.type ?? "")
+  const failedCount = results.filter(isFailed).length
 
   // Kõikide tiimide raw values (tulemusvälja jaoks)
   const teamRawValues = new Map<string, Record<string, string | number>>()
@@ -314,7 +328,7 @@ export function explainElementScores(
   const sectionScoreMaps: Map<string, number>[] = hasSections && element.sections
     ? element.sections.map(section =>
         section.calcMethod && section.fields.length > 0
-          ? computeSectionScores(section.calcMethod, results.filter(r => !r.exceptionLabel), section.fields, section.maxValue ?? maxValue, teams, calculatorConfig)
+          ? computeSectionScores(section.calcMethod, results.filter(r => !r.exceptionLabel || isFailed(r)), section.fields, section.maxValue ?? maxValue, teams, calculatorConfig, exceptions)
           : new Map<string, number>()
       )
     : []
@@ -326,6 +340,13 @@ export function explainElementScores(
     const rawValues = teamRawValues.get(result.teamId) ?? {}
 
     if (result.exceptionLabel) {
+      // Ebaõnnestunu on pingereas viimastel kohtadel; teistel erandi kindel karistus.
+      const total = results.filter(r => !r.exceptionLabel).length + failedCount
+      const explanation = isFailed(result) && hasSections
+        ? `Ebaõnnestus "${result.exceptionLabel}": igas osas viimane koht või halvim tulemus → ${score}p`
+        : isFailed(result) && rankedMethod
+          ? `Ebaõnnestus "${result.exceptionLabel}": pingerea viimane koht (${total}/${total}) → ${score}p`
+          : `Erand: "${result.exceptionLabel}" → ${Math.abs(result.exceptionPenalty ?? 0)}p karistust`
       breakdowns.push({
         teamId: result.teamId,
         teamName: team.name,
@@ -335,7 +356,7 @@ export function explainElementScores(
         exceptionLabel: result.exceptionLabel,
         rawValues,
         score,
-        explanation: `Erand: "${result.exceptionLabel}" → ${Math.abs(result.exceptionPenalty ?? 0)}p karistust`,
+        explanation,
       })
       continue
     }
@@ -416,7 +437,7 @@ export function explainElementScores(
       })
 
     const { explanation, rank, totalTeams } = element.calcMethod
-      ? explainCalc(element.calcMethod, rawValue, allRawValues, score, maxValue, scoringMode, element.fields, resultField, computed, rankByTeam.get(result.teamId))
+      ? explainCalc(element.calcMethod, rawValue, allRawValues, score, maxValue, scoringMode, element.fields, resultField, computed, rankByTeam.get(result.teamId), rankedMethod ? failedCount : 0)
       : { explanation: `${score}p`, rank: undefined, totalTeams: undefined }
 
     const displayVals: Record<string, string> = {}

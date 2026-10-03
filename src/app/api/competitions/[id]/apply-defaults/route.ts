@@ -5,6 +5,7 @@ import { canAccessCompetition } from "@/lib/competitionAccess"
 import { prisma } from "@/lib/prisma"
 import { recomputeCompetitionScores } from "@/lib/recompute"
 import { fixedRankingParamsForStorage, parseFixedRankingParams } from "@/lib/fixedRanking"
+import { exceptionKind, failedExceptionPenalty, FAILED_EXCEPTION_LABEL, inferExceptionKind } from "@/lib/exceptionKinds"
 
 // Elemendi tüüp → max väärtus seosed
 const MAX_VALUE_TYPES = ["CHECKPOINT", "PENALTY_BOX"] as const
@@ -42,7 +43,10 @@ async function handlePOST(_req: Request, { params }: { params: Promise<{ id: str
 
   let updatedMaxValues = 0
   let updatedExceptions = 0
+  let addedExceptions = 0
+  let markedFailedExceptions = 0
   let updatedCalcMethods = 0
+  const failedPenalty = failedExceptionPenalty(competition.scoringMode, competition.defaultKPMaxValue)
 
   for (const element of competition.elements) {
     // 1. maxValue: KP → defaultKPMaxValue, PK → defaultPKMaxValue
@@ -64,14 +68,40 @@ async function handlePOST(_req: Request, { params }: { params: Promise<{ id: str
     // 2. Erandite karistused (kõigi elementide puhul, siltide järgi)
     for (const exc of element.exceptions) {
       const key = EXCEPTION_MAP[exc.label.toLowerCase().trim()]
-      if (!key) continue
-      const newPenalty = competition[key]
+      const newPenalty = key ? competition[key] : exceptionKind(exc) === "FAILED" ? failedPenalty : null
+      if (newPenalty === null) continue
       if (exc.penalty !== newPenalty) {
         await prisma.elementException.update({
           where: { id: exc.id },
           data: { penalty: newPenalty },
         })
         updatedExceptions++
+      }
+    }
+
+    // 2b. Kontrollpunktile „Ebaõnnestus”, kui sellist erandit veel pole.
+    // Samanimeline erand, mis loodi enne liigi „Ebaõnnestus” lisandumist ja
+    // salvestus liigiga „Muu erand”, märgitakse ebaõnnestumiseks, et nimi ei
+    // korduks.
+    if (element.type === "CHECKPOINT" && !element.exceptions.some((exc) => exceptionKind(exc) === "FAILED")) {
+      const sameName = element.exceptions.find((exc) => inferExceptionKind(exc.label) === "FAILED")
+      if (sameName) {
+        await prisma.elementException.update({
+          where: { id: sameName.id },
+          data: { kind: "FAILED", penalty: failedPenalty },
+        })
+        markedFailedExceptions++
+      } else {
+        await prisma.elementException.create({
+          data: {
+            elementId: element.id,
+            label: FAILED_EXCEPTION_LABEL,
+            penalty: failedPenalty,
+            kind: "FAILED",
+            order: element.exceptions.reduce((max, exc) => Math.max(max, exc.order), -1) + 1,
+          },
+        })
+        addedExceptions++
       }
     }
 
@@ -122,6 +152,8 @@ async function handlePOST(_req: Request, { params }: { params: Promise<{ id: str
     updated: {
       maxValues: updatedMaxValues,
       exceptions: updatedExceptions,
+      addedExceptions,
+      markedFailedExceptions,
       calcMethods: updatedCalcMethods,
     },
   })

@@ -1,4 +1,5 @@
 import { calculateScores, withEffectiveHC, type ScoringMode } from "./calculators"
+import { isFailedResult } from "./exceptionKinds"
 import type { FieldDefinition, CalcMethod } from "@prisma/client"
 
 export type ComputeTeam = {
@@ -27,6 +28,8 @@ export type ComputeElement = {
   calcMethod: CalcMethod | null
   sections: { calcMethod: CalcMethod | null; fields: FieldDefinition[]; maxValue: number | null }[]
   miscEntries: { teamId: string; points: number }[]
+  // kind määrab ebaõnnestumise (vt exceptionKinds)
+  exceptions?: { label: string; kind?: string | null }[]
 }
 
 export type ComputeConfig = { scoringMode: ScoringMode; defaultKPMaxValue: number; defaultPKMaxValue: number }
@@ -67,14 +70,15 @@ export function computeAllScores(
 
     if (element.sections.length > 0) {
       const activeResults = elResults.filter((r) => { const d = r.team.dnfFromElementOrder; return d == null || element.order < d })
-      const exceptionResults = activeResults.filter((r) => r.exceptionLabel)
-      const normalResults = activeResults.filter((r) => !r.exceptionLabel)
+      const exceptions = element.exceptions ?? []
+      const exceptionResults = activeResults.filter((r) => r.exceptionLabel && !isFailedResult(r, exceptions))
+      const normalResults = activeResults.filter((r) => !r.exceptionLabel || isFailedResult(r, exceptions))
       const teamScores = new Map<string, number>()
       for (const r of exceptionResults) { const m = Math.abs(r.exceptionPenalty ?? 0); teamScores.set(r.teamId, isPlusMode ? -m : m) }
       for (const section of element.sections) {
         if (!section.calcMethod || section.fields.length === 0) continue
-        const mockElement = { id: element.id, calcMethod: section.calcMethod, fields: section.fields, exceptions: [], maxValue: section.maxValue }
-        const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), config)
+        const mockElement = { id: element.id, calcMethod: section.calcMethod, fields: section.fields, exceptions, maxValue: section.maxValue }
+        const sectionScored = calculateScores(mockElement, withEffectiveHC(normalResults, element.order), config, { failedWithoutRanking: "WORST" })
         for (const s of sectionScored) teamScores.set(s.teamId, round3((teamScores.get(s.teamId) ?? 0) + s.penaltyPoints))
       }
       const dnfResults = elResults.filter((r) => { const d = r.team.dnfFromElementOrder; return d != null && element.order >= d })
@@ -90,7 +94,7 @@ export function computeAllScores(
     // Tavaline element
     const activeResults = elResults.filter((r) => { const d = r.team.dnfFromElementOrder; return d == null || element.order < d })
     const scored = calculateScores(
-      { id: element.id, calcMethod: element.calcMethod, fields: element.fields, exceptions: [], maxValue: element.maxValue },
+      { id: element.id, calcMethod: element.calcMethod, fields: element.fields, exceptions: element.exceptions ?? [], maxValue: element.maxValue },
       withEffectiveHC(activeResults, element.order),
       config
     )

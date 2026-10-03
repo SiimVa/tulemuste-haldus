@@ -46,6 +46,7 @@
     "src/lib/geo/georef.ts",
     "src/lib/mapTemplate.ts",
     "src/lib/registrationFinalize.ts",
+    "src/lib/scoreCompute.ts",
     "src/lib/imageSize.ts",
     "src/lib/leaderboardFreeze.ts",
     "tests/**/*.test.ts"

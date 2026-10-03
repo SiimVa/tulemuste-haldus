@@ -10,14 +10,14 @@ export function ElementTableWidget({ data }: { data: DashboardData }) {
   const rows = data.elementTable
   if (!rows) return null
   return (
-    <WidgetCard id="elementTable" subtitle="„Käis KP-s” = sooritas + läbis, aga ei sooritanud. Andmete täielikkus arvestab sooritanute sisestusvälju.">
+    <WidgetCard id="elementTable" subtitle="„Käis KP-s” = sooritas + ebaõnnestus + läbis, aga ei sooritanud. Andmete täielikkus arvestab sooritanute sisestusvälju.">
       {rows.length === 0 ? <EmptyState>Elemente pole.</EmptyState> : (
         <TableScroll>
           <table className="w-full text-sm">
             <thead>
               <tr>
                 <th className={th}>Element</th><th className={`${th} text-right`}>Oodatud</th><th className={`${th} text-right`}>Tulemusi</th>
-                <th className={`${th} text-right`}>Sooritas</th><th className={`${th} text-right`}>Läbis, ei sooritanud</th><th className={`${th} text-right`}>Ei läbinud</th>
+                <th className={`${th} text-right`}>Sooritas</th><th className={`${th} text-right`}>Ebaõnnestus</th><th className={`${th} text-right`}>Läbis, ei sooritanud</th><th className={`${th} text-right`}>Ei läbinud</th>
                 <th className={`${th} text-right`}>Muu erand</th><th className={`${th} text-right`}>Käis KP-s</th><th className={`${th} text-right`}>Andmed</th>
               </tr>
             </thead>
@@ -28,6 +28,7 @@ export function ElementTableWidget({ data }: { data: DashboardData }) {
                   <td className={tdNum}>{row.expected}</td>
                   <td className={tdNum}>{row.entered} <span className="text-xs text-ink-muted">{formatPercent(row.enteredPct)}</span></td>
                   <td className={tdNum}>{row.performed}</td>
+                  <td className={tdNum}>{row.failed}</td>
                   <td className={tdNum}>{row.passedNotDone}</td>
                   <td className={tdNum}>{row.notPassed}</td>
                   <td className={tdNum}>{row.otherException}</td>
@@ -55,7 +56,7 @@ export function DifficultyWidget({ data }: { data: DashboardData }) {
   const rows = data.difficulty
   if (!rows) return null
   return (
-    <WidgetCard id="difficulty" subtitle="Keskmine punktikaotus parima tulemuse suhtes, protsendina KP maksimumist. Erandiga tulemused on sooritamata.">
+    <WidgetCard id="difficulty" subtitle="Keskmine punktikaotus parima tulemuse suhtes, protsendina KP maksimumist. Ebaõnnestunud ja sooritamata (muu erand) on eraldi.">
       {rows.length === 0 ? <EmptyState>KP-de tulemusi pole veel.</EmptyState> : (
         <ul className="space-y-2.5">
           {rows.map((row) => (
@@ -64,7 +65,7 @@ export function DifficultyWidget({ data }: { data: DashboardData }) {
               <span className="order-3 col-span-2 sm:order-none sm:col-span-1"><Bar value={row.lossPct ?? 0} tone={(row.lossPct ?? 0) >= 50 ? "bg-red-500" : (row.lossPct ?? 0) >= 25 ? "bg-amber-500" : "bg-green-500"} /></span>
               <span className="whitespace-nowrap text-right tabular-nums">
                 <strong className="text-ink">{formatPercent(row.lossPct)}</strong>
-                <span className="ml-2 text-xs text-ink-muted">−{formatNumber(row.averageLoss, 2)} p{row.notDonePct ? ` · sooritamata ${formatPercent(row.notDonePct)}` : ""}</span>
+                <span className="ml-2 text-xs text-ink-muted">−{formatNumber(row.averageLoss, 2)} p{row.failedPct ? ` · ebaõnnestus ${formatPercent(row.failedPct)}` : ""}{row.notDonePct ? ` · sooritamata ${formatPercent(row.notDonePct)}` : ""}</span>
               </span>
             </li>
           ))}

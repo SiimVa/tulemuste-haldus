@@ -117,7 +117,8 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
       }
     })
 
-    if (fields || calcMethod || maxValue !== undefined) await recomputeElementScores(id)
+    // Erandi liik mõjutab punkte (ebaõnnestunu jääb pingeritta viimaseks).
+    if (fields || exceptions || calcMethod || maxValue !== undefined) await recomputeElementScores(id)
     const updated = await prisma.scoringElement.findUnique({
       where: { id },
       include: { fields: { orderBy: { order: "asc" } }, exceptions: { orderBy: { order: "asc" } }, calcMethod: true },

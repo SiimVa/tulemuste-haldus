@@ -125,6 +125,7 @@ export type ElementTableRow = ElementRef & {
   entered: number
   enteredPct: number | null
   performed: number
+  failed: number
   passedNotDone: number
   notPassed: number
   otherException: number
@@ -151,11 +152,12 @@ export function elementTableRows(elements: DashElement[], teams: DashTeam[], res
         const team = teamById.get(result.teamId)
         return team && !isWithdrawnAt(team, element.order)
       })
-      let performed = 0, passedNotDone = 0, notPassed = 0, otherException = 0, dataCells = 0, dataFilled = 0
+      let performed = 0, failed = 0, passedNotDone = 0, notPassed = 0, otherException = 0, dataCells = 0, dataFilled = 0
       for (const result of elementResults) {
         const kind = resultExceptionKind(result.exceptionLabel, element.exceptions)
         if (kind === "NOT_PASSED") notPassed++
         else if (kind === "PASSED_NOT_DONE") passedNotDone++
+        else if (kind === "FAILED") failed++
         else if (kind === "OTHER") otherException++
         else {
           performed++
@@ -171,10 +173,12 @@ export function elementTableRows(elements: DashElement[], teams: DashTeam[], res
         entered: elementResults.length,
         enteredPct: pct(elementResults.length, expected),
         performed,
+        failed,
         passedNotDone,
         notPassed,
         otherException,
-        visited: performed + passedNotDone,
+        // KP-s käisid ka need, kes ülesande tegid, kuid ebaõnnestusid.
+        visited: performed + failed + passedNotDone,
         dataCells,
         dataFilled,
         dataPct: pct(dataFilled, dataCells),

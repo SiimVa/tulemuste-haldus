@@ -96,7 +96,8 @@ test("korraldaja näeb võistluse seisu ja avalik vaade näitab ainult avalikke 
   await expect(page.locator('[data-widget="missingResults"]')).toContainText("puudu: KP3")
   await expect(page.locator('[data-widget="freshness"]').getByRole("row").filter({ hasText: "Kadad" })).toContainText("Vaikib")
   const table = page.locator('[data-widget="elementTable"]').getByRole("row").filter({ hasText: "Vaatlus" })
-  await expect(table.getByRole("cell").nth(5)).toHaveText("1")
+  // Veerud: element, oodatud, tulemusi, sooritas, ebaõnnestus, läbis-ei-sooritanud, ei läbinud, muu, käis, andmed.
+  await expect(table.getByRole("cell").nth(6)).toHaveText("1")
   await expect(page.locator('[data-widget="judges"]')).toContainText("KP1 kohtunik")
   await expect(page.locator('[data-widget="withdrawals"]')).toContainText("Mari Maasikas")
   await expect(page.locator('[data-widget="topTeams"]')).toContainText("Jõgeva KT")
@@ -279,12 +280,12 @@ test("erandi liik salvestub ja muudab KP tabelit", async ({ page }) => {
   await login(page, user.email)
   await page.goto(`/dashboard/competitions/${competition.id}/overview`)
   const row = page.locator('[data-widget="elementTable"]').getByRole("row").filter({ hasText: "Kimi" })
-  await expect(row.getByRole("cell").nth(6)).toHaveText("1")
+  await expect(row.getByRole("cell").nth(7)).toHaveText("1")
 
   await page.goto(`/dashboard/competitions/${competition.id}/elements/${elements[1].id}/edit`)
-  const kind = page.getByRole("combobox", { name: "Erandi liik statistikas" }).nth(2)
+  const kind = page.getByRole("combobox", { name: "Erandi liik", exact: true }).nth(2)
   await expect(kind).toHaveValue("OTHER")
-  await expect(page.getByRole("combobox", { name: "Erandi liik statistikas" }).first()).toHaveValue("NOT_PASSED")
+  await expect(page.getByRole("combobox", { name: "Erandi liik", exact: true }).first()).toHaveValue("NOT_PASSED")
   await kind.selectOption("NOT_PASSED")
   await page.getByRole("button", { name: "Salvesta muudatused" }).click()
   await page.waitForURL(`**/elements/${elements[1].id}`)
@@ -292,8 +293,8 @@ test("erandi liik salvestub ja muudab KP tabelit", async ({ page }) => {
   expect(stored.map((exception) => exception.kind)).toEqual(["NOT_PASSED", "PASSED_NOT_DONE", "NOT_PASSED"])
 
   await page.goto(`/dashboard/competitions/${competition.id}/overview`)
-  await expect(row.getByRole("cell").nth(5)).toHaveText("1")
-  await expect(row.getByRole("cell").nth(6)).toHaveText("0")
+  await expect(row.getByRole("cell").nth(6)).toHaveText("1")
+  await expect(row.getByRole("cell").nth(7)).toHaveText("0")
 })
 
 test("võistluse koopia saab töölaua seaded uute elemendiviidetega, asukohad ja kaardi", async ({ page }) => {

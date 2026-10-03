@@ -85,6 +85,7 @@ export default async function ElementPage({
         fields: s.fields,
         calcMethod: s.calcMethod,
       })),
+      exceptions: element.exceptions,
     },
     element.results.map(r => ({
       teamId: r.teamId,
