@@ -5,8 +5,48 @@ Osavõistlused jäävad eraldi võistlusteks: igaühel on oma korraldajad, KP-d,
 hindamine ja pingerida. Arvestus loeb osavõistlustel salvestatud punkte ega
 muuda neid.
 
-Arvestust näeb ja muudab ainult administraator (administraatori menüü
-**Üleriiklik arvestus**). Avalikku vaadet veel pole.
+Arvestust haldab ainult administraator (administraatori menüü
+**Üleriiklik arvestus**). Avaldatud arvestusel on avalik pingerida,
+ülevaade, ekraanirežiim ja analüüs nagu võistlusel. Osavõistluste vaateid see
+ei muuda: üleriiklik koht on näha ainult üleriiklikes vaadetes.
+
+## Vaated
+
+Administraatori arvestuse lehel on sakid:
+
+- **Pingerida** — osavõistluste keskmised ja N, reeglite kontroll ning
+  pingerida. Pingereas on iga KP tähis eraldi veerus; arvesse minevad KP-d on
+  tumedad, arvestamata hallid. Klassifilter, vahed eelmise ja esimesega,
+  Exceli eksport ja prinditav pingerida on nagu võistlusel.
+- **Ülevaade** — vidinad: põhinumbrid, parimad võistkonnad, osavõistluste
+  võrdlus, klasside võrdlus, tihedad heitlused ja KP-d osavõistlustes.
+- **Analüüs** — võistkonna vaade (üld- ja klassikoht, KP-d osavõistluse
+  keskmisega, arvestatud KP-d, karistused) ja KP-de võrdlus osavõistluste
+  vahel. KP-de võrdluses on esile tõstetud osavõistlus, kus KP oli raskeim
+  (protsendina maksimumist).
+- **Avalik vaade** — avaldamine, külmutamine, analüüsi ligipääs ja ülevaate
+  vidinad.
+
+Avalikud aadressid on `/public/series/<id>` (pingerida), `/overview`,
+`/screen` ja `/analysis`.
+
+## Avaldamine ja külmutamine
+
+- Avalikud vaated avanevad ainult avaldatud arvestusel; avaldamata arvestust
+  näeb administraator eelvaatena. Arvestust ei lisata avalike võistluste
+  nimekirja, seega jaga linki ise.
+- Kui osavõistluse pingerida on külmutatud, näitavad avalikud üleriiklikud
+  vaated selle osavõistluse külmutamise hetke seisu. Peidetud tulemused ei
+  leki üleriikliku arvestuse kaudu.
+- Üleriikliku arvestuse saab ka ise külmutada (kohe või ajastatult). Siis
+  näitavad avalik pingerida, ülevaade ja ekraan külmutamise hetke seisu ning
+  analüüs on suletud kuni avalikustamiseni. Administraator näeb jooksvat
+  seisu.
+- Analüüsi ligipääs on nagu võistlusel: avalik, ainult lingiga
+  (`/analysis/series/<tunnus>`) või suletud.
+- Ülevaate iga vidina saab näidata administraatorile ja/või avalikus vaates;
+  järjekord ja lävendid (parimate arv, tiheda heitluse piir, ekraani vahetus)
+  on samas.
 
 ## Arvutus
 

@@ -99,24 +99,27 @@ test("administraator loob üleriikliku arvestuse ja näeb keskmisi, reeglite kon
   // 3 parimat KP-d + karistused: Beeta 68, Gamma 60, Delta 60, Alfa 50 − 5 − 2 = 43.
   const rankingRows = page.locator("tr[data-team]")
   await expect(rankingRows).toHaveCount(4)
+  // Veerud: üldkoht, klassikoht, võistkond, klass, läbitud, KP1–KP4, karistused, kokku, vahed.
   const summary = async () => (await rankingRows.all()).map(async (row) => [
     await row.getAttribute("data-team"),
     (await row.getByRole("cell").nth(0).textContent())?.trim(),
     (await row.getByRole("cell").nth(1).textContent())?.trim(),
-    (await row.getByRole("cell").last().textContent())?.trim(),
+    (await row.getByRole("cell").nth(10).textContent())?.trim(),
   ])
   expect(await Promise.all(await summary())).toEqual([
-    ["Beeta", "1", "1", "68"], ["Gamma", "2", "1", "60"], ["Delta", "2", "1", "60"], ["Alfa", "4", "3", "43"],
+    ["Beeta", "1", "1", "68.00"], ["Gamma", "2", "1", "60.00"], ["Delta", "2", "1", "60.00"], ["Alfa", "4", "3", "43.00"],
   ])
-  const alfa = page.locator('tr[data-team="Alfa"]')
-  await alfa.getByText("Arvestatud KP-d (3)").click()
-  await expect(alfa).toContainText("KP1 30 · KP2 20 · KP3 0")
-  await expect(alfa).toContainText("Arvestamata: KP4 −10")
-  await expect(alfa.getByRole("cell").nth(6)).toHaveText("−7")
+  const alfaCells = page.locator('tr[data-team="Alfa"]').getByRole("cell")
+  await expect(alfaCells.nth(4)).toHaveText("3")
+  await expect(alfaCells.nth(5)).toHaveText("30.0")
+  await expect(alfaCells.nth(8)).toHaveText("-10.0")
+  await expect(alfaCells.nth(8)).toHaveAttribute("title", "Ei lähe arvesse")
+  await expect(alfaCells.nth(9)).toHaveText("-7.0")
 
-  await page.getByRole("navigation", { name: "Klass" }).getByRole("link", { name: "KT" }).click()
-  await page.waitForURL(/klass=KT/)
-  expect(await Promise.all(await summary())).toEqual([["Gamma", "1", "2", "60"], ["Delta", "1", "2", "60"], ["Alfa", "3", "4", "43"]])
+  // Klassifilter nagu võistluse pingereas: kohad ja vahed jäävad kogu pingerea järgi.
+  await page.getByLabel("Filtreeri klassi järgi").check()
+  await page.waitForURL(/class=KT/)
+  expect(await Promise.all(await summary())).toEqual([["Gamma", "2", "1", "60.00"], ["Delta", "2", "1", "60.00"], ["Alfa", "4", "3", "43.00"]])
 
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)

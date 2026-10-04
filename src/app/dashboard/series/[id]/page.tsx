@@ -1,70 +1,53 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
 import { Card } from "@/components/ui/card"
 import { TableScroll, td, tdNum, th } from "@/components/dashboard/WidgetCard"
-import { SeriesEditPanel } from "@/components/series/SeriesForm"
-import { formatNumber } from "@/lib/dashboard/format"
-import { COMPETITION_STATUS_LABELS, loadSeriesRanking } from "@/lib/seriesRanking.server"
+import { LeaderboardClassFilter } from "@/components/leaderboard/LeaderboardClassFilter"
+import { SeriesLeaderboard } from "@/components/series/SeriesLeaderboard"
+import { formatDateTime, formatNumber } from "@/lib/dashboard/format"
+import { leaderboardClassFilter } from "@/lib/leaderboard"
+import { loadSeriesView } from "@/lib/seriesRanking.server"
+import { seriesGaps, seriesKpCodes } from "@/lib/seriesInsights"
 import { ELEMENT_TYPE_LABELS } from "@/lib/seriesRules"
 
 export const dynamic = "force-dynamic"
-
-const points = (value: number) => formatNumber(value, 2)
 
 export default async function SeriesPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ klass?: string }>
+  searchParams: Promise<{ class?: string | string[] }>
 }) {
   const session = await auth()
   if (!session?.user) redirect("/login")
   if (session.user.role !== "ADMIN") redirect("/dashboard")
-  const [{ id }, { klass }] = await Promise.all([params, searchParams])
+  const [{ id }, query] = await Promise.all([params, searchParams])
 
-  const [data, allCompetitions] = await Promise.all([
-    loadSeriesRanking(id),
-    prisma.competition.findMany({ orderBy: [{ date: "desc" }, { name: "asc" }], select: { id: true, name: true, date: true, status: true } }),
-  ])
-  if (!data) notFound()
-  const { series, competitions, ranking, rules } = data
+  const view = await loadSeriesView(id, "internal")
+  if (!view?.rules) notFound()
+  const { series, competitions, ranking, rules } = view
   const competitionName = new Map(competitions.map((competition) => [competition.id, competition.name]))
   const names = (ids: string[]) => ids.map((competitionId) => competitionName.get(competitionId) ?? competitionId).join(", ")
   const unfinished = competitions.filter((competition) => competition.status !== "FINISHED")
   const minimum = ranking.competitions.filter((summary) => summary.roundedAverage !== null && summary.roundedAverage === ranking.countedKpCount)
-  const selectedClass = klass && ranking.classes.includes(klass) ? klass : null
-  const rows = selectedClass ? ranking.rows.filter((row) => row.team.class === selectedClass) : ranking.rows
-  const unit = ranking.scoringMode === "PENALTY" ? "Karistuspunktid" : "Punktid"
+  const matchesClass = leaderboardClassFilter(query.class, ranking.classes)
+  const rows = ranking.rows.filter((row) => matchesClass(row.team))
+  const unit = ranking.scoringMode === "PENALTY" ? "karistuspunktid" : "punktid"
   const differenceCodes = new Set(rules.differences.map((difference) => difference.code))
   const rulesOk = rules.scoringModes.length <= 1 && rules.differences.length === 0 && rules.missing.length === 0
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Link href="/dashboard/series" className="text-sm text-ink-muted hover:text-primary">← Üleriiklik arvestus</Link>
-          <h1 className="mt-1 text-2xl font-bold text-ink">{series.name}</h1>
-          <p className="mt-1 text-sm text-ink-muted">{competitions.length} osavõistlust · nähtav ainult administraatorile</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <a href={`/api/series/${series.id}/export`} className="rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-canvas">
-            ↓ Ekspordi Excel
-          </a>
-          <SeriesEditPanel
-            competitions={allCompetitions.map((competition) => ({
-              id: competition.id,
-              name: competition.name,
-              date: competition.date?.toISOString() ?? null,
-              statusLabel: COMPETITION_STATUS_LABELS[competition.status] ?? competition.status,
-            }))}
-            initial={{ id: series.id, name: series.name, competitionIds: competitions.map((competition) => competition.id) }}
-          />
-        </div>
-      </div>
-
+      {series.freezeAt && (
+        <p role="status" className="rounded-card border border-primary-soft bg-primary-soft px-4 py-3 text-sm text-primary-hover">
+          {series.frozen
+            ? `Avalik vaade on külmutatud alates ${formatDateTime(series.freezeAt)}. Siin näed jooksvat seisu.`
+            : `Avalik vaade külmutatakse ${formatDateTime(series.freezeAt)}.`}{" "}
+          <Link href={`/dashboard/series/${series.id}/public`} className="font-medium underline">Muuda</Link>
+        </p>
+      )}
       {unfinished.length > 0 && (
         <p role="status" className="rounded-card border border-line bg-canvas px-4 py-3 text-sm text-ink-muted">
           Esialgne arvestus: {unfinished.map((competition) => `${competition.name} (${competition.statusLabel.toLocaleLowerCase("et")})`).join(", ")} pole veel lõppenud.
@@ -166,78 +149,21 @@ export default async function SeriesPage({
         )}
       </Card>
 
-      <Card className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold text-ink">Pingerida</h2>
-          {ranking.classes.length > 0 && (
-            <nav aria-label="Klass" className="flex flex-wrap gap-1 text-sm">
-              {[null, ...ranking.classes].map((className) => {
-                const active = className === selectedClass
-                return (
-                  <Link
-                    key={className ?? "all"}
-                    href={className ? `/dashboard/series/${series.id}?klass=${encodeURIComponent(className)}` : `/dashboard/series/${series.id}`}
-                    aria-current={active ? "page" : undefined}
-                    className={`rounded-full px-3 py-1 ${active ? "bg-primary text-primary-foreground" : "bg-canvas text-ink hover:bg-line"}`}
-                  >
-                    {className ?? "Kõik"}
-                  </Link>
-                )
-              })}
-            </nav>
-          )}
+      <section aria-labelledby="series-ranking-title" className="space-y-3">
+        <div>
+          <h2 id="series-ranking-title" className="font-semibold text-ink">Pingerida</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Tulemus = {ranking.countedKpCount ?? "kõigi"} parima KP {unit} + karistused (vastutegevus, varustus, hilinemine, katkestamine, muu element ja käsitsi karistused).
+            Hallid KP-d ei lähe arvesse. Võrdse tulemusega võistkonnad jagavad kohta.
+          </p>
         </div>
-        <p className="mt-1 text-sm text-ink-muted">
-          Tulemus = {ranking.countedKpCount ?? "kõigi"} parima KP punktid + karistused (vastutegevus, varustus, hilinemine, katkestamine, muu element ja käsitsi karistused). Võrdse tulemusega võistkonnad jagavad kohta.
-        </p>
-        {rows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-ink-muted">{ranking.mixedScoringModes ? "Pingerida ei arvutata." : "Tulemusi pole veel."}</p>
-        ) : (
-          <div className="mt-3">
-            <TableScroll>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className={th}>{selectedClass ? "Klassi koht" : "Koht"}</th>
-                    <th className={th}>{selectedClass ? "Üldkoht" : "Klassi koht"}</th>
-                    <th className={th}>Võistkond</th><th className={th}>Klass</th>
-                    <th className={`${th} text-right`}>Läbitud KP</th>
-                    <th className={`${th} text-right`}>KP {unit.toLocaleLowerCase("et")}</th>
-                    <th className={`${th} text-right`}>Karistused</th>
-                    <th className={`${th} text-right`}>Kokku</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {rows.map((row) => {
-                    const counted = row.kpScores.filter((score) => score.counted)
-                    const skipped = row.kpScores.filter((score) => !score.counted)
-                    return (
-                      <tr key={`${row.competitionId}-${row.team.id}`} data-team={row.team.name}>
-                        <td className={`${td} font-semibold`}>{selectedClass ? row.classRank : row.rank}</td>
-                        <td className={`${td} text-ink-muted`}>{selectedClass ? row.rank : row.classRank ?? "–"}</td>
-                        <td className={td}>
-                          <span className="font-medium text-ink">{row.team.name}</span>
-                          <span className="block text-xs text-ink-muted">{row.team.code} · {row.competitionName}</span>
-                          <details className="mt-1 text-xs">
-                            <summary className="cursor-pointer text-primary">Arvestatud KP-d ({counted.length})</summary>
-                            <p className="mt-1 text-ink">{counted.map((score) => `${score.code} ${points(score.points)}`).join(" · ") || "–"}</p>
-                            {skipped.length > 0 && <p className="mt-0.5 text-ink-muted">Arvestamata: {skipped.map((score) => `${score.code} ${points(score.points)}`).join(" · ")}</p>}
-                          </details>
-                        </td>
-                        <td className={td}>{row.team.class ?? "–"}</td>
-                        <td className={tdNum}>{row.passedCount}</td>
-                        <td className={tdNum}>{points(row.kpTotal)}</td>
-                        <td className={tdNum}>{row.penaltyTotal === 0 ? "–" : points(row.penaltyTotal)}</td>
-                        <td className={`${tdNum} font-semibold text-ink`}>{points(row.total)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </TableScroll>
-          </div>
+        {ranking.mixedScoringModes ? <p className="py-6 text-center text-sm text-ink-muted">Pingerida ei arvutata.</p> : (
+          <>
+            <LeaderboardClassFilter classes={ranking.classes} />
+            <SeriesLeaderboard rows={rows} gaps={seriesGaps(ranking)} kpCodes={seriesKpCodes(ranking)} showClasses={ranking.classes.length > 0} unit={unit} />
+          </>
         )}
-      </Card>
+      </section>
     </div>
   )
 }

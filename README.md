@@ -76,5 +76,6 @@ Erandite liigid ja erandi „Ebaõnnestus” mõju pingereale on kirjeldatud fai
 [docs/exceptions.md](docs/exceptions.md).
 
 Mitme osavõistluse üleriiklik arvestus (keskmine läbitud KP-de arv, N parimat
-KP-d ja reeglite kontroll) on kirjeldatud failis
+KP-d, reeglite kontroll ning avalik pingerida, ülevaade ja analüüs) on
+kirjeldatud failis
 [docs/national-ranking.md](docs/national-ranking.md).

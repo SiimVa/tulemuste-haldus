@@ -3,21 +3,24 @@ import { Card } from "@/components/ui/card"
 import { dashboardWidget, type DashboardWidgetId } from "@/lib/dashboard/config"
 import { cn } from "@/lib/utils"
 
-export function WidgetCard({ id, children, actions, className, subtitle }: {
-  id: DashboardWidgetId
+type WidgetFrameProps = {
+  id: string
+  title: string
   children: ReactNode
   actions?: ReactNode
   className?: string
   subtitle?: ReactNode
-}) {
-  const widget = dashboardWidget(id)
+}
+
+// Vidina kaart pealkirja, alapealkirja ja sisuga (ka üleriikliku arvestuse vidinad).
+export function WidgetFrame({ id, title, children, actions, className, subtitle }: WidgetFrameProps) {
   const headingId = `widget-${id}-title`
   return (
     <Card className={cn("min-w-0 overflow-hidden", className)}>
       <section aria-labelledby={headingId} data-widget={id}>
         <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <h2 id={headingId} className="font-semibold text-ink">{widget.title}</h2>
+            <h2 id={headingId} className="font-semibold text-ink">{title}</h2>
             {subtitle && <p className="mt-0.5 text-xs text-ink-muted">{subtitle}</p>}
           </div>
           {actions}
@@ -26,6 +29,10 @@ export function WidgetCard({ id, children, actions, className, subtitle }: {
       </section>
     </Card>
   )
+}
+
+export function WidgetCard({ id, ...props }: Omit<WidgetFrameProps, "title" | "id"> & { id: DashboardWidgetId }) {
+  return <WidgetFrame id={id} title={dashboardWidget(id).title} {...props} />
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {

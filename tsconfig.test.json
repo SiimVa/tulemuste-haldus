@@ -51,6 +51,10 @@
     "src/lib/leaderboardFreeze.ts",
     "src/lib/seriesRanking.ts",
     "src/lib/seriesRules.ts",
+    "src/lib/seriesInsights.ts",
+    "src/lib/seriesDashboard.ts",
+    "src/lib/seriesFreeze.ts",
+    "src/lib/leaderboard.ts",
     "tests/**/*.test.ts"
   ]
 }
