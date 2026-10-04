@@ -6,6 +6,7 @@ import {
 } from "@/lib/notifications.server"
 import { detectSecurityAlertsSafely } from "@/lib/securityAlerts.server"
 import { processDueLeaderboardFreezesSafely } from "@/lib/leaderboardFreeze.server"
+import { processDueSeriesFreezesSafely } from "@/lib/seriesRanking.server"
 
 export const dynamic = "force-dynamic"
 
@@ -30,7 +31,9 @@ export async function GET(req: Request) {
   const securityAlerts = await detectSecurityAlertsSafely()
   // Ajastatud pingerea külmutus saab snapshot'i ka ilma avaliku vaate avamiseta.
   const leaderboardFreezes = await processDueLeaderboardFreezesSafely()
+  // Pärast osavõistlusi, et üleriikliku arvestuse snapshot kasutaks nende külmutatud seisu.
+  const seriesFreezes = await processDueSeriesFreezesSafely()
   const queued = await enqueueDueMandateOpenedNotifications()
   const delivery = await deliverPendingNotifications({ limit: 100 })
-  return NextResponse.json({ queued, securityAlerts, leaderboardFreezes, ...delivery })
+  return NextResponse.json({ queued, securityAlerts, leaderboardFreezes, seriesFreezes, ...delivery })
 }

@@ -2,7 +2,7 @@ import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { setSecurityRecordCount } from "@/lib/security.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { loadSeriesRanking } from "@/lib/seriesRanking.server"
+import { loadSeriesView } from "@/lib/seriesRanking.server"
 import * as XLSX from "xlsx"
 
 const formatAverage = (value: number | null) => (value === null ? "" : value)
@@ -13,9 +13,9 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (session.user.role !== "ADMIN") return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   const { id } = await params
-  const data = await loadSeriesRanking(id)
-  if (!data) return NextResponse.json({ error: "Arvestust ei leitud" }, { status: 404 })
-  const { series, competitions, ranking, rules } = data
+  const view = await loadSeriesView(id, "internal")
+  if (!view?.rules) return NextResponse.json({ error: "Arvestust ei leitud" }, { status: 404 })
+  const { series, competitions, ranking, rules } = view
   setSecurityRecordCount(ranking.rows.length)
   const plus = ranking.scoringMode !== "PENALTY"
   const competitionName = new Map(competitions.map((competition) => [competition.id, competition.name]))

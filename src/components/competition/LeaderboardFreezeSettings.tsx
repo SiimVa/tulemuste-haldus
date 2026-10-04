@@ -18,13 +18,18 @@ function toLocalInput(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-export function LeaderboardFreezeSettings({ competitionId, initial }: { competitionId: string; initial: FreezeState }) {
+export function LeaderboardFreezeSettings({ competitionId, initial, url = `/api/competitions/${competitionId}/leaderboard-freeze`, description }: {
+  competitionId: string
+  initial: FreezeState
+  // Üleriiklik arvestus kasutab sama vormi oma aadressi ja selgitusega.
+  url?: string
+  description?: string
+}) {
   const router = useRouter()
   const [state, setState] = useState(initial)
   const [time, setTime] = useState(() => toLocalInput(new Date(Date.now() + 60 * 60 * 1000)))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
-  const url = `/api/competitions/${competitionId}/leaderboard-freeze`
 
   async function send(init: RequestInit) {
     setBusy(true)
@@ -56,8 +61,7 @@ export function LeaderboardFreezeSettings({ competitionId, initial }: { competit
       <div>
         <h2 className="font-semibold text-gray-900">Pingerea külmutamine</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Külmutamise hetkest näitavad avalik pingerida, avalik ülevaade ja ekraan seda seisu. Analüüs ja simulaator on suletud ning
-          võistlejad ei näe punkte ega kohti. Korraldajad näevad jooksvat seisu edasi. Autasustamisel avalikusta tulemused.
+          {description ?? "Külmutamise hetkest näitavad avalik pingerida, avalik ülevaade ja ekraan seda seisu. Analüüs ja simulaator on suletud ning võistlejad ei näe punkte ega kohti. Korraldajad näevad jooksvat seisu edasi. Autasustamisel avalikusta tulemused."}
         </p>
       </div>
       <p role="status" className={`rounded-lg px-3 py-2 text-sm ${state.frozen ? "bg-primary-soft text-primary-hover" : "bg-canvas text-ink-soft"}`}>

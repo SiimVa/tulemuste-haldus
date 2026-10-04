@@ -850,11 +850,22 @@ model TeamRepresentative {
 // osavõistluste salvestatud punkte ega muuda osavõistluste hindamist.
 // Vt src/lib/seriesRanking.ts ja docs/national-ranking.md.
 model CompetitionSeries {
-  id           String                         @id @default(cuid())
-  name         String
-  createdAt    DateTime                       @default(now())
-  updatedAt    DateTime                       @updatedAt
-  competitions CompetitionSeriesCompetition[]
+  id                 String                         @id @default(cuid())
+  name               String
+  // Avalikud vaated (/public/series/<id>) avanevad ainult avaldatud arvestusel.
+  isPublished        Boolean                        @default(false)
+  // Analüüsi avalik ligipääs nagu võistlusel: "PUBLIC" | "LINK_ONLY" | "PRIVATE".
+  analysisAccessMode String                         @default("PUBLIC")
+  analysisTokenHash  String?                        @unique
+  // Ülevaate vidinad ja lävendid, vt src/lib/seriesDashboard.ts.
+  dashboardConfig    String                         @default("{}")
+  // Avalike vaadete külmutamine: freezeAt hetkest näidatakse snapshot'i.
+  freezeAt           DateTime?
+  freezeSnapshot     Json?
+  freezeSnapshotAt   DateTime?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+  competitions       CompetitionSeriesCompetition[]
 }
 
 model CompetitionSeriesCompetition {

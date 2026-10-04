@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation"
 import type { AnalysisAccessMode } from "@/lib/analysisAccess"
 import { Input } from "@/components/ui/input"
 
-const MODES: { value: AnalysisAccessMode; label: string; desc: string }[] = [
+// linkLabel ja managersText erinevad üleriikliku arvestuse puhul.
+const modes = (linkLabel: string, managersText: string): { value: AnalysisAccessMode; label: string; desc: string }[] => [
   {
     value: "PUBLIC",
     label: "Avalik",
-    desc: "Link „VK analüüs →\" on pingereas nähtav ja igaüks pääseb analüüsi vaatesse.",
+    desc: `Link „${linkLabel}" on pingereas nähtav ja igaüks pääseb analüüsi vaatesse.`,
   },
   {
     value: "LINK_ONLY",
@@ -19,7 +20,7 @@ const MODES: { value: AnalysisAccessMode; label: string; desc: string }[] = [
   {
     value: "PRIVATE",
     label: "Suletud",
-    desc: "Analüüsi avalik vaade on välja lülitatud. Korraldajad näevad andmeid töölaual edasi.",
+    desc: `Analüüsi avalik vaade on välja lülitatud. ${managersText}`,
   },
 ]
 
@@ -27,10 +28,23 @@ export function AnalysisAccessSettings({
   competitionId,
   initialMode,
   initialHasLink,
+  accessUrl = `/api/competitions/${competitionId}/analysis-access`,
+  rotateUrl = `/api/competitions/${competitionId}/analysis-link/rotate`,
+  linkPath = "/analysis/",
+  title = "VK analüüsi ligipääs",
+  linkLabel = "VK analüüs →",
+  managersText = "Korraldajad näevad andmeid töölaual edasi.",
 }: {
   competitionId: string
   initialMode: AnalysisAccessMode
   initialHasLink: boolean
+  // Üleriiklik arvestus kasutab sama vormi oma aadressidega.
+  accessUrl?: string
+  rotateUrl?: string
+  linkPath?: string
+  title?: string
+  linkLabel?: string
+  managersText?: string
 }) {
   const router = useRouter()
   const [mode, setMode] = useState<AnalysisAccessMode>(initialMode)
@@ -47,13 +61,13 @@ export function AnalysisAccessSettings({
     setOrigin(window.location.origin)
   }, [])
 
-  const link = linkToken ? `${origin}/analysis/${linkToken}` : ""
+  const link = linkToken ? `${origin}${linkPath}${linkToken}` : ""
 
   async function save() {
     setSaving(true)
     setSaved(false)
     setError("")
-    const res = await fetch(`/api/competitions/${competitionId}/analysis-access`, {
+    const res = await fetch(accessUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ analysisAccessMode: mode }),
@@ -74,10 +88,7 @@ export function AnalysisAccessSettings({
   async function rotate() {
     setRotating(true)
     setError("")
-    const res = await fetch(
-      `/api/competitions/${competitionId}/analysis-link/rotate`,
-      { method: "POST" }
-    )
+    const res = await fetch(rotateUrl, { method: "POST" })
     setRotating(false)
     if (!res.ok) {
       setError("Uue lingi loomine ebaõnnestus.")
@@ -101,7 +112,7 @@ export function AnalysisAccessSettings({
   return (
     <div className="bg-white border rounded-xl p-5 space-y-4">
       <div>
-        <h2 className="font-semibold text-gray-900">VK analüüsi ligipääs</h2>
+        <h2 className="font-semibold text-gray-900">{title}</h2>
         <p className="text-xs text-gray-500 mt-1">
           Määrab, kas pingerea jagamisel saab sealt otse analüüsi vaatesse
           liikuda. Analüüsist pingereasse tagasi saab alati.
@@ -109,7 +120,7 @@ export function AnalysisAccessSettings({
       </div>
 
       <div className="space-y-2">
-        {MODES.map((option) => (
+        {modes(linkLabel, managersText).map((option) => (
           <label
             key={option.value}
             className={`flex gap-3 p-3 border rounded-lg cursor-pointer ${

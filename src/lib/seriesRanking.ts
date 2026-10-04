@@ -33,6 +33,8 @@ export type SeriesElement = {
   order: number
   isCancelled: boolean
   exceptions: { label: string; kind?: string | null }[]
+  // Efektiivne maksimum (elemendi oma või võistluse vaikeväärtus) protsentide jaoks.
+  maxValue?: number | null
 }
 
 export type SeriesTeam = {
@@ -54,7 +56,7 @@ export type SeriesCompetitionData = {
   teams: SeriesTeam[]
   results: { elementId: string; teamId: string; exceptionLabel: string | null }[]
   scores: { elementId: string; teamId: string; points: number }[]
-  manualPenalties: { teamId: string; points: number }[]
+  manualPenalties: { teamId: string; points: number; description?: string }[]
 }
 
 export type SeriesCompetitionSummary = {
