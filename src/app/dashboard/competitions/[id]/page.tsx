@@ -46,8 +46,8 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
 
   return (
     <div>
-      {/* Päis */}
-      <div className="flex items-start justify-between mb-6">
+      {/* Päis — kitsal ekraanil murduvad nupud pealkirja alla */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 text-sm">← Võistlused</Link>
@@ -63,7 +63,7 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <ExportMenu groups={[
             {
               title: "Kõik KP-d",
@@ -114,9 +114,9 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
 
       {/* Hindamiselemendid */}
       <Card>
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b">
           <h2 className="font-semibold text-gray-900">Hindamiselemendid</h2>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <ScoringElementCopyDialog fixedTargetCompetitionId={id} />
             <Link href={`/dashboard/competitions/${id}/elements/new`}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium">
@@ -126,6 +126,8 @@ export default async function CompetitionPage({ params }: { params: Promise<{ id
         </div>
 
         <ElementList
+          // Uued (nt kopeeritud) elemendid laaditakse nimekirja uuesti.
+          key={competition.elements.map((el) => el.id).join(",")}
           competitionId={id}
           initialElements={competition.elements.map(el => ({
             id: el.id,
