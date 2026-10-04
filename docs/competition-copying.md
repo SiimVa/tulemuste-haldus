@@ -26,11 +26,16 @@ olekut, osalejaid, registreerimisavaldusi, tulemusi, arvutatud punkte,
 karistusi, kasutajaõigusi, kohtunike määramisi ega ligipääsutokeneid. Uue
 võistluse omanik on koopia loonud administraator.
 
-## Hindamiselemendi kopeerimine
+## Hindamiselementide kopeerimine
 
-Võistluse ülevaates saab valida **Kopeeri olemasolev element**, lähtevõistluse
-ja lähteelemendi. Elemendi enda lehel olev **Kopeeri** nupp võimaldab valida
-sihtvõistluse. Sihtvõistlus võib olla lähtevõistlusega sama.
+Võistluse ülevaates saab valida **Kopeeri elemente**, lähtevõistluse ja ühe või
+mitu lähteelementi (**Vali kõik** valib kõik). Valitud elemendid kopeeritakse
+ühe toiminguna: kui mõne kopeerimine ebaõnnestub, ei lisata ühtegi. Koopiad
+lisatakse elementide nimekirja lõppu lähtevõistluse järjekorras. Korraga saab
+kopeerida kuni 100 elementi. Ühe elemendi kopeerimise järel avaneb selle leht.
+
+Elemendi enda lehel olev **Kopeeri** nupp võimaldab valida sihtvõistluse.
+Sihtvõistlus võib olla lähtevõistlusega sama.
 
 Elemendiga kopeeritakse:
 
@@ -46,5 +51,5 @@ lisatakse tähisele automaatselt järgmine vaba järjekorranumber, näiteks
 `KP1-2`. Sama võistluse sees lisatakse elemendi nimele „koopia”.
 
 Elemendi kopeerimiseks peab kasutajal olema nii lähte- kui ka sihtvõistluse
-haldusõigus. Terve võistluse kopeerimine järgib uue võistluse loomise õigust ja
+haldusõigus; mitme elemendi korral iga lähtevõistluse haldusõigus. Terve võistluse kopeerimine järgib uue võistluse loomise õigust ja
 on praegu lubatud ainult süsteemiadministraatorile.

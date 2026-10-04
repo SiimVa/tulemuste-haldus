@@ -32,17 +32,25 @@ export function ScoringElementCopyDialog({
   const [competitions, setCompetitions] = useState<CompetitionOption[]>([])
   const [sourceCompetitionId, setSourceCompetitionId] = useState("")
   const [sourceElements, setSourceElements] = useState<ElementOption[]>([])
-  const [sourceElementId, setSourceElementId] = useState("")
+  // Valitud lähteelemendid; kopeeritakse lähtevõistluse järjekorras.
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [targetCompetitionId, setTargetCompetitionId] = useState("")
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [copiedMessage, setCopiedMessage] = useState("")
 
-  const buttonLabel = fixedSource ? "Kopeeri" : "+ Kopeeri olemasolev element"
+  const buttonLabel = fixedSource ? "Kopeeri" : "+ Kopeeri elemente"
+  const selectedElements = sourceElements.filter((element) => selectedIds.includes(element.id))
+  const allSelected = sourceElements.length > 0 && selectedElements.length === sourceElements.length
+  const submitLabel = fixedSource || selectedElements.length <= 1
+    ? "Kopeeri element"
+    : `Kopeeri ${selectedElements.length} elementi`
 
   async function openDialog() {
     setOpen(true)
     setError("")
+    setCopiedMessage("")
     setLoadingOptions(true)
     const response = await fetch("/api/competitions")
     const data = await response.json().catch(() => [])
@@ -56,7 +64,7 @@ export function ScoringElementCopyDialog({
     const initialSourceCompetitionId =
       fixedSource?.competitionId ?? fixedTargetCompetitionId ?? options[0]?.id ?? ""
     setSourceCompetitionId(initialSourceCompetitionId)
-    setSourceElementId(fixedSource?.id ?? "")
+    setSelectedIds([])
     setTargetCompetitionId(
       fixedTargetCompetitionId ?? fixedSource?.competitionId ?? options[0]?.id ?? ""
     )
@@ -68,14 +76,13 @@ export function ScoringElementCopyDialog({
     let active = true
     setLoadingOptions(true)
     setSourceElements([])
-    setSourceElementId("")
+    setSelectedIds([])
     fetch(`/api/competitions/${sourceCompetitionId}/elements`)
       .then(async (response) => {
         const data = await response.json().catch(() => [])
         if (!response.ok) throw new Error()
         if (!active) return
         setSourceElements(data)
-        setSourceElementId(data[0]?.id ?? "")
       })
       .catch(() => {
         if (active) setError("Elementide laadimine ebaõnnestus")
@@ -88,29 +95,55 @@ export function ScoringElementCopyDialog({
     }
   }, [fixedSource, open, sourceCompetitionId])
 
+  function toggleElement(elementId: string) {
+    setError("")
+    setSelectedIds((current) =>
+      current.includes(elementId)
+        ? current.filter((id) => id !== elementId)
+        : [...current, elementId]
+    )
+  }
+
   async function copyElement(event: React.FormEvent) {
     event.preventDefault()
-    const selectedSourceId = fixedSource?.id ?? sourceElementId
-    if (!selectedSourceId || !targetCompetitionId) {
+    const sourceIds = fixedSource ? [fixedSource.id] : selectedElements.map(({ id }) => id)
+    if (sourceIds.length === 0 || !targetCompetitionId) {
       setError("Vali lähteelement ja sihtvõistlus")
       return
     }
     setSaving(true)
     setError("")
-    const response = await fetch(`/api/elements/${selectedSourceId}/copy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetCompetitionId }),
-    })
+    // Üks element: olemasolev otspunkt. Mitu: ühe tehinguna, kõik või mitte ükski.
+    const response = fixedSource
+      ? await fetch(`/api/elements/${fixedSource.id}/copy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetCompetitionId }),
+        })
+      : await fetch(`/api/competitions/${targetCompetitionId}/elements/copy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceElementIds: sourceIds }),
+        })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      setError(data.error ?? "Elemendi kopeerimine ebaõnnestus")
+      setError(data.error ?? (sourceIds.length > 1 ? "Elementide kopeerimine ebaõnnestus" : "Elemendi kopeerimine ebaõnnestus"))
       setSaving(false)
       return
     }
-    router.push(
-      `/dashboard/competitions/${targetCompetitionId}/elements/${data.id}`
-    )
+    const copied: { id: string }[] = fixedSource ? [data] : data.elements ?? []
+    if (copied.length === 1) {
+      router.push(
+        `/dashboard/competitions/${targetCompetitionId}/elements/${copied[0].id}`
+      )
+      router.refresh()
+      return
+    }
+    // Mitu koopiat: jää elementide nimekirja juurde, koopiad on selle lõpus.
+    setSaving(false)
+    setOpen(false)
+    setCopiedMessage(`Kopeeriti ${copied.length} elementi.`)
+    router.push(`/dashboard/competitions/${targetCompetitionId}`)
     router.refresh()
   }
 
@@ -127,6 +160,11 @@ export function ScoringElementCopyDialog({
       >
         {buttonLabel}
       </button>
+      {copiedMessage && (
+        <span role="status" className="text-sm text-green-700">
+          {copiedMessage}
+        </span>
+      )}
 
       {open && (
         <div
@@ -144,7 +182,7 @@ export function ScoringElementCopyDialog({
                 id="copy-element-title"
                 className="text-xl font-bold text-gray-900"
               >
-                Kopeeri hindamiselement
+                {fixedSource ? "Kopeeri hindamiselement" : "Kopeeri hindamiselemendid"}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
                 Kopeeritakse väljad, hindamisosad, erandid ja arvutusmeetod.
@@ -184,32 +222,59 @@ export function ScoringElementCopyDialog({
                     ))}
                   </Select>
                 </div>
-                <div>
-                  <label
-                    htmlFor="copy-element-source"
-                    className="text-sm font-medium text-gray-700 block mb-1"
-                  >
-                    Hindamiselement
-                  </label>
-                  <Select
-                    id="copy-element-source"
-                    required
-                    value={sourceElementId}
-                    onChange={(event) => setSourceElementId(event.target.value)}
-                    disabled={loadingOptions || sourceElements.length === 0}
-                    className="disabled:bg-gray-50"
-                  >
-                    {sourceElements.length === 0 && (
-                      <option value="">Elemente ei ole</option>
+                <fieldset aria-labelledby="copy-element-sources-label">
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <span id="copy-element-sources-label" className="text-sm font-medium text-gray-700">
+                      Hindamiselemendid
+                    </span>
+                    {sourceElements.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError("")
+                          setSelectedIds(allSelected ? [] : sourceElements.map(({ id }) => id))
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        {allSelected ? "Tühista kõik" : "Vali kõik"}
+                      </button>
                     )}
-                    {sourceElements.map((element) => (
-                      <option key={element.id} value={element.id}>
-                        {element.code} · {element.name}
-                        {element.isCancelled ? " (tühistatud)" : ""}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                  </div>
+                  <div className="border rounded-lg max-h-64 overflow-y-auto divide-y">
+                    {loadingOptions ? (
+                      <p role="status" className="text-sm text-gray-400 px-3 py-4">
+                        Laadin elemente…
+                      </p>
+                    ) : sourceElements.length === 0 ? (
+                      <p className="text-sm text-gray-400 px-3 py-4">
+                        Selles võistluses pole elemente.
+                      </p>
+                    ) : (
+                      sourceElements.map((element) => (
+                        <label
+                          key={element.id}
+                          className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(element.id)}
+                            onChange={() => toggleElement(element.id)}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-gray-700">
+                            <span className="font-medium">{element.code}</span> · {element.name}
+                            {element.isCancelled && <span className="text-gray-400"> (tühistatud)</span>}
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {sourceElements.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Valitud {selectedElements.length}/{sourceElements.length}. Koopiad lisatakse elementide nimekirja lõppu samas järjekorras.
+                    </p>
+                  )}
+                </fieldset>
               </>
             )}
 
@@ -261,10 +326,10 @@ export function ScoringElementCopyDialog({
               </button>
               <button
                 type="submit"
-                disabled={saving || loadingOptions}
+                disabled={saving || loadingOptions || (!fixedSource && selectedElements.length === 0)}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? "Kopeerin..." : "Kopeeri element"}
+                {saving ? "Kopeerin..." : submitLabel}
               </button>
             </div>
           </form>
