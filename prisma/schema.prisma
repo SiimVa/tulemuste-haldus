@@ -277,6 +277,7 @@ model Competition {
   notifications               Notification[]
   map                         CompetitionMap?
   leaderboardFreeze           LeaderboardFreeze?
+  seriesMemberships           CompetitionSeriesCompetition[]
 
   @@index([createdById])
   @@index([organizerId])
@@ -842,4 +843,27 @@ model TeamRepresentative {
 
   @@unique([teamId, competitionId])
   @@index([memberId])
+}
+
+// ─── Üleriiklik arvestus ─────────────────────────────────────────────────────
+// Mitme osavõistluse (eraldi võistluste) ühine pingerida. Arvutus loeb
+// osavõistluste salvestatud punkte ega muuda osavõistluste hindamist.
+// Vt src/lib/seriesRanking.ts ja docs/national-ranking.md.
+model CompetitionSeries {
+  id           String                         @id @default(cuid())
+  name         String
+  createdAt    DateTime                       @default(now())
+  updatedAt    DateTime                       @updatedAt
+  competitions CompetitionSeriesCompetition[]
+}
+
+model CompetitionSeriesCompetition {
+  seriesId      String
+  series        CompetitionSeries @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  competitionId String
+  competition   Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  order         Int               @default(0)
+
+  @@id([seriesId, competitionId])
+  @@index([competitionId])
 }
