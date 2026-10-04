@@ -74,3 +74,7 @@ ja avaliku pingerea külmutamine on kirjeldatud failis
 
 Erandite liigid ja erandi „Ebaõnnestus” mõju pingereale on kirjeldatud failis
 [docs/exceptions.md](docs/exceptions.md).
+
+Mitme osavõistluse üleriiklik arvestus (keskmine läbitud KP-de arv, N parimat
+KP-d ja reeglite kontroll) on kirjeldatud failis
+[docs/national-ranking.md](docs/national-ranking.md).

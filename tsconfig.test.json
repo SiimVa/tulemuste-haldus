@@ -49,6 +49,8 @@
     "src/lib/scoreCompute.ts",
     "src/lib/imageSize.ts",
     "src/lib/leaderboardFreeze.ts",
+    "src/lib/seriesRanking.ts",
+    "src/lib/seriesRules.ts",
     "tests/**/*.test.ts"
   ]
 }

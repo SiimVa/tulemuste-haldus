@@ -55,6 +55,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {session.user.role === "ADMIN" && (
           <nav aria-label="Administraatori tööriistad" className="mx-auto flex max-w-7xl flex-wrap gap-4 px-4 pb-2 text-sm">
             <Link href="/dashboard/users" className="text-gray-600 hover:text-blue-600 sm:hidden">Kasutajad</Link>
+            <Link href="/dashboard/series" className="text-gray-600 hover:text-blue-600">Üleriiklik arvestus</Link>
             <Link href="/dashboard/security" className="text-gray-600 hover:text-blue-600">
               Turvalogi
               {openSecurityAlerts > 0 && (
