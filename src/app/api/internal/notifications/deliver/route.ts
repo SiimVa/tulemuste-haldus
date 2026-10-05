@@ -7,6 +7,7 @@ import {
 import { detectSecurityAlertsSafely } from "@/lib/securityAlerts.server"
 import { processDueLeaderboardFreezesSafely } from "@/lib/leaderboardFreeze.server"
 import { processDueSeriesFreezesSafely } from "@/lib/seriesRanking.server"
+import { deliverPendingCompetitionMessagesSafely } from "@/lib/competitionMessages.server"
 
 export const dynamic = "force-dynamic"
 
@@ -35,5 +36,7 @@ export async function GET(req: Request) {
   const seriesFreezes = await processDueSeriesFreezesSafely()
   const queued = await enqueueDueMandateOpenedNotifications()
   const delivery = await deliverPendingNotifications({ limit: 100 })
-  return NextResponse.json({ queued, securityAlerts, leaderboardFreezes, seriesFreezes, ...delivery })
+  // Korraldajate kirjad võistkondadele: partiid, mis ei läinud kohe välja.
+  const competitionMessages = await deliverPendingCompetitionMessagesSafely()
+  return NextResponse.json({ queued, securityAlerts, leaderboardFreezes, seriesFreezes, competitionMessages, ...delivery })
 }

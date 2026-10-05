@@ -12,6 +12,10 @@ const e2eEnvironment = {
   SETUP_SECRET: "e2e-setup-secret-used-only-by-playwright-tests",
   CRON_SECRET: "e2e-cron-secret-used-only-by-playwright-tests",
   AUTH_URL: baseURL,
+  // E-kirjad lähevad testides kohalikku võltsserverisse, mitte Resendi.
+  RESEND_API_KEY: "e2e-resend-key",
+  EMAIL_FROM: "Matkamäng <noreply@example.com>",
+  RESEND_API_URL: "http://127.0.0.1:3199",
 }
 
 export default defineConfig({
