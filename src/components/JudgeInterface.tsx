@@ -128,6 +128,33 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
     }
   }
 
+  // Kustutab valitud võistkonna tulemuse (nt vale võistkonna sisestus).
+  async function deleteResult() {
+    if (!selectedTeamId || !selectedElementId) return
+    const team = teams.find(t => t.id === selectedTeamId)
+    if (!window.confirm(`Kustuta võistkonna „${team?.name ?? ""}” tulemus?`)) return
+    setError("")
+    setSaving(true)
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (accessToken) headers["x-access-token"] = accessToken
+    const res = await fetch(`/api/elements/${selectedElementId}/results`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ teamId: selectedTeamId, values: {}, exceptionLabel: null }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setError(data.error ?? "Kustutamine ebaõnnestus")
+      return
+    }
+    setResults(prev => prev.filter(r => !(r.elementId === selectedElementId && r.teamId === selectedTeamId)))
+    setLastSaved(`${team?.name} (tulemus kustutatud) — ${new Date().toLocaleTimeString("et-EE")}`)
+    setSelectedTeamId(null)
+    setFormValues({})
+    setExceptionLabel("")
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedTeamId || !selectedElementId) return
@@ -440,6 +467,12 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {saving ? "Salvestan..." : "✓ Salvesta tulemus"}
               </button>
+              {getExisting(selectedElement.id, selectedTeamId) && (
+                <button type="button" onClick={deleteResult} disabled={saving}
+                  className="w-full py-2.5 px-4 rounded-lg text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                  Kustuta tulemus
+                </button>
+              )}
             </form>
           )}
 

@@ -172,6 +172,27 @@ export function ElementResultsTable({ element, teams }: Props) {
     }
   }
 
+  // Kustutab võistkonna tulemuse (nt proovisisestuse). Tühi sisestus kustutab
+  // tulemuse ka siis, kui elemendil on kohustuslikke välju.
+  async function deleteResult(team: Team) {
+    if (!window.confirm(`Kustuta võistkonna „${team.name}” tulemus elemendist „${element.name}”?`)) return
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/elements/${element.id}/results`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId: team.id, values: {}, exceptionLabel: null }),
+      })
+      if (res.ok) {
+        setEditingTeamId(null)
+        window.location.reload()
+      } else { setError((await res.json().catch(() => ({}))).error ?? "Kustutamine ebaõnnestus") }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function sortByScore(list: Team[]) {
     return [...list].sort((a, b) => {
       const sa = getScore(a.id)
@@ -350,7 +371,13 @@ export function ElementResultsTable({ element, teams }: Props) {
                   className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50">
                   {saving ? "..." : "Salvesta"}
                 </button>
-                <button onClick={() => setEditingTeamId(null)}
+                {result && (
+                  <button onClick={() => deleteResult(team)} disabled={saving}
+                    className="px-2 py-1 text-red-600 rounded text-xs hover:bg-red-50 disabled:opacity-50">
+                    Kustuta
+                  </button>
+                )}
+                <button onClick={() => setEditingTeamId(null)} aria-label="Tühista muutmine"
                   className="px-2 py-1 text-gray-500 rounded text-xs hover:bg-gray-100">
                   ✕
                 </button>
