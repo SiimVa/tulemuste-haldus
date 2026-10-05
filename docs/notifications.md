@@ -71,3 +71,39 @@ katsega.
 Vastus sisaldab lisatud, saadetud ja ebaõnnestunud e-kirjade arve. Puuduvate
 e-posti muutujate korral säilivad rakendusesisesed teavitused, kuid vastuses on
 `configurationMissing: true`.
+
+## Kirjad võistkondadele
+
+Korraldaja saab saata vabas vormis kirja registreerunud võistkondade
+esindajatele ja liikmetele: **Registreerimine → Kirjad võistkondadele**.
+
+Saajad:
+
+- **Võistkonnad** (loodud võistkonnad, sh kinnitatud nimekirjast): esindaja
+  konto e-post, kutsutud esindaja e-post ja liikmete e-postid.
+- **Registreeritud, ootenimekirjas, ootab ülevaatamist, vajab täiendamist**
+  (veel kinnitamata avaldused): avalduse esitaja, vormis märgitud esindaja ja
+  liikmete loendi e-postid. Avaldust, millest võistkond on loodud, eraldi ei
+  loeta.
+- Vaikimisi on valitud võistkonnad ja registreeritud avaldused, nii esindajad
+  kui ka liikmed. Valikut saab kitsendada klassi järgi ja üksikuid saajaid
+  eemaldada.
+
+Iga aadress saab ühe kirja, ka siis, kui inimene on mitmes võistkonnas või nii
+esindaja kui ka liige; kirja jaluses on kõik põhjused (nt „Osula NK
+(esindaja)”). Teisi saajaid kirjas näha ei ole. Vigased aadressid jäetakse
+välja ja kuvatakse enne saatmist. Server arvutab saajad uuesti ega saada
+aadressidele, mis valikule ei vasta. Ühe kirjaga saab saata kuni 2000 saajale.
+
+`Reply-To` on saatja konto e-post. Enne saatmist saab saata proovikirja
+endale. Kirjad saadetakse Resendi partiidena (kuni 100 kirja ühes): esimesed
+kuni 500 saajat kohe, ülejäänud ja ebaõnnestunud partiid sama cron'iga kuni kuue
+katsega. Korduskatse kasutab sama `Idempotency-Key`'d, et kirjad ei läheks
+topelt. Saadetud kirjade ajalugu (sisu, saajad ja olek) on samal lehel.
+
+Saajate aadressid kustutatakse koos võistluse isikuandmetega (vt
+[personal-data-retention.md](personal-data-retention.md)); kirja teema ja sisu
+jäävad alles.
+
+`RESEND_API_URL` on vaikimisi `https://api.resend.com`. Testides suunatakse
+kirjad selle muutujaga kohalikku võltsserverisse.

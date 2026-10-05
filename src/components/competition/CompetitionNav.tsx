@@ -26,6 +26,7 @@ export function CompetitionNav({ competitionId }: { competitionId: string }) {
         { href: `${base}/registration-overview`, label: "Registreerimise ülevaade" },
         { href: `${base}/registration-forecast`, label: "Prognoos" },
         { href: `${base}/registration-settings`, label: "Registreerimise seaded" },
+        { href: `${base}/messages`, label: "Kirjad võistkondadele" },
       ],
     },
     {

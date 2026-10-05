@@ -372,7 +372,12 @@ test.describe.serial("võistluse põhivoog", () => {
     const combinedElementId = (await combinedElementResponse.json()).id
     await page.reload()
 
-    await page.getByRole("button", { name: "Kopeeri võistlus" }).click()
+    // Töölaual võib olla teiste testide võistlusi: kopeeri selle testi võistlust.
+    const competitionCard = page.locator("div")
+      .filter({ has: page.getByRole("heading", { name: "E2E proovivõistlus", exact: true }) })
+      .filter({ has: page.getByRole("button", { name: "Kopeeri võistlus" }) })
+      .last()
+    await competitionCard.getByRole("button", { name: "Kopeeri võistlus" }).click()
     const competitionCopyDialog = page.getByRole("dialog", {
       name: "Kopeeri võistlus",
     })

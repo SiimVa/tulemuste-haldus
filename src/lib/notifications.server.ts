@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import type { Prisma } from "@prisma/client"
 import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { resendConfig } from "@/lib/email.server"
 import {
   competitionStartedNotificationContent,
   mandateOpenedNotificationContent,
@@ -344,11 +345,11 @@ function absoluteNotificationUrl(href: string | null) {
 export async function deliverPendingNotifications(
   options: { limit?: number; now?: Date } = {}
 ) {
-  const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.EMAIL_FROM
-  if (!apiKey || !from) {
+  const config = resendConfig()
+  if (!config) {
     return { sent: 0, failed: 0, configurationMissing: true }
   }
+  const { apiKey, from, baseUrl } = config
 
   const now = options.now ?? new Date()
   const staleSending = new Date(now.getTime() - 10 * 60 * 1000)
@@ -428,7 +429,7 @@ export async function deliverPendingNotifications(
       ? `notification-batch-${first.emailBatchId}`
       : first.id
     try {
-      const response = await fetch("https://api.resend.com/emails", {
+      const response = await fetch(`${baseUrl}/emails`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,

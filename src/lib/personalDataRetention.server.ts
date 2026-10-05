@@ -174,6 +174,8 @@ export async function purgeCompetitionPersonalData(
     where: { competitionId },
     data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
   })
+  // Saadetud kirjad jäävad alles, saajate aadressid kustutatakse.
+  await tx.competitionMessageRecipient.deleteMany({ where: { message: { competitionId } } })
   await tx.competition.update({
     where: { id: competitionId },
     data: { personalDataPurgedAt: now },

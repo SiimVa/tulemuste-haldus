@@ -54,6 +54,7 @@
     "src/lib/seriesInsights.ts",
     "src/lib/seriesDashboard.ts",
     "src/lib/seriesFreeze.ts",
+    "src/lib/competitionMessages.ts",
     "src/lib/leaderboard.ts",
     "tests/**/*.test.ts"
   ]

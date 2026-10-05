@@ -96,6 +96,7 @@ model User {
   sentRoleInvitations      CompetitionRoleInvitation[]    @relation("CompetitionRoleInvitationInvitedBy")
   acceptedRoleInvitations  CompetitionRoleInvitation[]    @relation("CompetitionRoleInvitationAcceptedBy")
   notifications            Notification[]
+  sentCompetitionMessages  CompetitionMessage[]           @relation("CompetitionMessageSender")
 }
 
 model Account {
@@ -278,6 +279,7 @@ model Competition {
   map                         CompetitionMap?
   leaderboardFreeze           LeaderboardFreeze?
   seriesMemberships           CompetitionSeriesCompetition[]
+  messages                    CompetitionMessage[]
 
   @@index([createdById])
   @@index([organizerId])
@@ -877,4 +879,46 @@ model CompetitionSeriesCompetition {
 
   @@id([seriesId, competitionId])
   @@index([competitionId])
+}
+
+// ─── Kirjad võistkondadele ───────────────────────────────────────────────────
+// Korraldaja kiri registreerunud võistkondade esindajatele ja liikmetele.
+// Iga saaja saab eraldi kirja; saajate aadressid kustutatakse koos võistluse
+// isikuandmetega. Vt src/lib/competitionMessages.ts ja docs/notifications.md.
+model CompetitionMessage {
+  id             String                        @id @default(cuid())
+  competitionId  String
+  competition    Competition                   @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  subject        String
+  body           String                        @db.Text
+  replyTo        String?
+  sentById       String?
+  sentBy         User?                         @relation("CompetitionMessageSender", fields: [sentById], references: [id], onDelete: SetNull)
+  recipientCount Int
+  createdAt      DateTime                      @default(now())
+  recipients     CompetitionMessageRecipient[]
+
+  @@index([competitionId, createdAt])
+}
+
+model CompetitionMessageRecipient {
+  id            String             @id @default(cuid())
+  messageId     String
+  message       CompetitionMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  email         String
+  name          String?
+  // Miks kiri tuli (nt „Osula NK – esindaja”), kirja jaluses.
+  context       String
+  // Kirjad saadetakse kuni 100 kaupa; korduskatse saadab sama partii.
+  batchNo       Int
+  // "PENDING" | "SENDING" | "SENT" | "FAILED"
+  status        String             @default("PENDING")
+  attempts      Int                @default(0)
+  nextAttemptAt DateTime           @default(now())
+  lastError     String?            @db.Text
+  sentAt        DateTime?
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([messageId, batchNo])
 }

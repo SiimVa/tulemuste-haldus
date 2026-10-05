@@ -62,8 +62,9 @@ on kirjeldatud failis
 Võistluste ja hindamiselementide kopeerimise ulatus ning õigused on kirjeldatud
 failis [docs/competition-copying.md](docs/competition-copying.md).
 
-Rakendusesiseste teavituste, Resendi e-kirjade ja saatmise korduskatsete seadistus
-on kirjeldatud failis [docs/notifications.md](docs/notifications.md).
+Rakendusesiseste teavituste, Resendi e-kirjade, saatmise korduskatsete ja
+korraldaja kirjade (võistkondade esindajatele ja liikmetele) seadistus on
+kirjeldatud failis [docs/notifications.md](docs/notifications.md).
 
 Administraatori turvalogi, päringupiirangute, turvapäiste ning seire piiride
 kirjeldus on failis [docs/security.md](docs/security.md).
