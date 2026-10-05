@@ -116,6 +116,16 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   const keepsValues = resultKeepsValues({ exceptionLabel }, element?.exceptions ?? [])
   const storedValues = keepsValues ? (values ?? {}) : {}
 
+  // Kui erandit pole ja kõik lahtrid on tühjad → loe "sisestamata": kustuta kirje
+  // ja skoor. Enne valideerimist, et kohustuslik väli kustutamist ei takistaks.
+  const hasAnyValue = values && Object.values(values).some((v) => String(v ?? "").trim() !== "")
+  if (!exceptionLabel && !hasAnyValue) {
+    await prisma.result.deleteMany({ where: { elementId, teamId } })
+    await prisma.computedScore.deleteMany({ where: { elementId, teamId } })
+    await recomputeElementScores(elementId)
+    return NextResponse.json({ deleted: true, teamId })
+  }
+
   // Valideeri sisendväljad. Ebaõnnestunul võib mõni väärtus puududa, seega
   // kohustuslikke välju ei nõuta.
   if (keepsValues && values) {
@@ -153,15 +163,6 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
       const err = validateFieldValue(values[field.name], field.name, field.label, field.type, validation, field.meta)
       if (err) return NextResponse.json({ error: err.message }, { status: 422 })
     }
-  }
-
-  // Kui erandit pole ja kõik lahtrid on tühjad → loe "sisestamata": kustuta kirje ja skoor
-  const hasAnyValue = values && Object.values(values).some((v) => String(v ?? "").trim() !== "")
-  if (!exceptionLabel && !hasAnyValue) {
-    await prisma.result.deleteMany({ where: { elementId, teamId } })
-    await prisma.computedScore.deleteMany({ where: { elementId, teamId } })
-    await recomputeElementScores(elementId)
-    return NextResponse.json({ deleted: true, teamId })
   }
 
   const result = await prisma.result.upsert({
