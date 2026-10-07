@@ -17,7 +17,9 @@ export async function ensureCompetitionAccessTokens(
       select: { id: true, name: true, code: true },
     }),
     tx.team.findMany({
-      where: { competitionId, registrationStatus: "APPROVED" },
+      // Kõik võistkonnad, sh ilma registreerimiseta lisatud (DRAFT): lingi
+      // loomine ei jaga seda kellelegi, jagamist piiravad eraldi kontrollid.
+      where: { competitionId },
       select: { id: true, name: true, code: true },
     }),
     tx.accessToken.findMany({
