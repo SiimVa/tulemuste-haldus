@@ -93,7 +93,7 @@ export function DashboardNavigation({
               >
                 Turvalogi
                 {openSecurityAlerts > 0 && (
-                  <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold leading-4 text-white">
+                  <span className="relative rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold leading-4 text-white">
                     {openSecurityAlerts}<span className="sr-only"> avatud hoiatust</span>
                   </span>
                 )}
