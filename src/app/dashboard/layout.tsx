@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import Link from "next/link"
 import { SignOutButton } from "@/components/SignOutButton"
-import { NotificationNavLink } from "@/components/notifications/NotificationNavLink"
+import { DashboardNavigation } from "@/components/dashboard/DashboardNavigation"
 import { prisma } from "@/lib/prisma"
 import { openSecurityAlertCount } from "@/lib/securityAlerts.server"
 
@@ -24,48 +24,37 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <div className="mx-auto flex min-h-14 max-w-7xl items-center justify-between gap-3 px-4 py-2">
           <Link
             href="/dashboard"
-            aria-label="Töölaud"
-            className="flex shrink-0 items-center gap-1.5 font-semibold text-gray-900 hover:text-blue-600"
+            aria-label="Matkamäng"
+            className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg font-semibold text-gray-900 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
             <span aria-hidden="true">🏆</span>
-            <span className="hidden sm:inline">Võistlused</span>
+            <span>Matkamäng</span>
           </Link>
-          <nav className="flex min-w-0 items-center gap-2 sm:gap-4" aria-label="Põhinavigatsioon">
-            <Link href="/competitions" className="shrink-0 text-sm text-gray-500 hover:text-blue-600">
-              <span className="sm:hidden">Avalikud</span>
-              <span className="hidden sm:inline">Avalikud võistlused</span>
-            </Link>
-            <NotificationNavLink unreadCount={unreadNotifications} />
-            {session.user.role === "ADMIN" && (
-              <Link href="/dashboard/users" className="hidden text-sm text-gray-500 hover:text-blue-600 sm:inline">
-                Kasutajad
-              </Link>
-            )}
-            <Link href="/dashboard/profile" className="flex min-w-0 items-center gap-1 text-sm text-gray-500 hover:text-blue-600">
-              <span className="max-w-20 truncate sm:max-w-40">
-                {session.user.name}
+          <div className="flex min-w-0 items-center gap-2 text-sm sm:gap-4">
+            <div className="hidden min-w-0 items-center gap-2 text-gray-600 sm:flex">
+              <span className="max-w-36 truncate">
+                {session.user.name || session.user.email}
               </span>
-              <span className="hidden rounded-full bg-gray-100 px-2 py-0.5 text-xs md:inline">
+              <span className="hidden rounded-full bg-gray-100 px-2 py-0.5 text-xs lg:inline">
                 {roleLabel}
               </span>
+            </div>
+            <Link
+              href="/dashboard/profile"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-gray-600 hover:bg-gray-50 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            >
+              Profiil
             </Link>
-            <SignOutButton />
-          </nav>
+            <div className="flex min-h-11 items-center [&>button]:min-h-11 [&>button]:rounded-lg [&>button]:px-2 [&>button]:focus-visible:outline-2 [&>button]:focus-visible:outline-offset-2 [&>button]:focus-visible:outline-blue-500">
+              <SignOutButton />
+            </div>
+          </div>
         </div>
-        {session.user.role === "ADMIN" && (
-          <nav aria-label="Administraatori tööriistad" className="mx-auto flex max-w-7xl flex-wrap gap-4 px-4 pb-2 text-sm">
-            <Link href="/dashboard/users" className="text-gray-600 hover:text-blue-600 sm:hidden">Kasutajad</Link>
-            <Link href="/dashboard/series" className="text-gray-600 hover:text-blue-600">Üleriiklik arvestus</Link>
-            <Link href="/dashboard/security" className="text-gray-600 hover:text-blue-600">
-              Turvalogi
-              {openSecurityAlerts > 0 && (
-                <span className="ml-1 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
-                  {openSecurityAlerts}<span className="sr-only"> avatud hoiatust</span>
-                </span>
-              )}
-            </Link>
-          </nav>
-        )}
+        <DashboardNavigation
+          isAdmin={session.user.role === "ADMIN"}
+          unreadNotifications={unreadNotifications}
+          openSecurityAlerts={openSecurityAlerts}
+        />
       </header>
       <main className="dashboard-shell-main mx-auto max-w-7xl px-4 py-6 sm:py-8">{children}</main>
     </div>

@@ -374,6 +374,8 @@ test.describe.serial("võistluse põhivoog", () => {
     const combinedElementId = (await combinedElementResponse.json()).id
     await page.reload()
 
+    await page.getByRole("tab", { name: "Võistluste haldamine", exact: true }).click()
+
     // Töölaual võib olla teiste testide võistlusi: kopeeri selle testi võistlust.
     const competitionCard = page.locator("div")
       .filter({ has: page.getByRole("heading", { name: "E2E proovivõistlus", exact: true }) })
@@ -755,7 +757,7 @@ test.describe.serial("võistluse põhivoog", () => {
       page.getByRole("heading", { name: "Minu registreerimised" })
     ).toBeVisible()
     await expect(
-      page.getByRole("heading", { name: "Ootavad kinnitamist" })
+      page.getByText("Registreerimise mustand", { exact: true }).first()
     ).toBeVisible()
     await expect(
       page.getByRole("heading", { name: /VK 1 · Testvõistkond/ })
@@ -1673,7 +1675,7 @@ test.describe.serial("võistluse põhivoog", () => {
 
     await page.goto("/dashboard")
     await expect(
-      page.getByRole("heading", { name: "Tagasi saadetud mandaadid" })
+      page.getByRole("region", { name: "Mandaadid", exact: true }).getByText("Vajab täiendamist", { exact: true })
     ).toBeVisible()
     await page.goto(`/dashboard/representative/teams/${assignment.team.id}`)
     await expect(
@@ -1809,7 +1811,7 @@ test.describe.serial("võistluse põhivoog", () => {
 
     await page.goto("/dashboard")
     await expect(
-      page.getByRole("heading", { name: "Aktiivsed võistlused" })
+      page.getByRole("heading", { name: "Käimasolevad võistlused" })
     ).toBeVisible()
     await expect(page.getByRole("heading", { name: "Mandaadid" })).toHaveCount(
       0
@@ -1827,7 +1829,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.reload()
     await expect(
-      page.getByRole("link", { name: "Avalikud", exact: true })
+      page.getByRole("link", { name: "Avalikud võistlused", exact: true })
     ).toBeVisible()
     await expect(
       page
@@ -1870,7 +1872,7 @@ test.describe.serial("võistluse põhivoog", () => {
     await login(page, otherOrganizer.email, otherOrganizer.password)
 
     await expect(
-      page.getByRole("heading", { name: "Aktiivsed võistlused" })
+      page.getByRole("heading", { name: "Käimasolevad võistlused" })
     ).toBeVisible()
     const memberTeamCard = page
       .locator("article")
