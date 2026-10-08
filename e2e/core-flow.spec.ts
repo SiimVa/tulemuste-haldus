@@ -260,7 +260,9 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBe(200)
 
     await page.goto(`/dashboard/competitions/${competitionId}/access`)
-    await page.getByPlaceholder("kasutaja@email.ee").fill(accountJudge.email)
+    await page.getByRole("button", { name: "Lisa kasutajale rollid", exact: true }).click()
+    await page.getByRole("button", { name: /Kuva kõik/ }).click()
+    await page.getByRole("combobox", { name: "Kasutaja nimi või e-post" }).fill(accountJudge.email)
     await page.getByRole("checkbox", { name: /Kohtunik/ }).check()
     await page.getByLabel("KP1 · Kontrollpunkt 1").check()
     const assignmentResponse = page.waitForResponse(
@@ -280,7 +282,7 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBeVisible()
 
     await page
-      .getByPlaceholder("kasutaja@email.ee")
+      .getByRole("combobox", { name: "Kasutaja nimi või e-post" })
       .fill(competitionOrganizer.email)
     await page.getByRole("checkbox", { name: /Korraldaja/ }).check()
     const organizerAssignmentResponse = page.waitForResponse(
@@ -299,7 +301,7 @@ test.describe.serial("võistluse põhivoog", () => {
       page.getByText(competitionOrganizer.name, { exact: true })
     ).toBeVisible()
 
-    await page.getByPlaceholder("kasutaja@email.ee").fill(invitedJudge.email)
+    await page.getByRole("combobox", { name: "Kasutaja nimi või e-post" }).fill(invitedJudge.email)
     await page.getByRole("checkbox", { name: /Kohtunik/ }).check()
     await page.getByLabel("KP1 · Kontrollpunkt 1").check()
     const invitationResponsePromise = page.waitForResponse(
@@ -318,7 +320,7 @@ test.describe.serial("võistluse põhivoog", () => {
     judgeInvitationUrl = invitationData.invitationUrl
     expect(judgeInvitationUrl).toMatch(/^\/invitations\//)
     await expect(
-      page.getByText("Kutse on loodud – kopeeri link kohe")
+      page.getByText("Kutse on loodud, kuid e-kiri jäi saatmata")
     ).toBeVisible()
 
     const invitedJudgeResponse = await page.request.post("/api/users", {

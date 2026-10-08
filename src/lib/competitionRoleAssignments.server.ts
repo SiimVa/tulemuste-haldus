@@ -305,6 +305,18 @@ export async function setCompetitionOwner({
       if (!userExists) {
         throw new CompetitionRoleAssignmentError("Kasutajat ei leitud", 404)
       }
+      if (userId !== competition.organizerId) {
+        const organizer = await tx.competitionMember.findFirst({
+          where: { competitionId, userId, roles: { some: { role: "ORGANIZER" } } },
+          select: { id: true },
+        })
+        if (!organizer) {
+          throw new CompetitionRoleAssignmentError(
+            "Peakorraldajaks saab määrata ainult selle võistluse korraldaja",
+            400
+          )
+        }
+      }
     }
 
     const previousOwnerRoles = await tx.competitionMemberRole.findMany({

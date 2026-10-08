@@ -21,6 +21,8 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
   const [bulkMsg, setBulkMsg] = useState("")
   const [qrAudience, setQrAudience] = useState("ALL")
   const [qrPerPage, setQrPerPage] = useState(6)
+  const [tokenSearch, setTokenSearch] = useState("")
+  const [tokenType, setTokenType] = useState("ALL")
   const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(() => {
@@ -87,9 +89,9 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
       <div className="flex items-center gap-2 mb-4 text-sm text-gray-400">
         <Link href={`/dashboard/competitions/${competitionId}`}>← Tagasi</Link>
       </div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-xl font-bold text-gray-900">Juurdepääsu haldus</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {bulkMsg && <span className="text-sm text-green-600">{bulkMsg}</span>}
           {tokens.length > 0 && (
             <a href={`/api/competitions/${competitionId}/tokens/export`}
@@ -108,8 +110,14 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
         "Loo kõik lingid" loob automaatselt kohtuniku lingid igale elemendile ja võistleja lingid igale võistkonnale (kui need juba pole olemas).
       </p>
 
-      <section className="bg-white border rounded-xl p-5 mb-6 space-y-3" aria-labelledby="qr-export-title">
-        <h2 id="qr-export-title" className="font-semibold text-gray-900">Ekspordi QR-koodid</h2>
+      <CompetitionRoleManager
+        competitionId={competitionId}
+        elements={elements}
+        teams={teams}
+      />
+
+      <details className="bg-white border rounded-xl p-5 mb-6 space-y-3">
+        <summary className="cursor-pointer font-semibold text-gray-900">Ekspordi QR-koodid</summary>
         <p className="text-sm text-gray-500">Prindi olemasolevad juurdepääsulingid või salvesta PDF-ina. Ühele A4 lehele mahub kuni 12 QR-koodi.</p>
         <div className="flex flex-wrap items-end gap-4">
           <label className="text-sm text-gray-700">
@@ -133,61 +141,67 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
             </a>
           ) : <p className="text-sm text-gray-500">Valitud sihtrühmale pole linke loodud.</p>}
         </div>
-      </section>
+      </details>
 
-      <CompetitionRoleManager
-        competitionId={competitionId}
-        elements={elements}
-        teams={teams}
-      />
 
       {/* Uue tokeni vorm */}
-      <form onSubmit={createToken} className="bg-white border rounded-xl p-5 mb-6 space-y-4">
-        <h3 className="font-semibold text-gray-900">Loo üksik varulink</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Tüüp</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="JUDGE">Kohtunik</option>
-              <option value="ATHLETE">Võistleja</option>
-            </select>
+      <details className="bg-white border rounded-xl p-5 mb-6">
+        <summary className="cursor-pointer font-semibold text-gray-900">Loo üksik varulink</summary>
+        <form onSubmit={createToken} className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Tüüp</label>
+              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="JUDGE">Kohtunik</option>
+                <option value="ATHLETE">Võistleja</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Nimi *</label>
+              <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                placeholder={form.type === "JUDGE" ? "Jüri Mets (KP 1)" : "Võistkond Uulukad"}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Nimi *</label>
-            <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-              placeholder={form.type === "JUDGE" ? "Jüri Mets (KP 1)" : "Võistkond Uulukad"}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-        </div>
 
-        {form.type === "JUDGE" && (
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">KP (jäta tühjaks = kõik KP-d)</label>
-            <select value={form.elementId} onChange={e => setForm({ ...form, elementId: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">— Kõik elemendid —</option>
-              {elements.map(el => <option key={el.id} value={el.id}>[{el.code}] {el.name}</option>)}
-            </select>
-          </div>
-        )}
+          {form.type === "JUDGE" && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">KP (jäta tühjaks = kõik KP-d)</label>
+              <select value={form.elementId} onChange={e => setForm({ ...form, elementId: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— Kõik elemendid —</option>
+                {elements.map(el => <option key={el.id} value={el.id}>[{el.code}] {el.name}</option>)}
+              </select>
+            </div>
+          )}
 
-        {form.type === "ATHLETE" && (
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Võistkond *</label>
-            <select required value={form.teamId} onChange={e => setForm({ ...form, teamId: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">— Vali võistkond —</option>
-              {teams.map(t => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}
-            </select>
-          </div>
-        )}
+          {form.type === "ATHLETE" && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Võistkond *</label>
+              <select required value={form.teamId} onChange={e => setForm({ ...form, teamId: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— Vali võistkond —</option>
+                {teams.map(t => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}
+              </select>
+            </div>
+          )}
 
-        <Button type="submit" disabled={saving}>
-          {saving ? "Loon..." : "Loo link"}
-        </Button>
-      </form>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Loon..." : "Loo link"}
+          </Button>
+        </form>
+      </details>
 
+      <div className="grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 mb-3">
+        <h2 className="font-semibold text-gray-900">Juurdepääsulingid ({tokens.length})</h2>
+        <input aria-label="Otsi juurdepääsulinke" placeholder="Otsi nime, võistkonda või elementi" value={tokenSearch} onChange={event => setTokenSearch(event.target.value)} className="min-w-0 flex-1 border rounded-lg px-3 py-2 text-sm" />
+        <select aria-label="Lingi tüüp" value={tokenType} onChange={event => setTokenType(event.target.value)} className="border rounded-lg px-3 py-2 text-sm">
+          <option value="ALL">Kõik lingid</option>
+          <option value="JUDGE">Kohtunikud</option>
+          <option value="ATHLETE">Võistkonnad</option>
+        </select>
+      </div>
       {/* Tokenite nimekiri */}
       <Card className="divide-y">
         {tokens.length === 0 ? (
@@ -195,7 +209,7 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
         ) : (() => {
           const elementOrderMap = new Map(elements.map((el, i) => [el.id, i]))
           const teamOrderMap = new Map(teams.map((t, i) => [t.id, i]))
-          const sorted = [...tokens].sort((a, b) => {
+          const sorted = tokens.filter(token => (tokenType === "ALL" || token.type === tokenType) && [token.name, token.team?.name, token.element?.name].join(" ").toLocaleLowerCase("et").includes(tokenSearch.trim().toLocaleLowerCase("et"))).sort((a, b) => {
             if (a.type !== b.type) return a.type === "JUDGE" ? -1 : 1
             if (a.type === "JUDGE") {
               const aO = a.elementId ? (elementOrderMap.get(a.elementId) ?? 9999) : -1
@@ -206,8 +220,9 @@ export default function AccessPage({ params }: { params: Promise<{ id: string }>
             const bO = b.teamId ? (teamOrderMap.get(b.teamId) ?? 9999) : 9999
             return aO - bO
           })
+          if (!sorted.length) return <p className="px-5 py-6 text-sm text-gray-500">Otsingule vastavaid linke ei leitud.</p>
           return sorted.map(t => (
-          <div key={t.id} className="px-5 py-3 flex items-center justify-between gap-4">
+          <div key={t.id} className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-0.5">
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.type === "JUDGE" ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>

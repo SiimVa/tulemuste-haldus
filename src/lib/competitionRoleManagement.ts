@@ -47,6 +47,9 @@ export function parseCompetitionRoleManagementRequest(
   if (!email) {
     return { ok: false, error: "Kasutaja e-post on kohustuslik" }
   }
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Sisesta korrektne e-posti aadress või vali olemasolev kasutaja" }
+  }
   if (
     rawRoles.some(
       (role) =>
