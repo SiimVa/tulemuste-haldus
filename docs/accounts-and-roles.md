@@ -24,7 +24,7 @@ Toetatud võistluse rollid:
 
 ## Rollide haldamine
 
-Võistluse **Juurdepääsu** lehel saab olemasoleva kasutajakonto e-posti järgi
+Võistluse **Juurdepääsu** lehel saab olemasoleva kasutajakonto nime või e-posti järgi otsida ning
 määrata ja muuta aktiivseid võistlusepõhiseid rolle ühes kohas.
 
 - võistluse omanik ja süsteemiadministraator saavad anda või eemaldada
@@ -40,11 +40,25 @@ määrata ja muuta aktiivseid võistlusepõhiseid rolle ühes kohas.
 Kasutajale võistluse korraldaja rolli andmine ei muuda tema süsteemiülest
 rolli ega anna talle õigust uusi võistlusi luua.
 
+Vaikimisi kuvatakse peakorraldaja ja korraldajad. **Kuva kõik** avab teiste
+rollidega kasutajad; loendit saab otsida nime, e-posti, rolli, võistkonna või
+elemendi järgi ja kasutajaid kuvatakse kümne kaupa. Lisamise vorm avaneb
+loendi kohal. Olemasoleva liikme valimine otsingust laadib tema senised õigused.
+Peakorraldajaks saab määrata ainult sama võistluse `ORGANIZER` rolliga kasutaja;
+piirangut kontrollitakse ka serveris.
+
 ## Kontota kasutaja kutsumine
 
 Kui sisestatud e-posti aadressiga kasutajakontot veel ei ole, saab korraldaja
-**Juurdepääsu** lehel luua turvalise kutselingi. Rakendus e-kirju ise ei saada:
-korraldaja kopeerib kuvatud lingi ja edastab selle kutsutule ise.
+**Juurdepääsu** lehel saata turvalise kutselingiga e-kirja. Kirjas on kutsuja
+nimi, võistluse nimi ja pakutavad rollid. Saatmiseks kasutatakse olemasolevaid
+`RESEND_API_KEY` ja `EMAIL_FROM` seadeid; lingi baasiks on `AUTH_URL` (vaikimisi
+`https://www.matkamang.ee`).
+
+Saatmise õnnestumine või viga kuvatakse kohe. Kui saatmine ebaõnnestub või
+pole seadistatud, jääb kutse kehtima ja korraldaja saab kopeerida lingi või
+valida kutsete loendis **Saada uus kutse**, et avada vorm uuesti saatmiseks.
+Uue kutse salvestamine muudab varasema lingi kehtetuks.
 
 - kutse kehtib seitse päeva ja selle saab enne vastuvõtmist tühistada või uue
   lingiga asendada;
@@ -58,7 +72,7 @@ korraldaja kopeerib kuvatud lingi ja edastab selle kutsutule ise.
   õiguste andmise õigus.
 
 Kutselinki ennast andmebaasis ei hoita. Salvestatakse ainult tokeni SHA-256
-räsi, mistõttu tuleb loodud link kohe kopeerida.
+räsi. Kui soovid lingi ise edastada, kopeeri see enne lehe uuesti laadimist.
 
 ## Kasutajakontoga kohtunik
 

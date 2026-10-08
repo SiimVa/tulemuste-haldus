@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { CompetitionUserSearch } from "@/components/CompetitionUserSearch"
 import { Input } from "@/components/ui/input"
 
 type ManagedRole = "ORGANIZER" | "JUDGE" | "REPRESENTATIVE"
@@ -79,6 +80,13 @@ export function CompetitionRoleManager({
   elements: ElementOption[]
   teams: TeamOption[]
 }) {
+  const formRef = useRef<HTMLFormElement>(null)
+  const [formOpen, setFormOpen] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [memberSearch, setMemberSearch] = useState("")
+  const [visibleCount, setVisibleCount] = useState(10)
+  const [notice, setNotice] = useState("")
+  const [invitationEmailStatus, setInvitationEmailStatus] = useState("")
   const [data, setData] = useState<RoleData | null>(null)
   const [invitations, setInvitations] = useState<RoleInvitation[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,28 +101,41 @@ export function CompetitionRoleManager({
   const [copiedInvitationLink, setCopiedInvitationLink] = useState(false)
 
   const loadRoles = useCallback(async () => {
-    const [response, invitationsResponse] = await Promise.all([
-      fetch(`/api/competitions/${competitionId}/roles`),
-      fetch(`/api/competitions/${competitionId}/role-invitations`),
-    ])
-    const responseData = await response.json().catch(() => null)
-    if (!response.ok) {
-      setError(responseData?.error ?? "Rollide laadimine ebaõnnestus")
+    try {
+      const [response, invitationsResponse] = await Promise.all([
+        fetch(`/api/competitions/${competitionId}/roles`),
+        fetch(`/api/competitions/${competitionId}/role-invitations`),
+      ])
+      const responseData = await response.json().catch(() => null)
+      if (!response.ok) {
+        setError(responseData?.error ?? "Rollide laadimine ebaõnnestus")
+        setLoading(false)
+        return
+      }
+      setData(responseData)
+      if (invitationsResponse.ok) {
+        setInvitations(
+          await invitationsResponse.json().catch(() => [])
+        )
+      }
       setLoading(false)
-      return
+    } catch {
+      setError("Rollide laadimine ebaõnnestus. Proovi lehte uuendada.")
+      setLoading(false)
     }
-    setData(responseData)
-    if (invitationsResponse.ok) {
-      setInvitations(
-        await invitationsResponse.json().catch(() => [])
-      )
-    }
-    setLoading(false)
   }, [competitionId])
 
   useEffect(() => {
     void loadRoles()
   }, [loadRoles])
+
+  function openForm() {
+    setFormOpen(true)
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      formRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true })
+    })
+  }
 
   function resetForm() {
     setEmail("")
@@ -126,6 +147,7 @@ export function CompetitionRoleManager({
   }
 
   function editMember(member: CompetitionMember) {
+    openForm()
     const currentRoles = roleNames(member)
     setEmail(member.user.email)
     setEditingUserId(member.userId)
@@ -143,6 +165,7 @@ export function CompetitionRoleManager({
   }
 
   function editInvitation(invitation: RoleInvitation) {
+    openForm()
     setEmail(invitation.email)
     setEditingUserId(null)
     setRoles(invitation.roles)
@@ -174,64 +197,72 @@ export function CompetitionRoleManager({
   async function updateRoles(requestedRoles: ManagedRole[]) {
     setSaving(true)
     setError("")
+    setNotice("")
     setInvitationLink("")
-    const response = await fetch(
-      `/api/competitions/${competitionId}/roles`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          roles: requestedRoles,
-          elementIds,
-          teamIds,
-        }),
-      }
-    )
-    const responseData = await response.json().catch(() => ({}))
-    if (!response.ok) {
-      if (
-        responseData.code === "USER_NOT_FOUND" &&
-        requestedRoles.length > 0 &&
-        !editingUserId
-      ) {
-        const invitationResponse = await fetch(
-          `/api/competitions/${competitionId}/role-invitations`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email,
-              roles: requestedRoles,
-              elementIds,
-              teamIds,
-            }),
-          }
-        )
-        const invitationData = await invitationResponse
-          .json()
-          .catch(() => ({}))
-        setSaving(false)
-        if (!invitationResponse.ok) {
-          setError(
-            invitationData.error ?? "Kutse loomine ebaõnnestus"
-          )
-          return false
+    setCopiedInvitationLink(false)
+    try {
+      const response = await fetch(
+        `/api/competitions/${competitionId}/roles`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            roles: requestedRoles,
+            elementIds,
+            teamIds,
+          }),
         }
-        const link = `${window.location.origin}${invitationData.invitationUrl}`
-        await loadRoles()
-        resetForm()
-        setInvitationLink(link)
-        return true
+      )
+      const responseData = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        if (
+          responseData.code === "USER_NOT_FOUND" &&
+          requestedRoles.length > 0 &&
+          !editingUserId
+        ) {
+          const invitationResponse = await fetch(
+            `/api/competitions/${competitionId}/role-invitations`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email,
+                roles: requestedRoles,
+                elementIds,
+                teamIds,
+              }),
+            }
+          )
+          const invitationData = await invitationResponse
+            .json()
+            .catch(() => ({}))
+          if (!invitationResponse.ok) {
+            setError(
+              invitationData.error ?? "Kutse loomine ebaõnnestus"
+            )
+            return false
+          }
+          const link = `${window.location.origin}${invitationData.invitationUrl}`
+          await loadRoles()
+          resetForm()
+          setInvitationLink(link)
+          setInvitationEmailStatus(invitationData.emailStatus)
+          return true
+        }
+        setError(responseData.error ?? "Rollide salvestamine ebaõnnestus")
+        return false
       }
-      setSaving(false)
-      setError(responseData.error ?? "Rollide salvestamine ebaõnnestus")
+      await loadRoles()
+      resetForm()
+      setNotice("Kasutaja õigused on salvestatud.")
+      return true
+    } catch {
+      setError("Salvestamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.")
       return false
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    await loadRoles()
-    resetForm()
-    return true
   }
 
   async function copyInvitationLink() {
@@ -330,6 +361,14 @@ export function CompetitionRoleManager({
     resetForm()
   }
 
+  const allMembers = data ? [...(data.owner ? [data.owner] : []), ...data.members] : []
+  const organizerCount = allMembers.filter(member => member.userId === data?.owner?.userId || roleNames(member).includes("ORGANIZER")).length
+  const filteredMembers = allMembers.filter(member => {
+    if (!showAll && member.userId !== data?.owner?.userId && !roleNames(member).includes("ORGANIZER")) return false
+    const text = [member.user.name, member.user.email, ...member.roles.map(({ role }) => ROLE_LABELS[role]), ...member.representedTeams.map(({ team }) => `${team.code} ${team.name}`), ...member.judgedElements.map(({ element }) => `${element.code} ${element.name}`)].join(" ").toLocaleLowerCase("et")
+    return text.includes(memberSearch.trim().toLocaleLowerCase("et"))
+  })
+
   if (loading) {
     return (
       <section className="bg-white border border-blue-200 rounded-xl p-5 mb-6">
@@ -345,10 +384,203 @@ export function CompetitionRoleManager({
           Kasutajate võistlusepõhised rollid
         </h2>
         <p className="text-xs text-gray-500 mt-1">
-          Määra korraldaja, kohtuniku või esindaja õigused. Kui selle
-          e-postiga kontot veel pole, luuakse jagatav kutselink.
+          Halda korraldajaid, kohtunikke ja esindajaid. Vaikimisi näed ainult korraldajaid.
         </p>
       </div>
+
+      {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      <button type="button" disabled={saving} aria-expanded={formOpen} aria-controls="role-form" onClick={() => { if (formOpen) { setFormOpen(false); resetForm() } else { resetForm(); openForm() } }} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+        {formOpen ? "Sulge vorm" : "Lisa kasutajale rollid"}
+      </button>
+
+      {formOpen && <form id="role-form" ref={formRef} onSubmit={saveRoles} className="space-y-4 rounded-lg border bg-gray-50/50 p-4">
+        <fieldset disabled={saving} className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-800">
+              {editingUserId ? "Muuda kasutaja rolle" : "Lisa kasutajale rollid"}
+            </h3>
+            {editingUserId && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="text-xs text-gray-500 hover:text-gray-700"
+              >
+                Tühista muutmine
+              </button>
+            )}
+          </div>
+
+          <CompetitionUserSearch competitionId={competitionId} value={email} readOnly={Boolean(editingUserId)} onChange={setEmail} onSelect={user => {
+            const member = allMembers.find(member => member.userId === user.id)
+            if (member) editMember(member)
+            else setEmail(user.email)
+          }} />
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            {MANAGED_ROLES.map(({ role, label, help }) => {
+              const organizerLocked =
+                role === "ORGANIZER" && !data?.canManageOrganizers
+              return (
+                <label
+                  key={role}
+                  className={`border rounded-lg px-3 py-3 flex items-start gap-3 ${
+                    organizerLocked
+                      ? "bg-gray-50 text-gray-400"
+                      : "cursor-pointer hover:bg-gray-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={roles.includes(role)}
+                    disabled={organizerLocked}
+                    onChange={() => toggleRole(role)}
+                    className="mt-0.5 rounded border-gray-300"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">{label}</span>
+                    <span className="block text-xs mt-1">{help}</span>
+                    {organizerLocked && (
+                      <span className="block text-xs mt-1">
+                        Muudetav ainult omanikule või administraatorile.
+                      </span>
+                    )}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+
+          {roles.includes("JUDGE") && (
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <label className="text-xs text-gray-500">
+                  Kohtuniku lubatud elemendid
+                </label>
+                {elements.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setElementIds(
+                        elementIds.length === elements.length
+                          ? []
+                          : elements.map(({ id }) => id)
+                      )
+                    }
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    {elementIds.length === elements.length
+                      ? "Tühista kõik"
+                      : "Vali kõik"}
+                  </button>
+                )}
+              </div>
+              <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
+                {elements.length === 0 ? (
+                  <p className="text-sm text-gray-400 px-3 py-4">
+                    Võistlusel pole veel elemente.
+                  </p>
+                ) : (
+                  elements.map((element) => (
+                    <label
+                      key={element.id}
+                      className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={elementIds.includes(element.id)}
+                        onChange={() =>
+                          toggleSelection(element.id, setElementIds)
+                        }
+                        className="rounded border-gray-300"
+                      />
+                      <span className="font-medium text-gray-700">
+                        {element.code} · {element.name}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {roles.includes("REPRESENTATIVE") && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">
+                Esindaja võistkonnad
+              </label>
+              <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
+                {teams.length === 0 ? (
+                  <p className="text-sm text-gray-400 px-3 py-4">
+                    Võistlusel pole veel võistkondi.
+                  </p>
+                ) : (
+                  teams.map((team) => (
+                    <label
+                      key={team.id}
+                      className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={teamIds.includes(team.id)}
+                        onChange={() => toggleSelection(team.id, setTeamIds)}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="font-medium text-gray-700">
+                        {team.code} · {team.name}
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Kui võistkonnal oli teine esindaja, liigub esindusõigus sellele
+                kasutajale.
+              </p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={
+              saving ||
+              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+              (!editingUserId && roles.length === 0) ||
+              (roles.includes("JUDGE") && elementIds.length === 0) ||
+              (roles.includes("REPRESENTATIVE") && teamIds.length === 0)
+            }
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Salvestan..." : "Salvesta õigused"}
+          </button>
+        </fieldset>
+      </form>}
+
+      {invitationLink && (
+        <div role="status" className={`border rounded-lg p-4 ${invitationEmailStatus === "SENT" ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+          <p className={`text-sm font-medium ${invitationEmailStatus === "SENT" ? "text-green-800" : "text-amber-900"}`}>
+            {invitationEmailStatus === "SENT" ? "Kutse on e-postiga saadetud" : "Kutse on loodud, kuid e-kiri jäi saatmata"}
+          </p>
+          <p className={`text-xs mt-1 ${invitationEmailStatus === "SENT" ? "text-green-700" : "text-amber-800"}`}>
+            {invitationEmailStatus === "NOT_CONFIGURED" ? "E-kirjade saatmine pole seadistatud. Edasta kutselink ise." : invitationEmailStatus !== "SENT" ? "Saatmine ebaõnnestus. Edasta kutselink ise või proovi kutsete loendist uuesti." : "Soovi korral saad kutselingi ka ise edastada."}
+            {" "}Link kehtib seitse päeva ja on siin nähtav kuni lehe uuesti laadimiseni.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 mt-3">
+            <Input
+              readOnly
+              value={invitationLink}
+              className="flex-1 min-w-0 border-green-200 bg-white text-xs"
+            />
+            <button
+              type="button"
+              onClick={copyInvitationLink}
+              className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800"
+            >
+              {copiedInvitationLink ? "Kopeeritud" : "Kopeeri link"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {data && (
         <div className="space-y-3">
@@ -364,8 +596,16 @@ export function CompetitionRoleManager({
               </div>
             </div>
           )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-gray-700">{showAll ? `Kõik kasutajad (${allMembers.length})` : `Korraldajad (${organizerCount})`}</p>
+            <button type="button" aria-pressed={showAll} onClick={() => { setShowAll(!showAll); setVisibleCount(10); setMemberSearch("") }} className="text-sm text-blue-600 hover:underline">
+              {showAll ? "Kuva ainult korraldajad" : `Kuva kõik (${allMembers.length})`}
+            </button>
+          </div>
+          <Input aria-label="Otsi rolliloendist" placeholder="Otsi nime, rolli, võistkonna või elemendi järgi" value={memberSearch} onChange={event => { setMemberSearch(event.target.value); setVisibleCount(10) }} />
           <div className="divide-y border rounded-lg">
-            {[...(data.owner ? [data.owner] : []), ...data.members].map((member) => {
+            {filteredMembers.length === 0 && <p className="p-4 text-sm text-gray-500">{memberSearch ? "Otsingule vastavaid kasutajaid ei leitud." : "Selles vaates pole kasutajaid."}</p>}
+            {filteredMembers.slice(0, visibleCount).map((member) => {
               const currentRoles = roleNames(member)
               const isOwner = member.userId === data.owner?.userId
               const visibleRoles = isOwner
@@ -431,8 +671,8 @@ export function CompetitionRoleManager({
                       </button>
                     )
                   ) : (
-                    <div className="flex items-center gap-2 shrink-0">
-                      {data.canManageOrganizers && (
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {data.canManageOrganizers && currentRoles.includes("ORGANIZER") && (
                         <button
                           type="button"
                           onClick={() => changeOwner(member)}
@@ -445,6 +685,7 @@ export function CompetitionRoleManager({
                       <button
                         type="button"
                         onClick={() => editMember(member)}
+                        disabled={saving}
                         className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1"
                       >
                         Muuda rolle
@@ -465,14 +706,15 @@ export function CompetitionRoleManager({
               )
             })}
           </div>
+          {filteredMembers.length > visibleCount && <button type="button" onClick={() => setVisibleCount(count => count + 10)} className="text-sm text-blue-600 hover:underline">Kuva veel ({filteredMembers.length - visibleCount})</button>}
         </div>
       )}
 
       {invitations.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-800 mb-2">
-            Vastuvõtmist ootavad kutsed
-          </h3>
+        <details>
+          <summary className="cursor-pointer text-sm font-semibold text-gray-800 mb-2">
+            Vastuvõtmist ootavad kutsed ({invitations.length})
+          </summary>
           <div className="divide-y border rounded-lg">
             {invitations.map((invitation) => {
               const organizerInvitation =
@@ -511,13 +753,13 @@ export function CompetitionRoleManager({
                     </p>
                   </div>
                   {mayManageInvitation && (
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => editInvitation(invitation)}
                         className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1"
                       >
-                        Loo uus link
+                        Saada uus kutse
                       </button>
                       <button
                         type="button"
@@ -532,207 +774,9 @@ export function CompetitionRoleManager({
               )
             })}
           </div>
-        </div>
+        </details>
       )}
 
-      {invitationLink && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-sm font-medium text-green-800">
-            Kutse on loodud – kopeeri link kohe
-          </p>
-          <p className="text-xs text-green-700 mt-1">
-            Turvalisuse tõttu ei saa sama linki pärast lehe uuesti laadimist
-            enam kuvada. Vajaduse korral loo uus link.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2 mt-3">
-            <Input
-              readOnly
-              value={invitationLink}
-              className="flex-1 min-w-0 border-green-200 bg-white text-xs"
-            />
-            <button
-              type="button"
-              onClick={copyInvitationLink}
-              className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800"
-            >
-              {copiedInvitationLink ? "Kopeeritud" : "Kopeeri link"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={saveRoles} className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-gray-800">
-            {editingUserId ? "Muuda kasutaja rolle" : "Lisa kasutajale rollid"}
-          </h3>
-          {editingUserId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
-              Tühista muutmine
-            </button>
-          )}
-        </div>
-
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">
-            Kasutaja e-post
-          </label>
-          <input
-            type="email"
-            required
-            readOnly={Boolean(editingUserId)}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="kasutaja@email.ee"
-            className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 read-only:bg-gray-50"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Konto olemasolul rakenduvad õigused kohe. Uuele kasutajale saad
-            kutselingi, mis kehtib seitse päeva.
-          </p>
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-3">
-          {MANAGED_ROLES.map(({ role, label, help }) => {
-            const organizerLocked =
-              role === "ORGANIZER" && !data?.canManageOrganizers
-            return (
-              <label
-                key={role}
-                className={`border rounded-lg px-3 py-3 flex items-start gap-3 ${
-                  organizerLocked
-                    ? "bg-gray-50 text-gray-400"
-                    : "cursor-pointer hover:bg-gray-50"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={roles.includes(role)}
-                  disabled={organizerLocked}
-                  onChange={() => toggleRole(role)}
-                  className="mt-0.5 rounded border-gray-300"
-                />
-                <span>
-                  <span className="block text-sm font-medium">{label}</span>
-                  <span className="block text-xs mt-1">{help}</span>
-                  {organizerLocked && (
-                    <span className="block text-xs mt-1">
-                      Muudetav ainult omanikule või administraatorile.
-                    </span>
-                  )}
-                </span>
-              </label>
-            )
-          })}
-        </div>
-
-        {roles.includes("JUDGE") && (
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <label className="text-xs text-gray-500">
-                Kohtuniku lubatud elemendid
-              </label>
-              {elements.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setElementIds(
-                      elementIds.length === elements.length
-                        ? []
-                        : elements.map(({ id }) => id)
-                    )
-                  }
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  {elementIds.length === elements.length
-                    ? "Tühista kõik"
-                    : "Vali kõik"}
-                </button>
-              )}
-            </div>
-            <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
-              {elements.length === 0 ? (
-                <p className="text-sm text-gray-400 px-3 py-4">
-                  Võistlusel pole veel elemente.
-                </p>
-              ) : (
-                elements.map((element) => (
-                  <label
-                    key={element.id}
-                    className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={elementIds.includes(element.id)}
-                      onChange={() =>
-                        toggleSelection(element.id, setElementIds)
-                      }
-                      className="rounded border-gray-300"
-                    />
-                    <span className="font-medium text-gray-700">
-                      {element.code} · {element.name}
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {roles.includes("REPRESENTATIVE") && (
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">
-              Esindaja võistkonnad
-            </label>
-            <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
-              {teams.length === 0 ? (
-                <p className="text-sm text-gray-400 px-3 py-4">
-                  Võistlusel pole veel võistkondi.
-                </p>
-              ) : (
-                teams.map((team) => (
-                  <label
-                    key={team.id}
-                    className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={teamIds.includes(team.id)}
-                      onChange={() => toggleSelection(team.id, setTeamIds)}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="font-medium text-gray-700">
-                      {team.code} · {team.name}
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Kui võistkonnal oli teine esindaja, liigub esindusõigus sellele
-              kasutajale.
-            </p>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={
-            saving ||
-            !email ||
-            (roles.includes("JUDGE") && elementIds.length === 0) ||
-            (roles.includes("REPRESENTATIVE") && teamIds.length === 0)
-          }
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Salvestan..." : "Salvesta õigused"}
-        </button>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </form>
     </section>
   )
 }

@@ -19,6 +19,7 @@ import {
 import { hashCompetitionRoleInvitationToken } from "@/lib/competitionRoleInvitations.server"
 import { parseCompetitionRoleManagementRequest } from "@/lib/competitionRoleManagement"
 import { prisma } from "@/lib/prisma"
+import { sendRoleInvitationEmail } from "@/lib/roleInvitationEmail.server"
 
 function actorFromSession(session: {
   user: { id: string; role?: string | null }
@@ -154,6 +155,8 @@ async function handlePOST(
   }
 
   const token = randomBytes(32).toString("base64url")
+  const competition = await prisma.competition.findUniqueOrThrow({ where: { id }, select: { name: true } })
+  const inviter = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id }, select: { name: true } })
   const stored = serializeRoleInvitationValues({ roles, elementIds, teamIds })
   const expiresAt = roleInvitationExpiresAt()
   const invitation = await prisma.competitionRoleInvitation.upsert({
@@ -183,10 +186,15 @@ async function handlePOST(
     },
   })
 
+  const emailStatus = await sendRoleInvitationEmail({
+    email, roles, token, inviterName: inviter.name, competitionName: competition.name,
+  })
+
   return NextResponse.json(
     {
       invitation: { ...invitation, roles, elementIds, teamIds },
       invitationUrl: `/invitations/${token}`,
+      emailStatus,
     },
     { status: 201 }
   )
