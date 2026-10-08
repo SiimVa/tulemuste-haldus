@@ -36,7 +36,7 @@ vormiehitajas eemaldada.
 
 ## Esindaja vaade
 
-Esindaja näeb dashboard'il jaotist **Minu esindatavad võistkonnad**. Sealt
+Esindaja näeb töölaual jaotist **Minu võistkonnad**. Sealt
 avaneb ainult talle määratud võistkonna registreerimise ja mandaadi vorm.
 
 Esindaja:
@@ -78,22 +78,33 @@ Leht ei ava teiste esitajate avaldusi ega võimalda ilma registreerimislingita
 uusi võistkondi lisada. Tagasi saadetud avaldust saab täiendada ka pärast
 registreerimise sulgemist, kuni osalejate nimekiri pole lõplikult kinnitatud.
 
-Esindaja töölaud kuvab ainult käimasoleva etapiga seotud tegevusi:
+Töölaua **Minu võistkonnad** vaade näitab registreeritud ja esindatud võistkondi
+ning kontoga seotud liikme enda võistkonda. Võistkond püsib nähtav ka etappide
+vahel. Avalduse ja sellest loodud võistkonna seos võetakse `teamId` järgi, et
+sama võistkonda ei kuvataks topelt.
 
-- avalikud võistlused, mille registreerimine on avatud;
-- aktiivsed registreeringud eraldi kinnitatud, ootenimekirjas, tagasi saadetud
-  ja korraldaja otsust ootavate võistkondadena;
-- aktiivsed mandaadid eraldi täitmist vajavate, esitatud, tagasi saadetud ja
-  kinnitatud võistkondadena;
-- aktiivse võistluse kinnitatud võistkonnad koos tulemuste vaatamise ja
-  jagatava tulemuste lingi kopeerimise võimalusega.
+- **Registreerimised:** mustand, registreeritud, registreerimine kinnitatud,
+  ootenimekirjas või vajab täiendamist. Kinnitatud võistkond püsib siin ka pärast
+  osalejate nimekirja kinnitamist, kuni mandaat avaneb. Kaardil on järgmine samm
+  ja võimalusel mandaadi avanemise aeg.
+- **Mandaadid:** ootab mandaadi esitamist, mandaat esitatud, vajab täiendamist
+  või mandaat kinnitatud. Kinnitatud mandaat jääb nähtavaks kuni võistluse
+  alguseni, ka pärast mandaadietapi lõplikku kinnitamist.
+- **Käimasolevad võistlused:** võistluse aktiveerimisel liigub kinnitatud
+  võistkond siia. Esindaja ja kontoga seotud liige saavad avada enda tulemused
+  ja kopeerida tulemuste lingi.
 
-Registreering eemaldatakse töölaua registreerimisosast osalejate nimekirja
-kinnitamisel. Mandaat eemaldatakse võistluse aktiveerimisel ning võistkond
-liigub aktiivsete võistluste alla. Võistluse aktiveerimisel luuakse puuduvad
-256-bitised juurdepääsutunnused automaatselt nii hindamiselementidele kui ka
-kinnitatud võistkondadele. Varem aktiveeritud võistkonna puuduv tulemuste link
-luuakse esimesel kopeerimisel.
+Vaates saab filtreerida etapi järgi, otsida võistkonna või võistluse nime järgi
+ning kuvada ainult enda tegevust vajavad kirjed. Mandaadikaart avab kohe
+mandaadi jaotise. Ainult esindaja saab avada võistkonna muutmise vormi; liige
+näeb enne võistluse algust olekut. Endisel avalduse esitajal säilib juurdepääs
+enda registreeringule ka siis, kui korraldaja on esindaja vahetanud.
+
+Töölaua ülejäänud valikud on **Hindamine**, **Võistluste haldamine** ja
+**Leia võistlus**. Need eristavad kohtuniku, korraldaja ja osaleja tegevused.
+Vaikimisi avaneb enda võistkondade vaade, kui neid leidub; muidu enda
+hindamispunktid või hallatavad võistlused. Põhimenüüs on töölaud, avalikud
+võistlused, teavitused ning administraatori tööriistad ka mobiilis.
 
 ## Korraldaja vaade
 

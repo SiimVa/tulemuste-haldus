@@ -121,6 +121,12 @@ export default function RepresentativeTeamPage({
     void loadTeam()
   }, [loadTeam])
 
+  useEffect(() => {
+    if (!loading && team && window.location.hash === "#mandate") {
+      document.getElementById("mandate")?.scrollIntoView({ block: "start" })
+    }
+  }, [loading, team])
+
   async function update(
     path: string,
     options: RequestInit,
@@ -443,7 +449,7 @@ export default function RepresentativeTeamPage({
         )}
       </section>
 
-      <section className="mt-6 bg-white border rounded-xl p-5 space-y-4">
+      <section id="mandate" className="mt-6 scroll-mt-6 bg-white border rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold text-gray-900">2. Mandaat</h2>

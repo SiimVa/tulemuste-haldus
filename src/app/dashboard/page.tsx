@@ -1,12 +1,11 @@
 import Link from "next/link"
 import { CompetitionCopyButton } from "@/components/competition/CompetitionCopyButton"
-import { TeamResultActions } from "@/components/representative/TeamResultActions"
+import { DashboardViews } from "@/components/dashboard/DashboardViews"
+import { ParticipantTeams } from "@/components/dashboard/ParticipantTeams"
 import { auth } from "@/lib/auth"
 import { managedCompetitionsWhere } from "@/lib/competitionAccess"
-import {
-  getCompetitionMandateStatus,
-  getCompetitionRegistrationStatus,
-} from "@/lib/competitionPhases"
+import { getCompetitionMandateStatus, getCompetitionRegistrationStatus } from "@/lib/competitionPhases"
+import { participantTeamPhase, type ParticipantItem } from "@/lib/participantWorkflow"
 import { canCreateCompetition } from "@/lib/permissions"
 import { prisma } from "@/lib/prisma"
 import { teamDisplayName } from "@/lib/teamDisplay"
@@ -35,84 +34,6 @@ const competitionStatusColor: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-700",
   ARCHIVED: "bg-slate-100 text-slate-600",
 }
-
-const registrationGroups = [
-  {
-    key: "confirmed",
-    title: "Kinnitatud võistkonnad",
-    description: "Võistkonnad, kelle koht võistlusel on kinnitatud.",
-    statuses: ["CONFIRMED", "APPROVED"],
-    badge: "Kinnitatud",
-    badgeClass: "bg-green-100 text-green-700",
-    borderClass: "border-green-200",
-  },
-  {
-    key: "waitlisted",
-    title: "Ootenimekirjas",
-    description: "Võistkonnad, mis ootavad vaba kohta.",
-    statuses: ["WAITLISTED"],
-    badge: "Ootenimekirjas",
-    badgeClass: "bg-amber-100 text-amber-800",
-    borderClass: "border-amber-200",
-  },
-  {
-    key: "changes",
-    title: "Tagasi saadetud",
-    description: "Täienda andmeid ja esita registreering uuesti.",
-    statuses: ["CHANGES_REQUESTED"],
-    badge: "Vajab täiendamist",
-    badgeClass: "bg-red-100 text-red-700",
-    borderClass: "border-red-200",
-  },
-  {
-    key: "review",
-    title: "Ootavad kinnitamist",
-    description: "Esitatud või pooleliolevad registreeringud.",
-    statuses: ["PENDING_REVIEW", "DRAFT", "SUBMITTED"],
-    badge: "Ootab kinnitamist",
-    badgeClass: "bg-blue-100 text-blue-700",
-    borderClass: "border-blue-200",
-  },
-] as const
-
-const mandateGroups = [
-  {
-    key: "draft",
-    title: "Vajavad täitmist",
-    description: "Ava mandaat, täienda koosseis ja esita see korraldajale.",
-    statuses: ["DRAFT"],
-    badge: "Täitmata",
-    badgeClass: "bg-blue-100 text-blue-700",
-    borderClass: "border-blue-200",
-  },
-  {
-    key: "submitted",
-    title: "Esitatud mandaadid",
-    description: "Korraldaja ei ole neid veel kinnitanud.",
-    statuses: ["SUBMITTED"],
-    badge: "Esitatud",
-    badgeClass: "bg-amber-100 text-amber-800",
-    borderClass: "border-amber-200",
-  },
-  {
-    key: "changes",
-    title: "Tagasi saadetud mandaadid",
-    description: "Paranda korraldaja märkused ja esita mandaat uuesti.",
-    statuses: ["CHANGES_REQUESTED"],
-    badge: "Vajab täiendamist",
-    badgeClass: "bg-red-100 text-red-700",
-    borderClass: "border-red-200",
-  },
-  {
-    key: "approved",
-    title: "Kinnitatud mandaadid",
-    description: "Korraldaja on mandaadi kinnitanud.",
-    statuses: ["APPROVED"],
-    badge: "Kinnitatud",
-    badgeClass: "bg-green-100 text-green-700",
-    borderClass: "border-green-200",
-  },
-] as const
 
 function SectionHeading({
   id,
@@ -160,242 +81,132 @@ export default async function DashboardPage() {
   const session = await auth()
   if (!session?.user?.id) return null
   const currentUser = session.user
-  const managedWhere = managedCompetitionsWhere({
-    id: currentUser.id,
-    role: currentUser.role,
-  })
-
-  const [
-    competitions,
-    representedTeams,
-    openCompetitionCandidates,
-    registrationApplications,
-    activeTeams,
-    judgeMemberships,
-  ] = await Promise.all([
+  const managedWhere = managedCompetitionsWhere({ id: currentUser.id, role: currentUser.role })
+  const [competitions, ownTeams, openCompetitionCandidates, registrationApplications, judgeMemberships] = await Promise.all([
     prisma.competition.findMany({
-      where: managedWhere,
-      orderBy: { createdAt: "desc" },
-      include: {
-        organizer: { select: { name: true } },
-        _count: { select: { teams: true, elements: true } },
-      },
+      where: managedWhere, orderBy: { createdAt: "desc" },
+      include: { organizer: { select: { name: true } }, _count: { select: { teams: true, elements: true } } },
     }),
     prisma.team.findMany({
       where: {
-        representative: { is: { member: { userId: currentUser.id } } },
+        AND: [{ OR: [{ competition: { status: "SETUP" } }, { competition: { status: "ACTIVE" }, registrationStatus: "APPROVED" }] }],
+        OR: [{ representative: { is: { member: { userId: currentUser.id } } } }, { members: { some: { userId: currentUser.id } } }],
       },
       select: {
-        id: true,
-        code: true,
-        name: true,
-        class: true,
-        registrationStatus: true,
-        mandateStatus: true,
-        competition: {
-          select: {
-            id: true,
-            name: true,
-            date: true,
-            endDate: true,
-            location: true,
-            status: true,
-            registrationFinalizedAt: true,
-            mandateOverride: true,
-            mandateOpensAt: true,
-            mandateClosesAt: true,
-            mandateFinalizedAt: true,
-          },
-        },
+        id: true, code: true, name: true, class: true,
+        registrationStatus: true, registrationReviewNote: true,
+        registrationApplication: { select: { id: true } },
+        mandateStatus: true, mandateReviewNote: true,
+        competition: { select: {
+          id: true, name: true, date: true, status: true,
+          registrationFinalizedAt: true, mandateOverride: true, mandateOpensAt: true, mandateClosesAt: true, mandateFinalizedAt: true,
+        } },
+        representative: { select: { member: { select: { userId: true } } } },
+        members: { where: { userId: currentUser.id }, select: { id: true }, take: 1 },
+        accessTokens: { where: { type: "ATHLETE" }, select: { token: true }, orderBy: { createdAt: "asc" }, take: 1 },
       },
-      orderBy: [
-        { competition: { date: "asc" } },
-        { code: "asc" },
-      ],
+      orderBy: [{ competition: { date: "asc" } }, { code: "asc" }],
     }),
     prisma.competition.findMany({
-      where: {
-        isPublic: true,
-        registrationAccessMode: "PUBLIC",
-        status: { notIn: ["CANCELLED", "ARCHIVED", "FINISHED"] },
-      },
+      where: { isPublic: true, registrationAccessMode: "PUBLIC", status: { notIn: ["CANCELLED", "ARCHIVED", "FINISHED"] } },
       select: {
-        id: true,
-        name: true,
-        date: true,
-        endDate: true,
-        location: true,
-        registrationOverride: true,
-        registrationOpensAt: true,
-        registrationClosesAt: true,
-        registrationFinalizedAt: true,
+        id: true, name: true, date: true, endDate: true, location: true,
+        registrationOverride: true, registrationOpensAt: true, registrationClosesAt: true, registrationFinalizedAt: true,
       },
       orderBy: [{ date: "asc" }, { createdAt: "desc" }],
     }),
     prisma.registrationApplication.findMany({
-      where: {
-        submittedById: currentUser.id,
-        status: { notIn: ["REJECTED", "WITHDRAWN"] },
-        competition: {
-          status: "SETUP",
-          registrationFinalizedAt: null,
-        },
-      },
+      where: { submittedById: currentUser.id, status: { notIn: ["REJECTED", "WITHDRAWN"] }, competition: { status: "SETUP" } },
       select: {
-        id: true,
-        teamName: true,
-        status: true,
-        allocationReason: true,
-        waitlistPosition: true,
-        competition: {
-          select: { id: true, name: true, date: true, endDate: true },
-        },
-        class: { select: { name: true } },
+        id: true, teamId: true, teamName: true, status: true, allocationReason: true, waitlistPosition: true,
+        competition: { select: { id: true, name: true, date: true, registrationFinalizedAt: true } }, class: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.team.findMany({
-      where: {
-        registrationStatus: "APPROVED",
-        competition: { status: "ACTIVE" },
-        OR: [
-          { members: { some: { userId: currentUser.id } } },
-          {
-            representative: {
-              is: { member: { userId: currentUser.id } },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        class: true,
-        competition: {
-          select: {
-            id: true,
-            name: true,
-            date: true,
-            endDate: true,
-            location: true,
-          },
-        },
-        members: {
-          where: { userId: currentUser.id },
-          select: { id: true, name: true, role: true },
-        },
-        representative: {
-          select: { member: { select: { userId: true } } },
-        },
-        accessTokens: {
-          where: { type: "ATHLETE" },
-          select: { token: true },
-          orderBy: { createdAt: "asc" },
-          take: 1,
-        },
-      },
-      orderBy: [
-        { competition: { date: "asc" } },
-        { code: "asc" },
-      ],
-    }),
     prisma.competitionMember.findMany({
-      where: {
-        userId: currentUser.id,
-        roles: { some: { role: "JUDGE" } },
-        judgedElements: { some: {} },
-        competition: { status: { in: ["SETUP", "ACTIVE"] } },
-      },
+      where: { userId: currentUser.id, roles: { some: { role: "JUDGE" } }, judgedElements: { some: {} }, competition: { status: { in: ["SETUP", "ACTIVE"] } } },
       select: {
-        id: true,
-        competition: {
-          select: { id: true, name: true, date: true, status: true },
-        },
-        judgedElements: {
-          select: {
-            element: {
-              select: { id: true, code: true, name: true, order: true },
-            },
-          },
-          orderBy: { element: { order: "asc" } },
-        },
+        id: true, competition: { select: { id: true, name: true, date: true, status: true } },
+        judgedElements: { select: { element: { select: { id: true, code: true, name: true, order: true } } }, orderBy: { element: { order: "asc" } } },
       },
       orderBy: { competition: { date: "desc" } },
     }),
   ])
-
-  const openCompetitions = openCompetitionCandidates.filter(
-    (competition) =>
-      getCompetitionRegistrationStatus(competition) === "OPEN"
-  )
-  const mandateTeams = representedTeams.filter((team) => {
-    if (
-      team.competition.status !== "SETUP" ||
-      !team.competition.registrationFinalizedAt
-    ) {
-      return false
-    }
-    const phase = getCompetitionMandateStatus(team.competition)
-    return (
-      team.mandateStatus === "CHANGES_REQUESTED" ||
-      phase === "OPEN" ||
-      phase === "CLOSED"
-    )
-  })
-  const registrationItems = [
-    ...registrationApplications.map((application) => ({
-      id: `application-${application.id}`,
+  const now = new Date()
+  const openCompetitions = openCompetitionCandidates.filter(competition => getCompetitionRegistrationStatus(competition, now) === "OPEN")
+  const ownTeamIds = new Set(ownTeams.map(team => team.id))
+  const ownApplicationsByTeamId = new Map(registrationApplications.filter(application => application.teamId).map(application => [application.teamId!, application]))
+  const participantItems: ParticipantItem[] = registrationApplications
+    .filter(application => !application.teamId || !ownTeamIds.has(application.teamId))
+    .map(application => ({
+      id: `application-${application.id}`, teamId: application.teamId, phase: "REGISTRATION", status: application.status,
+      competitionId: application.competition.id, competitionName: application.competition.name,
+      teamName: application.teamName, className: application.class?.name ?? null, date: application.competition.date?.toISOString() ?? null,
       href: `/dashboard/registrations/${application.id}`,
-      competitionName: application.competition.name,
-      teamName: application.teamName,
-      className: application.class?.name ?? null,
-      status: application.status,
-      allocationReason: application.allocationReason,
-      waitlistPosition: application.waitlistPosition,
-    })),
-    ...representedTeams
-      .filter(
-        (team) =>
-          team.competition.status === "SETUP" &&
-          !team.competition.registrationFinalizedAt
-      )
-      .map((team) => ({
-        id: `team-${team.id}`,
-        href: `/dashboard/representative/teams/${team.id}`,
-        competitionName: team.competition.name,
-        teamName: teamDisplayName(team),
-        className: team.class,
-        status: team.registrationStatus,
-        allocationReason: null,
-        waitlistPosition: null,
-      })),
-  ]
+      action: application.teamId || application.competition.registrationFinalizedAt ? "Vaata registreeringut" : application.status === "CHANGES_REQUESTED" ? "Täienda registreeringut" : application.status === "DRAFT" ? "Jätka registreerimist" : "Vaata registreeringut",
+      description: ["CONFIRMED", "APPROVED"].includes(application.status) ? "Sinu võistkonna koht on kinnitatud. Mandaadietapi avanemisel saad koosseisu täiendada." : application.status === "CHANGES_REQUESTED" ? "Korraldaja palus registreeringut täiendada ja uuesti esitada." : application.status === "DRAFT" ? "Registreering on pooleli. Täida andmed ja esita registreering." : application.status === "WAITLISTED" ? "Võistkond ootab vaba kohta. Kinnitamisest antakse teada." : "Registreering on esitatud ja ootab korraldaja kinnitust.",
+      note: application.allocationReason, waitlistPosition: application.waitlistPosition,
+      isRepresentative: false, isMember: false, resultsToken: null,
+      requiresAction: !application.teamId && !application.competition.registrationFinalizedAt && ["DRAFT", "CHANGES_REQUESTED"].includes(application.status),
+    }))
+  for (const team of ownTeams) {
+    const isRepresentative = team.representative?.member.userId === currentUser.id
+    const isMember = team.members.length > 0
+    const mandatePhase = getCompetitionMandateStatus(team.competition, now)
+    const phase = participantTeamPhase({ competitionStatus: team.competition.status, registrationStatus: team.registrationStatus, mandateStatus: team.mandateStatus, mandatePhase, hasRegistrationApplication: Boolean(team.registrationApplication) })
+    const ownApplication = ownApplicationsByTeamId.get(team.id)
+    const canFillMandate = mandatePhase === "OPEN" || !team.registrationApplication
+    const status = phase === "MANDATE" ? team.mandateStatus : team.registrationStatus
+    let description = ""
+    let action = ""
+    if (phase === "REGISTRATION") {
+      if (status === "APPROVED") {
+        description = "Registreerimine on kinnitatud. Mandaat pole veel avatud."
+        if (team.competition.mandateOverride === "AUTO" && team.competition.mandateOpensAt && team.competition.mandateOpensAt > now) {
+          description = `Registreerimine on kinnitatud. Mandaat avaneb ${team.competition.mandateOpensAt.toLocaleString("et-EE", { timeZone: "Europe/Tallinn", dateStyle: "short", timeStyle: "short" })}.`
+        }
+        action = "Vaata võistkonda"
+      } else if (status === "CHANGES_REQUESTED") {
+        description = "Täienda registreerimise andmeid ja esita need uuesti."
+        action = "Täienda registreeringut"
+      } else if (status === "DRAFT") {
+        description = "Registreering on pooleli. Täida andmed ja esita registreering."
+        action = "Jätka registreerimist"
+      } else {
+        description = "Registreering on esitatud ja ootab korraldaja kinnitust."
+        action = "Vaata registreeringut"
+      }
+    } else if (phase === "MANDATE") {
+      if (status === "APPROVED") {
+        description = "Mandaat on kinnitatud. Järgmine etapp on võistlus; tulemused ilmuvad siia võistluse alguses."
+        action = "Vaata mandaati"
+      } else if (status === "CHANGES_REQUESTED") {
+        description = "Täienda mandaati korraldaja märkuste järgi ja esita uuesti."
+        action = "Täienda mandaati"
+      } else if (status === "SUBMITTED") {
+        description = "Mandaat on esitatud ja ootab korraldaja kinnitust."
+        action = "Vaata mandaati"
+      } else {
+        description = canFillMandate ? "Täienda võistkonna koosseisu ja esita mandaat korraldajale." : "Mandaadi esitamine on suletud. Võta järgmise sammu osas ühendust korraldajaga."
+        action = canFillMandate ? "Täida mandaat" : "Vaata mandaati"
+      }
+    } else {
+      description = [isRepresentative ? "Esindaja" : null, isMember ? "Võistkonna liige" : null].filter(Boolean).join(" · ")
+    }
+    if (!isRepresentative && phase !== "ACTIVE") description += " Andmeid haldab sinu võistkonna esindaja."
+    participantItems.push({
+      id: `team-${team.id}`, teamId: team.id, phase, status,
+      competitionId: team.competition.id, competitionName: team.competition.name,
+      teamName: teamDisplayName(team), className: team.class, date: team.competition.date?.toISOString() ?? null,
+      href: isRepresentative && phase !== "ACTIVE" ? `/dashboard/representative/teams/${team.id}${phase === "MANDATE" ? "#mandate" : ""}` : ownApplication && phase !== "ACTIVE" ? `/dashboard/registrations/${ownApplication.id}` : null,
+      action: isRepresentative && phase !== "ACTIVE" ? action : ownApplication && phase !== "ACTIVE" ? "Vaata registreeringut" : null, description,
+      note: phase === "MANDATE" ? team.mandateReviewNote : phase === "REGISTRATION" ? team.registrationReviewNote : null,
+      requiresAction: isRepresentative && (phase === "REGISTRATION" ? ["DRAFT", "CHANGES_REQUESTED"].includes(status) : phase === "MANDATE" && (status === "CHANGES_REQUESTED" || (status === "DRAFT" && canFillMandate))),
+      waitlistPosition: null, isRepresentative, isMember, resultsToken: phase === "ACTIVE" ? team.accessTokens[0]?.token ?? null : null,
+    })
+  }
   const mayCreateCompetition = canCreateCompetition(currentUser.role)
-  const hasPersonalWorkflow =
-    openCompetitions.length > 0 ||
-    registrationItems.length > 0 ||
-    mandateTeams.length > 0 ||
-    activeTeams.length > 0 ||
-    judgeMemberships.length > 0
-
-  return (
-    <div>
-      <div className="mb-8 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-          Töölaud
-        </h1>
-        {mayCreateCompetition && (
-          <Link
-            href="/dashboard/competitions/new"
-            className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:px-4"
-          >
-            + Uus võistlus
-          </Link>
-        )}
-      </div>
-
-      {openCompetitions.length > 0 && (
+  const discoverContent = (
         <section className="mb-12" aria-labelledby="open-competitions-title">
           <SectionHeading
             id="open-competitions-title"
@@ -410,6 +221,7 @@ export default async function DashboardPage() {
               </Link>
             }
           />
+          {openCompetitions.length === 0 && <p className="rounded-xl border bg-white p-5 text-sm text-gray-500">Praegu ei ole avalikke registreerimisi avatud. <Link href="/competitions" className="text-blue-600 hover:underline">Vaata kõiki avalikke võistlusi →</Link></p>}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {openCompetitions.map((competition) => (
               <Link
@@ -436,199 +248,8 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
-      )}
-
-      {registrationItems.length > 0 && (
-        <section className="mb-12" aria-labelledby="registrations-title">
-          <SectionHeading
-            id="registrations-title"
-            title="Minu registreerimised"
-            description="Aktiivse registreerimisetapi võistkonnad oleku järgi."
-          />
-          <div className="space-y-7">
-            {registrationGroups.map((group) => {
-              const applications = registrationItems.filter(
-                (item) =>
-                  (group.statuses as readonly string[]).includes(
-                    item.status
-                  )
-              )
-              if (applications.length === 0) return null
-              return (
-                <div key={group.key}>
-                  <div className="mb-3 flex items-baseline gap-2">
-                    <h3 className="font-semibold text-gray-900">
-                      {group.title}
-                    </h3>
-                    <span className="text-xs text-gray-400">
-                      {applications.length}
-                    </span>
-                  </div>
-                  <p className="-mt-2 mb-3 text-sm text-gray-500">
-                    {group.description}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {applications.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md sm:p-5 ${group.borderClass}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-xs font-medium text-blue-600">
-                            {item.competitionName}
-                          </p>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-1 text-xs ${group.badgeClass}`}
-                          >
-                            {group.badge}
-                          </span>
-                        </div>
-                        <h4 className="mt-2 font-semibold text-gray-900">
-                          {item.teamName}
-                        </h4>
-                        {item.className && (
-                          <p className="mt-1 text-sm text-gray-500">
-                            Klass: {item.className}
-                          </p>
-                        )}
-                        {item.status === "WAITLISTED" &&
-                          item.waitlistPosition && (
-                            <p className="mt-3 text-sm font-medium text-amber-800">
-                              Ootenimekirja koht: {item.waitlistPosition}
-                            </p>
-                          )}
-                        {item.allocationReason && (
-                          <p className="mt-2 text-xs text-gray-500">
-                            {item.allocationReason}
-                          </p>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {mandateTeams.length > 0 && (
-        <section className="mb-12" aria-labelledby="mandates-title">
-          <SectionHeading
-            id="mandates-title"
-            title="Mandaadid"
-            description="Aktiivse mandaadietapi võistkonnad oleku järgi."
-          />
-          <div className="space-y-7">
-            {mandateGroups.map((group) => {
-              const teams = mandateTeams.filter((team) =>
-                (group.statuses as readonly string[]).includes(
-                  team.mandateStatus
-                )
-              )
-              if (teams.length === 0) return null
-              return (
-                <div key={group.key}>
-                  <div className="mb-3 flex items-baseline gap-2">
-                    <h3 className="font-semibold text-gray-900">
-                      {group.title}
-                    </h3>
-                    <span className="text-xs text-gray-400">
-                      {teams.length}
-                    </span>
-                  </div>
-                  <p className="-mt-2 mb-3 text-sm text-gray-500">
-                    {group.description}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {teams.map((team) => (
-                      <Link
-                        key={team.id}
-                        href={`/dashboard/representative/teams/${team.id}`}
-                        className={`rounded-xl border bg-white p-4 transition-shadow hover:shadow-md sm:p-5 ${group.borderClass}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-xs font-medium text-blue-600">
-                            {team.competition.name}
-                          </p>
-                          <span
-                            className={`shrink-0 rounded-full px-2 py-1 text-xs ${group.badgeClass}`}
-                          >
-                            {group.badge}
-                          </span>
-                        </div>
-                        <h4 className="mt-2 font-semibold text-gray-900">
-                          {teamDisplayName(team)}
-                        </h4>
-                        {team.class && (
-                          <p className="mt-1 text-sm text-gray-500">
-                            Klass: {team.class}
-                          </p>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {activeTeams.length > 0 && (
-        <section className="mb-12" aria-labelledby="active-teams-title">
-          <SectionHeading
-            id="active-teams-title"
-            title="Aktiivsed võistlused"
-            description="Vaata oma võistkonna tulemusi või jaga tulemuste linki võistkonnaga."
-          />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {activeTeams.map((team) => {
-              const isRepresentative =
-                team.representative?.member.userId === currentUser.id
-              const isMember = team.members.length > 0
-              return (
-                <article
-                  key={team.id}
-                  className="rounded-xl border border-violet-200 bg-white p-4 sm:p-5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-xs font-medium text-blue-600">
-                      {team.competition.name}
-                    </p>
-                    <span className="shrink-0 rounded-full bg-violet-100 px-2 py-1 text-xs text-violet-700">
-                      Võistlus toimub
-                    </span>
-                  </div>
-                  <h3 className="mt-2 font-semibold text-gray-900">
-                    {teamDisplayName(team)}
-                  </h3>
-                  {team.class && (
-                    <p className="mt-1 text-sm text-gray-500">
-                      Klass: {team.class}
-                    </p>
-                  )}
-                  <p className="mt-3 text-xs text-gray-500">
-                    {[
-                      isRepresentative ? "Esindaja" : null,
-                      isMember ? "Võistkonna liige" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  <TeamResultActions
-                    teamId={team.id}
-                    initialToken={team.accessTokens[0]?.token ?? null}
-                  />
-                </article>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
-      {judgeMemberships.length > 0 && (
+  )
+  const judgeContent = (
         <section className="mb-12" aria-labelledby="judge-assignments-title">
           <SectionHeading
             id="judge-assignments-title"
@@ -675,15 +296,15 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
-      )}
-
-      {competitions.length > 0 && (
+  )
+  const managedContent = (
         <section aria-labelledby="managed-competitions-title">
           <SectionHeading
             id="managed-competitions-title"
             title="Minu hallatavad võistlused"
             description="Võistlused, mida saad administraatori, peakorraldaja või korraldajana hallata."
           />
+          {competitions.length === 0 && <p className="rounded-xl border bg-white p-5 text-sm text-gray-500">Sul pole praegu hallatavaid võistlusi.</p>}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[...competitions].sort((a, b) =>
               (competitionStatusOrder[a.status] ?? 5) - (competitionStatusOrder[b.status] ?? 5)
@@ -734,17 +355,24 @@ export default async function DashboardPage() {
             ))}
           </div>
         </section>
-      )}
-
-      {!hasPersonalWorkflow && competitions.length === 0 && (
-        <div className="py-16 text-center text-gray-400">
-          <p className="mb-3 text-4xl">🏁</p>
-          <p className="font-medium">Ühtegi aktiivset tegevust pole</p>
-          <p className="mt-1 text-sm">
-            Avalikud registreerimised ja sinu võistkonnad ilmuvad siia.
-          </p>
+  )
+  const views = [
+    { id: "teams", label: "Minu võistkonnad", count: participantItems.length, content: <ParticipantTeams items={participantItems} /> },
+    ...(judgeMemberships.length ? [{ id: "judge", label: "Hindamine", count: judgeMemberships.length, content: judgeContent }] : []),
+    ...(competitions.length || mayCreateCompetition ? [{ id: "manage", label: "Võistluste haldamine", count: competitions.length, content: managedContent }] : []),
+    { id: "discover", label: "Leia võistlus", count: openCompetitions.length, content: discoverContent },
+  ]
+  const initialView = participantItems.length ? "teams" : judgeMemberships.length ? "judge" : competitions.length || mayCreateCompetition ? "manage" : "teams"
+  return (
+    <div>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Töölaud</h1>
+          <p className="mt-2 text-sm text-gray-500">Sinu võistkonnad, ülesanded ja võistlused ühes kohas.</p>
         </div>
-      )}
+        {mayCreateCompetition && <Link href="/dashboard/competitions/new" className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:px-4">+ Uus võistlus</Link>}
+      </div>
+      <DashboardViews views={views} initialView={initialView} />
     </div>
   )
 }
