@@ -2,6 +2,7 @@ import "server-only"
 
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { invalidatePublicSnapshots } from "@/lib/publicSnapshotCache"
 import { parseFreezeSnapshot, type FreezeSnapshot, type PublicFreeze } from "@/lib/leaderboardFreeze"
 
 type Tx = Prisma.TransactionClient
@@ -34,7 +35,7 @@ async function createFreezeSnapshot(tx: Tx, competitionId: string, takenAt: Date
 // Võtab snapshot'i, kui külmutamise aeg on käes ja seda veel pole. Samaaegsed
 // päringud ei kirjuta üksteise snapshot'i üle.
 async function ensureSnapshot(competitionId: string, now: Date): Promise<PublicFreeze | null> {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const freeze = await tx.leaderboardFreeze.findUnique({ where: { competitionId } })
     if (!freeze || freeze.freezeAt > now) return null
     if (freeze.snapshot) return { freezeAt: freeze.freezeAt, snapshot: parseFreezeSnapshot(freeze.snapshot, freeze.freezeAt) }
@@ -47,6 +48,8 @@ async function ensureSnapshot(competitionId: string, now: Date): Promise<PublicF
     const stored = await tx.leaderboardFreeze.findUnique({ where: { competitionId } })
     return stored ? { freezeAt: stored.freezeAt, snapshot: parseFreezeSnapshot(stored.snapshot, stored.freezeAt) } : null
   }, { maxWait: 5_000, timeout: 20_000 })
+  if (result) invalidatePublicSnapshots(competitionId)
+  return result
 }
 
 // Avalike vaadete seis: null = jooksvad tulemused, muidu külmutatud snapshot.
@@ -74,11 +77,13 @@ export async function setLeaderboardFreeze(competitionId: string, freezeAt: Date
     create: { competitionId, freezeAt, createdById: userId },
     update: { freezeAt, snapshot: Prisma.DbNull, snapshotAt: null, createdById: userId },
   })
+  invalidatePublicSnapshots(competitionId)
   if (freezeAt <= now) await ensureSnapshot(competitionId, now)
 }
 
 export async function revealLeaderboard(competitionId: string) {
   await prisma.leaderboardFreeze.deleteMany({ where: { competitionId } })
+  invalidatePublicSnapshots(competitionId)
 }
 
 // Cron: ajastatud külmutused saavad snapshot'i ka siis, kui keegi avalikku

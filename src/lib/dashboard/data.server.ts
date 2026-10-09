@@ -1,19 +1,19 @@
 import "server-only"
 
 import { prisma } from "@/lib/prisma"
+import { getPublicSnapshot } from "@/lib/publicSnapshotCache"
 import { naturalCompare } from "@/lib/utils"
 import { parseTieBreakConfig } from "@/lib/tieBreak"
 import { resultExceptionKind } from "@/lib/exceptionKinds"
 import { applyFrozenElementStatus, applyFrozenTeamStatus } from "@/lib/leaderboardFreeze"
 import { getFreezeState, getPublicFreeze } from "@/lib/leaderboardFreeze.server"
+import type { PublicFreeze } from "@/lib/leaderboardFreeze"
 import {
   parseDashboardConfig,
   visibleWidgetIds,
-  type DashboardConfig,
   type DashboardWidgetId,
-  type MapColorMode,
 } from "@/lib/dashboard/config"
-import { computeTeamProgress, sortTeamProgress, type TeamProgress } from "@/lib/dashboard/routes"
+import { computeTeamProgress, sortTeamProgress } from "@/lib/dashboard/routes"
 import {
   elementProgressRows,
   elementTableRows,
@@ -22,14 +22,6 @@ import {
   judgeActivity,
   summaryStats,
   withdrawals,
-  type ElementProgressRow,
-  type ElementTableRow,
-  type EntryRate,
-  type FreshnessLevel,
-  type FreshnessRow,
-  type JudgeActivity,
-  type SummaryStats,
-  type Withdrawals,
 } from "@/lib/dashboard/progress"
 import {
   buildStandings,
@@ -37,11 +29,7 @@ import {
   elementWinners,
   interimStandings,
   topTeams,
-  type CloseContest,
-  type ElementWinner,
-  type InterimStandings,
   type StandingRow,
-  type TopTeams,
 } from "@/lib/dashboard/standings"
 import {
   classComparison,
@@ -49,72 +37,13 @@ import {
   discriminationRows,
   penaltySummary,
   timeSpentRows,
-  type ClassComparison,
-  type DifficultyRow,
-  type DiscriminationRow,
-  type PenaltySummary,
-  type TimeSpentRow,
 } from "@/lib/dashboard/analysis"
 import { mapGeometry, parseMapMarkers } from "@/lib/dashboard/mapData"
+import { dashboardDataRequirements, dashboardResultSelect } from "@/lib/dashboard/requirements"
 import type { DashElement, DashMiscEntry, DashPenalty, DashResult, DashScore, DashTeam, ScoringMode } from "@/lib/dashboard/types"
 
-export type DashboardAudience = "internal" | "public"
-
-export type DashboardMapPoint = {
-  id: string
-  code: string
-  name: string
-  mapX: number
-  mapY: number
-  visits: number
-  // 0 (halb) … 1 (hea) keskmise tulemuse järgi; null kui hinnatav tulemus puudub.
-  score: number | null
-  freshness: FreshnessLevel | null
-  minutesAgo: number | null
-  teamsHere: number
-}
-
-export type DashboardMapData = {
-  mode: "IMAGE" | "SCHEMATIC"
-  imageUrl: string | null
-  aspect: number
-  scaleBar: { meters: number; fraction: number } | null
-  colorMode: MapColorMode
-  points: DashboardMapPoint[]
-  markers: { id: string; label: string; mapX: number; mapY: number }[]
-  unplacedCount: number
-  maxVisits: number
-}
-
-export type DashboardData = {
-  competition: { id: string; name: string; status: string; location: string | null; scoringMode: ScoringMode }
-  audience: DashboardAudience
-  generatedAt: Date
-  // Avalikus vaates: külmutatud seisu aeg. Töölaual: avaliku pingerea külmutuse seis.
-  freeze: { freezeAt: Date; frozen: boolean } | null
-  config: DashboardConfig
-  widgets: DashboardWidgetId[]
-  classes: string[]
-  summary?: SummaryStats
-  elementProgress?: ElementProgressRow[]
-  freshness?: FreshnessRow[]
-  teamTracker?: TeamProgress[]
-  missingResults?: TeamProgress[]
-  judges?: JudgeActivity
-  withdrawals?: Withdrawals
-  entryRate?: EntryRate | null
-  topTeams?: TopTeams
-  interimStandings?: InterimStandings
-  closeContests?: CloseContest[]
-  elementWinners?: ElementWinner[]
-  elementTable?: ElementTableRow[]
-  difficulty?: DifficultyRow[]
-  discrimination?: DiscriminationRow[]
-  classComparison?: ClassComparison
-  timeSpent?: TimeSpentRow[]
-  penalties?: PenaltySummary
-  map?: DashboardMapData | null
-}
+import type { DashboardAudience, DashboardData, DashboardMapPoint } from "./viewTypes"
+export type { DashboardAudience, DashboardData, DashboardMapPoint, DashboardMapData } from "./viewTypes"
 
 function parseValues(raw: string): Record<string, unknown> {
   try {
@@ -125,18 +54,25 @@ function parseValues(raw: string): Record<string, unknown> {
   }
 }
 
-const STANDINGS_WIDGETS: DashboardWidgetId[] = ["topTeams", "interimStandings", "closeContests", "elementWinners", "difficulty", "discrimination", "classComparison", "map"]
-
 export function mapImageUrl(competitionId: string, audience: DashboardAudience, version: Date) {
   const base = audience === "public" ? `/api/public/competitions/${competitionId}/map-image` : `/api/competitions/${competitionId}/map/image`
   return `${base}?v=${version.getTime()}`
 }
 
 export async function loadDashboard(competitionId: string, audience: DashboardAudience, now = new Date()): Promise<DashboardData | null> {
+  if (audience === "internal") return loadDashboardData(competitionId, audience, now, null)
+  // Check freeze state before every cache lookup, so a newly frozen view can
+  // never reuse a live snapshot even during the short sharing window.
+  const freeze = await getPublicFreeze(competitionId, now)
+  const version = freeze ? `${freeze.freezeAt.toISOString()}:${freeze.snapshot.takenAt}` : "live"
+  return getPublicSnapshot("dashboard", competitionId, version, () => loadDashboardData(competitionId, audience, now, freeze))
+}
+
+async function loadDashboardData(competitionId: string, audience: DashboardAudience, now: Date, publicFreeze: PublicFreeze | null): Promise<DashboardData | null> {
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },
     select: {
-      id: true, name: true, status: true, location: true, scoringMode: true, tieBreakConfig: true, dashboardConfig: true,
+      id: true, name: true, status: true, location: true, scoringMode: true, analysisAccessMode: true, tieBreakConfig: true, dashboardConfig: true,
       defaultKPMaxValue: true, defaultPKMaxValue: true,
       registrationClasses: { where: { isActive: true }, orderBy: [{ order: "asc" }, { name: "asc" }], select: { name: true } },
     },
@@ -147,8 +83,8 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
   const show = (id: DashboardWidgetId) => widgets.includes(id)
   const scoringMode: ScoringMode = competition.scoringMode === "PLUS" ? "PLUS" : "PENALTY"
 
-  const publicFreeze = audience === "public" ? await getPublicFreeze(competitionId, now) : null
   const freezeState = audience === "internal" ? await getFreezeState(competitionId, now) : null
+  const needs = dashboardDataRequirements(widgets, audience)
 
   const needsJudges = show("judges")
   const needsMap = show("map")
@@ -162,21 +98,33 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
       orderBy: { order: "asc" },
       select: {
         id: true, code: true, name: true, type: true, order: true, isCancelled: true, maxValue: true,
-        mapX: true, mapY: true, mgrs: true, latitude: true, longitude: true,
-        fields: { orderBy: { order: "asc" }, select: { name: true, label: true, type: true, meta: true, rankingPriority: true } },
-        exceptions: { orderBy: { order: "asc" }, select: { label: true, kind: true } },
+        mapX: needsMap, mapY: needsMap, mgrs: needsMap, latitude: needsMap, longitude: needsMap,
+        fields: needs.fields ? { orderBy: { order: "asc" }, select: { name: true, label: true, type: true, meta: true, rankingPriority: true } } : false,
+        exceptions: needs.exceptions ? { orderBy: { order: "asc" }, select: { label: true, kind: true } } : false,
       },
     }),
-    prisma.result.findMany({
-      where: { element: { competitionId } },
-      select: { elementId: true, teamId: true, values: true, exceptionLabel: true, enteredAt: true, updatedAt: true, enteredByUserId: true, enteredByTokenId: true },
-    }),
-    prisma.miscEntry.findMany({
-      where: { element: { competitionId } },
-      select: { elementId: true, teamId: true, points: true, description: true, reason: true, abandonElementId: true, abandonTime: true, createdAt: true },
-    }),
-    prisma.computedScore.findMany({ where: { element: { competitionId } }, select: { elementId: true, teamId: true, penaltyPoints: true } }),
-    prisma.manualPenalty.findMany({ where: { competitionId }, select: { teamId: true, points: true, description: true, enteredAt: true } }),
+    needs.results
+      ? prisma.result.findMany({
+        where: { element: { competitionId }, ...(publicFreeze ? { enteredAt: { lte: publicFreeze.freezeAt } } : {}) },
+        select: dashboardResultSelect(needs),
+      })
+      : Promise.resolve([]),
+    needs.miscEntries
+      ? prisma.miscEntry.findMany({
+        where: { element: { competitionId }, ...(publicFreeze ? { createdAt: { lte: publicFreeze.freezeAt } } : {}) },
+        select: {
+          elementId: true, teamId: true,
+          points: needs.miscDetails, description: needs.miscDetails, reason: needs.miscDetails,
+          abandonElementId: needs.miscDetails, abandonTime: needs.miscDetails, createdAt: needs.miscDetails,
+        },
+      })
+      : Promise.resolve([]),
+    needs.scores && !publicFreeze
+      ? prisma.computedScore.findMany({ where: { element: { competitionId } }, select: { elementId: true, teamId: true, penaltyPoints: true } })
+      : Promise.resolve([]),
+    needs.penalties && !publicFreeze
+      ? prisma.manualPenalty.findMany({ where: { competitionId }, select: { teamId: true, points: true, description: true, enteredAt: true } })
+      : Promise.resolve([]),
     needsJudges
       ? prisma.accessToken.findMany({ where: { competitionId }, select: { id: true, name: true, type: true, elementId: true, lastUsedAt: true } })
       : Promise.resolve([]),
@@ -192,23 +140,32 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
   let elements: DashElement[] = elementRows.map((element) => ({
     id: element.id, code: element.code, name: element.name, type: element.type, order: element.order,
     isCancelled: element.isCancelled, maxValue: element.maxValue,
-    inputFields: element.fields.filter((field) => field.type !== "COMPUTED"),
-    exceptions: element.exceptions,
+    inputFields: (element.fields ?? []).filter((field) => field.type !== "COMPUTED"),
+    exceptions: element.exceptions ?? [],
   }))
-  let results: DashResult[] = resultRows.map((result) => ({ ...result, values: parseValues(result.values) }))
-  let miscEntries: DashMiscEntry[] = miscRows
+  const unusedDate = new Date(0)
+  const results: DashResult[] = resultRows.map((result) => ({
+    elementId: result.elementId, teamId: result.teamId,
+    values: needs.resultValues ? parseValues(result.values) : {},
+    exceptionLabel: result.exceptionLabel ?? null,
+    enteredAt: result.enteredAt ?? unusedDate, updatedAt: result.updatedAt ?? unusedDate,
+    enteredByUserId: result.enteredByUserId ?? null, enteredByTokenId: result.enteredByTokenId ?? null,
+  }))
+  const miscEntries: DashMiscEntry[] = miscRows.map((entry) => ({
+    elementId: entry.elementId, teamId: entry.teamId,
+    points: entry.points ?? 0, description: entry.description ?? "", reason: entry.reason ?? null,
+    abandonElementId: entry.abandonElementId ?? null, abandonTime: entry.abandonTime ?? null, createdAt: entry.createdAt ?? unusedDate,
+  }))
   let scores: DashScore[] = scoreRows.map((score) => ({ elementId: score.elementId, teamId: score.teamId, points: score.penaltyPoints }))
   let penalties: DashPenalty[] = penaltyRows
 
   // Külmutatud avalik vaade: tulemused ja seisud külmutamise hetke seisuga.
   if (publicFreeze) {
-    const { freezeAt, snapshot } = publicFreeze
+    const { snapshot } = publicFreeze
     teams = applyFrozenTeamStatus(teams, snapshot)
     elements = applyFrozenElementStatus(elements, snapshot)
-    results = results.filter((result) => result.enteredAt <= freezeAt)
-    miscEntries = miscEntries.filter((entry) => entry.createdAt <= freezeAt)
-    scores = snapshot.scores
-    penalties = snapshot.penalties.map((penalty) => ({ ...penalty, enteredAt: new Date(penalty.enteredAt) }))
+    scores = needs.scores ? snapshot.scores : []
+    penalties = needs.penalties ? snapshot.penalties.map((penalty) => ({ ...penalty, enteredAt: new Date(penalty.enteredAt) })) : []
   }
 
   const classes = [...new Set([
@@ -217,7 +174,7 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
   ])]
 
   const data: DashboardData = {
-    competition: { id: competition.id, name: competition.name, status: competition.status, location: competition.location, scoringMode },
+    competition: { id: competition.id, name: competition.name, status: competition.status, location: competition.location, scoringMode, analysisAccessMode: competition.analysisAccessMode },
     audience,
     generatedAt: now,
     freeze: publicFreeze ? { freezeAt: publicFreeze.freezeAt, frozen: true } : freezeState ? { freezeAt: freezeState.freezeAt, frozen: freezeState.frozen } : null,
@@ -226,11 +183,11 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
     classes,
   }
 
-  const progress = elementProgressRows(elements, teams, results, miscEntries)
-  const teamProgress = computeTeamProgress({
+  const progress = needs.elementProgress ? elementProgressRows(elements, teams, results, miscEntries) : []
+  const teamProgress = needs.teamProgress ? computeTeamProgress({
     teams, elements, results, config, safetyMinutes: config.thresholds.safetyMinutes, status: competition.status, now,
-  })
-  const freshness = show("freshness") || needsMap
+  }) : []
+  const freshness = needs.freshness
     ? freshnessRows(elements, progress, results, config.thresholds, competition.status, now)
     : []
 
@@ -268,7 +225,7 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
   if (show("penalties")) data.penalties = penaltySummary(elements, scores, results, penalties)
 
   let standings: StandingRow[] = []
-  if (STANDINGS_WIDGETS.some(show)) {
+  if (needs.standings) {
     standings = buildStandings({
       teams, scores, penalties, elements, scoringMode, tieBreak: parseTieBreakConfig(competition.tieBreakConfig),
     })
@@ -288,14 +245,14 @@ export async function loadDashboard(competitionId: string, audience: DashboardAu
       ? { width: mapRow.imageWidth, height: mapRow.imageHeight, updatedAt: mapRow.imageUpdatedAt }
       : null
     const markers = parseMapMarkers(mapRow?.markers ?? [])
-    const activeElements = elementRows.filter((element) => !element.isCancelled)
+    const elementById = new Map(elements.map((element) => [element.id, element]))
+    const activeElements = elementRows.filter((element) => !elementById.get(element.id)?.isCancelled)
     const geometry = mapGeometry(image, [
       ...activeElements.map((element) => ({ id: element.id, mapX: element.mapX, mapY: element.mapY, mgrs: element.mgrs, latitude: element.latitude, longitude: element.longitude })),
       ...markers.map((marker) => ({ ...marker, id: `marker:${marker.id}` })),
     ])
     if (!geometry) data.map = null
     else {
-      const elementById = new Map(elements.map((element) => [element.id, element]))
       const visits = new Map<string, number>()
       for (const result of results) {
         const element = elementById.get(result.elementId)

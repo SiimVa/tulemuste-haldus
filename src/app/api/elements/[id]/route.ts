@@ -1,5 +1,5 @@
 import { parseExceptionKind } from "@/lib/exceptionKinds"
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -55,7 +55,7 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
     const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
       ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
       : (calcMethod?.params ?? {})
-    await prisma.$transaction(async (tx) => {
+    await withElementScoreTransaction(id, async (tx) => {
       await tx.scoringElement.update({
         where: { id },
         data: {
@@ -117,8 +117,6 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
       }
     })
 
-    // Erandi liik mõjutab punkte (ebaõnnestunu jääb pingeritta viimaseks).
-    if (fields || exceptions || calcMethod || maxValue !== undefined) await recomputeElementScores(id)
     const updated = await prisma.scoringElement.findUnique({
       where: { id },
       include: { fields: { orderBy: { order: "asc" } }, exceptions: { orderBy: { order: "asc" } }, calcMethod: true },

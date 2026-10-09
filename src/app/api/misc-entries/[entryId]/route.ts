@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canAccessMiscEntry } from "@/lib/competitionAccess"
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 
 async function handlePATCH(req: Request, { params }: { params: Promise<{ entryId: string }> }) {
   const session = await auth()
@@ -40,8 +40,7 @@ async function handleDELETE(_req: Request, { params }: { params: Promise<{ entry
     select: { elementId: true },
   })
   if (!entry) return NextResponse.json({ error: "Kirjet ei leitud" }, { status: 404 })
-  await prisma.miscEntry.delete({ where: { id: entryId } })
-  await recomputeElementScores(entry.elementId)
+  await withElementScoreTransaction(entry.elementId, (tx) => tx.miscEntry.delete({ where: { id: entryId } }))
   return NextResponse.json({ ok: true })
 }
 

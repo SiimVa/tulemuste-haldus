@@ -1,22 +1,52 @@
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 import { calculateScores, withEffectiveHC } from "@/lib/calculators"
 import { isFailedResult } from "@/lib/exceptionKinds"
 import { parseClassGroups, scopeKeyFor, TEAM_COUNT_SCOPES } from "@/lib/classGroups"
+import { invalidatePublicSnapshots } from "@/lib/publicSnapshotCache"
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
 async function replaceComputedScores(
+  tx: Prisma.TransactionClient,
   elementId: string,
   scores: { teamId: string; penaltyPoints: number }[]
 ): Promise<void> {
   const computedAt = new Date()
-  await prisma.$transaction(async (tx) => {
-    await tx.computedScore.deleteMany({ where: { elementId } })
-    if (scores.length > 0) {
-      await tx.computedScore.createMany({
-        data: scores.map((score) => ({ ...score, elementId, computedAt })),
-      })
-    }
+  await tx.computedScore.deleteMany({ where: { elementId } })
+  if (scores.length > 0) {
+    await tx.computedScore.createMany({
+      data: scores.map((score) => ({ ...score, elementId, computedAt })),
+    })
+  }
+}
+
+// A PostgreSQL row lock coordinates every application instance. Acquire it
+// before reading results: locking only the replacement would allow an older
+// calculation to overwrite a newer one. READ COMMITTED sees the previous
+// writer's committed results after waiting for this lock.
+async function withElementScoreLock<T>(
+  elementId: string,
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const committed = await prisma.$transaction(async (tx) => {
+    const [element] = await tx.$queryRaw<{ competitionId: string }[]>(Prisma.sql`SELECT "competitionId" FROM "ScoringElement" WHERE "id" = ${elementId} FOR UPDATE`)
+    return { value: await work(tx), competitionId: element?.competitionId }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 15_000 })
+  if (committed.competitionId) invalidatePublicSnapshots(committed.competitionId)
+  return committed.value
+}
+
+// Keep the source mutation and all affected teams' scores in the same commit.
+// A calculation failure rolls back the input as well as the computed scores.
+export async function withElementScoreTransaction<T>(
+  elementId: string,
+  mutation: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return withElementScoreLock(elementId, async (tx) => {
+    const value = await mutation(tx)
+    await recomputeLockedElementScores(tx, elementId)
+    return value
   })
 }
 
@@ -27,7 +57,11 @@ async function replaceComputedScores(
 // hindamine, erandid, DNF (katkestanud) ja käsitsi lisapunktid (misc).
 // ─────────────────────────────────────────────────────────────────────────────
 export async function recomputeElementScores(elementId: string): Promise<number> {
-  const element = await prisma.scoringElement.findUnique({
+  return withElementScoreLock(elementId, (tx) => recomputeLockedElementScores(tx, elementId))
+}
+
+async function recomputeLockedElementScores(tx: Prisma.TransactionClient, elementId: string): Promise<number> {
+  const element = await tx.scoringElement.findUnique({
     where: { id: elementId },
     include: {
       // NB: ainult ülemise taseme väljad (mitte sektsiooniväljad) → õige tulemusväli
@@ -50,7 +84,7 @@ export async function recomputeElementScores(elementId: string): Promise<number>
   // skoopide kaupa. Loeme kõik võistluse võistkonnad, mitte ainult need, kellel
   // on selles elemendis tulemus — nii jääb punktiskaala kõigis elementides samaks.
   const classGroups = parseClassGroups(element.competition.classGroups)
-  const allTeams = await prisma.team.findMany({
+  const allTeams = await tx.team.findMany({
     where: { competitionId: element.competitionId, isHorsDeCompetition: false },
     select: { class: true },
   })
@@ -73,11 +107,11 @@ export async function recomputeElementScores(elementId: string): Promise<number>
 
   // Tühistatud element: kõik võistkonnad saavad 0
   if (element.isCancelled) {
-    const teams = await prisma.team.findMany({
+    const teams = await tx.team.findMany({
       where: { competitionId: element.competitionId },
       select: { id: true },
     })
-    await replaceComputedScores(elementId, teams.map((team) => ({
+    await replaceComputedScores(tx, elementId, teams.map((team) => ({
       teamId: team.id,
       penaltyPoints: 0,
     })))
@@ -89,6 +123,7 @@ export async function recomputeElementScores(elementId: string): Promise<number>
     const byTeam = new Map<string, number>()
     for (const e of element.miscEntries) byTeam.set(e.teamId, (byTeam.get(e.teamId) ?? 0) + e.points)
     await replaceComputedScores(
+      tx,
       elementId,
       [...byTeam.entries()].map(([teamId, penaltyPoints]) => ({ teamId, penaltyPoints }))
     )
@@ -100,7 +135,7 @@ export async function recomputeElementScores(elementId: string): Promise<number>
   for (const e of element.miscEntries) miscByTeam.set(e.teamId, (miscByTeam.get(e.teamId) ?? 0) + e.points)
 
   // DNF: võistkonnad, kes katkestasid teatud elemendist alates
-  const dnfList = await prisma.team.findMany({
+  const dnfList = await tx.team.findMany({
     where: { competitionId: element.competitionId, dnfFromElementOrder: { not: null } },
     select: { id: true, dnfFromElementOrder: true },
   })
@@ -110,9 +145,9 @@ export async function recomputeElementScores(elementId: string): Promise<number>
     return o != null && element.order >= o
   }
 
-  const results = await prisma.result.findMany({ where: { elementId }, include: { team: true } })
+  const results = await tx.result.findMany({ where: { elementId }, include: { team: true } })
   if (results.length === 0 && miscByTeam.size === 0) {
-    await replaceComputedScores(elementId, [])
+    await replaceComputedScores(tx, elementId, [])
     return 0
   }
 
@@ -176,7 +211,7 @@ export async function recomputeElementScores(elementId: string): Promise<number>
     }))
   }
 
-  await replaceComputedScores(elementId, scored)
+  await replaceComputedScores(tx, elementId, scored)
   return scored.length
 }
 

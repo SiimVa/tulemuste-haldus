@@ -4,12 +4,19 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { parseValidation, validateClockValue, validateFieldValue } from "@/lib/fieldValidation"
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 import { resultKeepsValues } from "@/lib/exceptionKinds"
 import {
   canEnterElementResults,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
+
+class ResultVersionConflict extends Error {}
+
+function sameValues(left: string, right: string): boolean {
+  const canonical = (value: string) => JSON.stringify(Object.entries(JSON.parse(value)).sort(([a], [b]) => a.localeCompare(b)))
+  try { return canonical(left) === canonical(right) } catch { return false }
+}
 
 // GET – kõik tulemused selle elemendi jaoks
 async function handleGET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -76,7 +83,13 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
 
   setSecurityActor(enteredByUserId, enteredByTokenId)
   const body = await req.json().catch(() => ({}))
-  const { teamId, values, exceptionLabel } = body
+  const { teamId, values, exceptionLabel, expectedUpdatedAt } = body
+  const checksVersion = Object.prototype.hasOwnProperty.call(body, "expectedUpdatedAt")
+  if (checksVersion && expectedUpdatedAt !== null && (
+    typeof expectedUpdatedAt !== "string" || !Number.isFinite(Date.parse(expectedUpdatedAt))
+  )) {
+    return NextResponse.json({ error: "Vigane tulemuse versioon" }, { status: 400 })
+  }
   if (typeof teamId !== "string" || !teamId) {
     return NextResponse.json({ error: "Võistkonna ID puudub" }, { status: 400 })
   }
@@ -120,9 +133,20 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   // ja skoor. Enne valideerimist, et kohustuslik väli kustutamist ei takistaks.
   const hasAnyValue = values && Object.values(values).some((v) => String(v ?? "").trim() !== "")
   if (!exceptionLabel && !hasAnyValue) {
-    await prisma.result.deleteMany({ where: { elementId, teamId } })
-    await prisma.computedScore.deleteMany({ where: { elementId, teamId } })
-    await recomputeElementScores(elementId)
+    try {
+      await withElementScoreTransaction(elementId, async (tx) => {
+        const current = await tx.result.findUnique({ where: { elementId_teamId: { elementId, teamId } } })
+        // A repeated deletion is already complete. A stale deletion must not
+        // remove a newer result entered while the client was disconnected.
+        if (current && checksVersion && (expectedUpdatedAt === null || current.updatedAt.getTime() !== Date.parse(expectedUpdatedAt))) {
+          throw new ResultVersionConflict()
+        }
+        await tx.result.deleteMany({ where: { elementId, teamId } })
+      })
+    } catch (error) {
+      if (error instanceof ResultVersionConflict) return NextResponse.json({ error: "Tulemus on vahepeal muutunud. Värskenda lehte ja kontrolli tulemust enne uuesti salvestamist." }, { status: 409 })
+      throw error
+    }
     return NextResponse.json({ deleted: true, teamId })
   }
 
@@ -165,31 +189,46 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     }
   }
 
-  const result = await prisma.result.upsert({
-    where: { elementId_teamId: { elementId, teamId } },
-    create: {
-      elementId,
-      teamId,
-      values: JSON.stringify(storedValues),
-      exceptionLabel: exceptionLabel ?? null,
-      exceptionPenalty,
-      enteredByUserId,
-      enteredByTokenId,
-    },
-    update: {
-      values: JSON.stringify(storedValues),
-      exceptionLabel: exceptionLabel ?? null,
-      exceptionPenalty,
-      enteredByUserId,
-      enteredByTokenId,
-    },
-    include: { team: true },
-  })
-
-  // Taasaruta skoorid kohe pärast sisestust (jagatud loogika hulgi-ümberarvutusega)
-  await recomputeElementScores(elementId)
-
-  return NextResponse.json(result)
+  try {
+    const result = await withElementScoreTransaction(elementId, async (tx) => {
+      const current = await tx.result.findUnique({
+        where: { elementId_teamId: { elementId, teamId } },
+        include: { team: true },
+      })
+      const serializedValues = JSON.stringify(storedValues)
+      // The first attempt may have committed even if its HTTP response was
+      // lost. Return that record without changing timestamps or provenance.
+      if (checksVersion && current &&
+        sameValues(current.values, serializedValues) &&
+        current.exceptionLabel === (exceptionLabel ?? null) &&
+        current.exceptionPenalty === exceptionPenalty &&
+        current.enteredByUserId === enteredByUserId &&
+        current.enteredByTokenId === enteredByTokenId
+      ) return current
+      if (checksVersion && (expectedUpdatedAt === null
+        ? current !== null
+        : current?.updatedAt.getTime() !== Date.parse(expectedUpdatedAt))) {
+        throw new ResultVersionConflict()
+      }
+      const data = {
+        values: serializedValues,
+        exceptionLabel: exceptionLabel ?? null,
+        exceptionPenalty,
+        enteredByUserId,
+        enteredByTokenId,
+      }
+      return tx.result.upsert({
+        where: { elementId_teamId: { elementId, teamId } },
+        create: { elementId, teamId, ...data },
+        update: data,
+        include: { team: true },
+      })
+    })
+    return NextResponse.json(result)
+  } catch (error) {
+    if (error instanceof ResultVersionConflict) return NextResponse.json({ error: "Tulemus on vahepeal muutunud. Värskenda lehte ja kontrolli tulemust enne uuesti salvestamist." }, { status: 409 })
+    throw error
+  }
 }
 
 export const GET = withSecurityRoute("/api/elements/[id]/results", handleGET)
