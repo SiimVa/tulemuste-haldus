@@ -115,9 +115,12 @@ koosseisu. Esitatud etapi saab kinnitada või märkusega parandamisele saata.
 Nupp **Muuda võistkonda** avab korraldajale võistkonna nime, klassi ja vormi
 vastused, sealhulgas esindaja kontaktandmed ja liikmed. Muudatused saab otse
 salvestada ka pärast registreerimise tähtaega ning mandaadi ajal. Salvestamine
-ei muuda avalduse ega mandaadi kinnitamise staatust. Esindaja kontaktandmete
-muutmine ei vaheta võistkonnaga seotud kasutajakontot; konto määratakse endiselt
-**Juurdepääsu** lehel.
+ei muuda avalduse ega mandaadi kinnitamise staatust. **Muuda esindajat** määrab nime ja e-posti järgi uue esindaja. Olemasoleva
+konto nimi ja e-post on määravad; kontota inimese määrang ootab sama e-postiga
+sisselogimist või administraatori loodud kontot. Vahetamisel tuleb uue esindaja
+telefon uuesti sisestada. Nime ja e-posti eraldi vormivastustena muuta ei saa.
+Esindajat saab määrata ka **Juurdepääsu** lehel; seal tehtud vahetus tühjendab
+vana esindaja telefoninumbri.
 
 **Lisa võistkond** loob enne osalejate nimekirja kinnitamist korraldaja esitatud
 kinnitatud avalduse. Avatud automaatse registreerimise korral rakendub sellele
@@ -172,16 +175,39 @@ korraga, ka peidetud veergude puhul. Excel ja CSV järgivad neid filtreid nii
 kokkuvõttes kui ka võistkondade loendis. Etapi vahetamisel vastusefiltrid tühjendatakse.
 
 Registreerimise aruanne kasutab avalduse vastuseid; mandaadi aruanne võistkonna
-praeguseid vastuseid ja koosseisu. Varasemad avalduseta võistkonnad on samuti
+praeguseid vastuseid ja koosseisu. **Esindaja nimi, e-post ja telefon näitavad
+mõlemas aruandes praegust esindajat**, nagu registreerimiskaart ja muutmisvorm.
+Registreerimiskaardil on algne registreerija eraldi real „Registreeris”. Varasemad avalduseta võistkonnad on samuti
 kaasatud, kuid avaldusest loodud võistkonda registreerimisel topelt ei loeta.
 Kõik staatused, sh mustandid ja loobumised, on vaikimisi kaasatud. Eksport on
 kättesaadav ainult võistluse haldusõigusega kasutajale. Kustutatud isikuandmeid
 aruandes ei taastata.
 
-Avaliku registreerimise kinnitamisel seotakse registreeringu esitanud kasutaja
-võistkonna esindajaks. Korraldaja saab esindajat hiljem võistluse
-**Juurdepääsu** lehel muuta. Kui esindajal veel kontot ei ole, saab talle samalt
-lehelt luua rollikutse ja edastada kuvatud lingi käsitsi.
+Avalikul registreerimisel on registreerija alguses ka esindaja. Edaspidi on
+algne registreerija (`submittedById`) ja avalduse praegune esindaja
+(`representativeId` või ootel e-post) eraldi. Esindaja vahetamine ei kirjuta
+registreerijat üle. Algne registreerija saab enda avaldust vaadata, kuid pärast
+vahetust saab seda muuta ja registreeringust loobuda ainult praegune esindaja.
+Osalejate nimekirja kinnitamisel kantakse praegune esindaja üle võistkonnale.
+
+Kõik esindaja määramise viisid uuendavad sama seost ja praeguseid kontaktandmeid.
+Uuele esindajale saadetakse teavitus; kontota saaja saab e-kirja juhisega sama
+e-postiga sisse logida. Ka staatusteated ja korraldaja kirjade saajaloend kasutavad
+praegust esindajat. Vana esindaja saatmata töövooteated tühistatakse.
+
+**Juurdepääsu** lehe rollikutse annab õigused vastuvõtmisel. Hilisem esindaja
+määramine eemaldab selle võistkonna teistele esindajatele saadetud ootel kutsetest;
+esindaja eemaldamine tühistab selle võistkonna määrangu kõigis ootel kutsetes.
+Kutse teiste võistkondade ja rollide õigused säilivad. Tühjaks jäänud kutse
+tühistatakse. Vastuvõtmine ja õiguste määramine toimuvad ühes tehingus.
+
+Esindajavahetus kajastub seotud avalduse sündmuste ajaloos; varasemate sündmuste
+tegijaid ei muudeta. Vana muutmisvormi salvestamine lükatakse tagasi, kui esindaja
+on vahepeal muutunud.
+
+Olemasolevate andmete migratsioon taastab algse registreerija avalduse esimese
+loomissündmuse tegija järgi. Puuduva loomissündmuse korral säilib olemasolev
+esitaja; puuduvat ajalugu ei oletata.
 
 ## Isikuandmed
 

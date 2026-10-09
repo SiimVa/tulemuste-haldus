@@ -1,3 +1,6 @@
+import { Prisma } from "@prisma/client"
+import { setTeamRepresentative } from "@/lib/teamRepresentatives.server"
+import { deliverPendingNotificationsSafely } from "@/lib/notifications.server"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
@@ -98,74 +101,7 @@ async function handlePOST(
   }
 
   const assignments = await prisma.$transaction(async (tx) => {
-    const previousMemberIds = [
-      ...new Set(
-        (
-          await tx.teamRepresentative.findMany({
-            where: { competitionId: id, teamId: { in: teamIds } },
-            select: { memberId: true },
-          })
-        ).map((assignment) => assignment.memberId)
-      ),
-    ]
-
-    const membership = await tx.competitionMember.upsert({
-      where: { competitionId_userId: { competitionId: id, userId: user.id } },
-      create: { competitionId: id, userId: user.id },
-      update: {},
-    })
-
-    await tx.competitionMemberRole.upsert({
-      where: {
-        memberId_role: {
-          memberId: membership.id,
-          role: "REPRESENTATIVE",
-        },
-      },
-      create: { memberId: membership.id, role: "REPRESENTATIVE" },
-      update: {},
-    })
-
-    await tx.team.updateMany({
-      where: { competitionId: id, id: { in: teamIds } },
-      data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
-    })
-    for (const teamId of teamIds) {
-      await tx.teamRepresentative.upsert({
-        where: { teamId },
-        create: {
-          competitionId: id,
-          teamId,
-          memberId: membership.id,
-        },
-        update: { memberId: membership.id },
-      })
-    }
-
-    for (const previousMemberId of previousMemberIds) {
-      if (previousMemberId === membership.id) continue
-
-      const remainingAssignments = await tx.teamRepresentative.count({
-        where: { memberId: previousMemberId },
-      })
-      if (remainingAssignments === 0) {
-        await tx.competitionMemberRole.deleteMany({
-          where: {
-            memberId: previousMemberId,
-            role: "REPRESENTATIVE",
-          },
-        })
-
-        const remainingRoles = await tx.competitionMemberRole.count({
-          where: { memberId: previousMemberId },
-        })
-        if (remainingRoles === 0) {
-          await tx.competitionMember.delete({
-            where: { id: previousMemberId },
-          })
-        }
-      }
-    }
+    for (const teamId of teamIds) await setTeamRepresentative(tx, id, teamId, user.id, { actorId: session.user.id })
 
     return tx.teamRepresentative.findMany({
       where: { competitionId: id, teamId: { in: teamIds } },
@@ -179,7 +115,8 @@ async function handlePOST(
       },
       orderBy: { team: { code: "asc" } },
     })
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  await deliverPendingNotificationsSafely()
 
   return NextResponse.json(assignments)
 }
@@ -207,41 +144,9 @@ async function handleDELETE(
   }
 
   await prisma.$transaction(async (tx) => {
-    const assignment = await tx.teamRepresentative.findFirst({
-      where: { competitionId: id, teamId: body.teamId },
-      select: { memberId: true },
-    })
-    await tx.team.updateMany({
-      where: { competitionId: id, id: body.teamId },
-      data: { pendingRepresentativeEmail: null, pendingRepresentativeName: null },
-    })
-    if (!assignment) return
-
-    await tx.teamRepresentative.deleteMany({
-      where: { competitionId: id, teamId: body.teamId },
-    })
-
-    const representedTeamCount = await tx.teamRepresentative.count({
-      where: { memberId: assignment.memberId },
-    })
-    if (representedTeamCount === 0) {
-      await tx.competitionMemberRole.deleteMany({
-        where: {
-          memberId: assignment.memberId,
-          role: "REPRESENTATIVE",
-        },
-      })
-    }
-
-    const roleCount = await tx.competitionMemberRole.count({
-      where: { memberId: assignment.memberId },
-    })
-    if (roleCount === 0 && representedTeamCount === 0) {
-      await tx.competitionMember.delete({
-        where: { id: assignment.memberId },
-      })
-    }
-  })
+    const team = await tx.team.findFirst({ where: { id: body.teamId, competitionId: id } })
+    if (team) await setTeamRepresentative(tx, id, team.id, null, { actorId: session.user.id })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   return NextResponse.json({ ok: true })
 }
 

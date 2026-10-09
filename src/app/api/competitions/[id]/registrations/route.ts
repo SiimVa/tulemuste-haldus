@@ -1,3 +1,5 @@
+import { applicationRepresentativeIdentity, teamRepresentativeIdentity, currentRepresentativeAnswers } from "@/lib/representativeIdentity"
+import { isRepresentativeFormField } from "@/lib/registrationForm"
 import { setSecurityTargets } from "@/lib/security.server"
 import { organizerTeamAnswers } from "@/lib/organizerRegistration"
 import { saveOrganizerRegistration, OrganizerRegistrationError } from "@/lib/organizerRegistration.server"
@@ -149,6 +151,7 @@ async function handleGET(
       include: {
         class: { select: { id: true, name: true } },
         submittedBy: { select: { id: true, name: true, email: true } },
+        representative: { select: { id: true, name: true, email: true } },
         team: { select: { id: true, code: true } },
         events: {
           orderBy: { createdAt: "desc" },
@@ -210,33 +213,41 @@ async function handleGET(
     teamComposition: { representativeRequired: competition.representativeRequired, captainRequired: competition.captainRequired, memberRoles: parseTeamMemberRoles(competition.teamMemberRoles) },
     memberFormFields: registrationFormFields.filter((field) => field.showInRegistration && field.type === "MEMBER_LIST").map(toFormFieldDefinition),
     applications: applications.map(({ fieldValues, ...application }) => {
+      const team = teams.find(team => team.id === application.teamId)
+      const currentRepresentative = team ? teamRepresentativeIdentity(team) : applicationRepresentativeIdentity(application)
+      const currentValues = team ? team.formValues : fieldValues
+      const currentAnswers = currentRepresentativeAnswers(Object.fromEntries(currentValues.flatMap(({ field, value }) => {
+        const parsed = parseFormAnswer(value)
+        return parsed === undefined ? [] : [[field.key, parsed]]
+      })), currentRepresentative)
       const sortedValues = fieldValues.sort(
         (a, b) => a.field.order - b.field.order
       )
       return {
         ...application,
-        answers: Object.fromEntries(
+        currentRepresentative,
+        answers: currentRepresentativeAnswers(Object.fromEntries(
           sortedValues.flatMap(({ field, value }) => {
             const answer = parseFormAnswer(value)
             return answer === undefined ? [] : [[field.key, answer]]
           })
-        ),
+        ), currentRepresentative),
         details: sortedValues.map(({ field, value }) => {
           const definition = toFormFieldDefinition(field)
           return {
             fieldId: field.id,
             label: field.label,
-            value: formatFormAnswer(definition, parseFormAnswer(value)),
+            value: formatFormAnswer(definition, isRepresentativeFormField(field.key) ? currentAnswers[field.key] : parseFormAnswer(value)),
           }
         }),
       }
     }),
     legacyTeams: teams.map(({ formValues, ...team }) => ({
       ...team,
-      answers: organizerTeamAnswers(registrationFormFields.map(toFormFieldDefinition), Object.fromEntries(formValues.flatMap(({ field, value }) => {
+      answers: organizerTeamAnswers(registrationFormFields.map(toFormFieldDefinition), currentRepresentativeAnswers(Object.fromEntries(formValues.flatMap(({ field, value }) => {
         const answer = parseFormAnswer(value)
         return answer === undefined ? [] : [[field.key, answer]]
-      })), team.members),
+      })), teamRepresentativeIdentity(team)), team.members),
       details: formValues
         .sort((a, b) => a.field.order - b.field.order)
         .map(({ field, value }) => {
@@ -246,7 +257,12 @@ async function handleGET(
             label: field.label,
             value: formatFormAnswer(
               definition,
-              parseFormAnswer(value)
+              isRepresentativeFormField(field.key)
+                ? currentRepresentativeAnswers(Object.fromEntries(formValues.flatMap(item => {
+                    const parsed = parseFormAnswer(item.value)
+                    return parsed === undefined ? [] : [[item.field.key, parsed]]
+                  })), teamRepresentativeIdentity(team))[field.key]
+                : parseFormAnswer(value)
             ),
           }
         }),

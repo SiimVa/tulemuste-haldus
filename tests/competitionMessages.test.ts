@@ -60,14 +60,12 @@ const contacts = collectMessageContacts({
 
 test("kontaktid: avaldused, võistkonnad, esindajad ja liikmed", () => {
   assert.deepEqual(contacts.map((contact) => [contact.teamKey, contact.role, contact.email, contact.group]), [
-    ["application:a", "REPRESENTATIVE", "esindaja.a@example.com", "CONFIRMED"],
     ["application:a", "REPRESENTATIVE", "esitaja-a@example.com", "CONFIRMED"],
     ["application:a", "MEMBER", "mari@example.com", "CONFIRMED"],
     ["application:a", "MEMBER", "vigane@", "CONFIRMED"],
     ["application:w", "REPRESENTATIVE", "esitaja-w@example.com", "WAITLISTED"],
     ["application:w", "MEMBER", "ootaja@example.com", "WAITLISTED"],
     ["team:t1", "REPRESENTATIVE", "esindaja-t1@example.com", "TEAM"],
-    ["team:t1", "REPRESENTATIVE", "uus-esindaja@example.com", "TEAM"],
     ["team:t1", "MEMBER", "mari@example.com", "TEAM"],
     ["team:t1", "MEMBER", "kati@example.com", "TEAM"],
   ])
@@ -77,19 +75,17 @@ test("saajad: vaikimisi grupid, ühele aadressile üks kiri, vigased välja", ()
   const { recipients, invalid } = selectMessageRecipients(contacts, { groups: DEFAULT_MESSAGE_GROUPS, roles: ["REPRESENTATIVE", "MEMBER"], classes: null })
   assert.deepEqual(invalid, ["vigane@"])
   assert.deepEqual(recipients.map((recipient) => [recipient.email, recipient.contexts]), [
-    ["esindaja.a@example.com", ["Avaldus a (esindaja)"]],
     ["esitaja-a@example.com", ["Avaldus a (esindaja)"]],
     // Mari on liige kahes registreeringus: üks kiri, mõlemad põhjused.
     ["mari@example.com", ["Avaldus a (liige)", "Võistkond t1 (liige)"]],
     ["esindaja-t1@example.com", ["Võistkond t1 (esindaja)"]],
-    ["uus-esindaja@example.com", ["Võistkond t1 (esindaja)"]],
     ["kati@example.com", ["Võistkond t1 (liige)"]],
   ])
 })
 
 test("saajad: rolli, oleku ja klassi filter", () => {
   const representatives = selectMessageRecipients(contacts, { groups: ["TEAM"], roles: ["REPRESENTATIVE"], classes: null })
-  assert.deepEqual(representatives.recipients.map((recipient) => recipient.email), ["esindaja-t1@example.com", "uus-esindaja@example.com"])
+  assert.deepEqual(representatives.recipients.map((recipient) => recipient.email), ["esindaja-t1@example.com"])
   const waitlist = selectMessageRecipients(contacts, { groups: ["WAITLISTED"], roles: ["REPRESENTATIVE", "MEMBER"], classes: [NO_CLASS] })
   assert.deepEqual(waitlist.recipients.map((recipient) => recipient.email), ["esitaja-w@example.com", "ootaja@example.com"])
   const kt = selectMessageRecipients(contacts, { groups: ["TEAM", "CONFIRMED", "WAITLISTED"], roles: ["MEMBER"], classes: ["KT"] })
@@ -122,4 +118,13 @@ test("kirja sisu: lõigud, lingid, varjestus ja jalus", () => {
   assert.match(content.html, /<p[^>]*>Tere!<br>Start on kell 10\.<\/p><p[^>]*>Vaata <a href="https:\/\/www\.matkamang\.ee\/info"/)
   assert.ok(!content.html.includes("<script>"))
   assert.ok(content.html.includes("&lt;script&gt;"))
+})
+
+
+test("esindaja vahetusel ei lisata algset registreerijat ega vana vormikontakti saajateks", () => {
+  const contacts = collectMessageContacts({ fields, teams: [], applications: [
+    application("a", "CONFIRMED", { representative: { name: "Uus", email: "uus@example.com" }, fieldValues: [{ fieldId: "rep-email", value: '"vana@example.com"' }] }),
+    application("b", "WAITLISTED", { pendingRepresentativeEmail: "kontota@example.com", pendingRepresentativeName: "Kontota" }),
+  ] })
+  assert.deepEqual(contacts.map(contact => contact.email), ["uus@example.com", "kontota@example.com"])
 })

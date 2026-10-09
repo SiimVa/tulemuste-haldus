@@ -1,3 +1,4 @@
+import { applicationRepresentativeId } from "@/lib/representativeIdentity"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
@@ -101,7 +102,7 @@ async function updateApplication(
           },
         },
       })
-      if (!application || application.submittedById !== userId) {
+      if (!application || applicationRepresentativeId(application) !== userId) {
         throw new Error("Registreerimisavaldust ei leitud")
       }
       if (
@@ -274,7 +275,7 @@ async function withdrawApplication(applicationId: string, userId: string) {
           },
         },
       })
-      if (!application || application.submittedById !== userId) {
+      if (!application || applicationRepresentativeId(application) !== userId) {
         throw new Error("Registreerimisavaldust ei leitud")
       }
       if (

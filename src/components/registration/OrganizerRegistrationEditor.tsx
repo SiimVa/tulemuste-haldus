@@ -29,7 +29,7 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
   onSaved: () => Promise<void>
   onCancel: () => void
 }) {
-  const [assignRepresentative, setAssignRepresentative] = useState(false)
+  const [assignRepresentative, setAssignRepresentative] = useState(!target.applicationId && !target.teamId && fields.some(field => field.key === REPRESENTATIVE_FORM_FIELD_KEYS.name && field.requiredInRegistration))
   const [representativeName, setRepresentativeName] = useState(target.representativeName ?? "")
   const [representativeEmail, setRepresentativeEmail] = useState(target.representativeEmail ?? "")
   const representative = { name: representativeName.trim(), email: representativeEmail.trim().toLowerCase() }
@@ -52,7 +52,7 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
     try {
       const response = await fetch(`/api/competitions/${competitionId}/registrations`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId: target.applicationId, teamId: target.teamId, teamName: name, classId: classId || null, className, representative: assignRepresentative ? representative : undefined, answers: validated.answers }),
+        body: JSON.stringify({ expectedRepresentativeEmail: target.representativeEmail ?? "", applicationId: target.applicationId, teamId: target.teamId, teamName: name, classId: classId || null, className, representative: assignRepresentative ? representative : undefined, answers: validated.answers }),
       })
       const data = await response.json()
       if (!response.ok) { setError(data.error ?? "Salvestamine ebaõnnestus"); return }
@@ -76,7 +76,7 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
       <legend className="px-1 text-sm font-medium">Võistkonna esindaja</legend>
       {target.representativeEmail && <p className="text-sm text-gray-600">Praegune esindaja: {target.representativeName} · {target.representativeEmail}</p>}
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={assignRepresentative} disabled={saving} onChange={(event) => setAssignRepresentative(event.target.checked)} />
+        <input type="checkbox" checked={assignRepresentative} disabled={saving} onChange={(event) => { setAssignRepresentative(event.target.checked); if (event.target.checked) setAnswers(current => ({ ...current, [REPRESENTATIVE_FORM_FIELD_KEYS.phone]: "" })) }} />
         {target.applicationId || target.teamId ? "Muuda esindajat" : "Määra esindajaks teine inimene"}
       </label>
       {assignRepresentative && <>
@@ -86,10 +86,10 @@ export function OrganizerRegistrationEditor({ competitionId, target, fields, cla
         <label className="block text-sm">Esindaja e-post
           <Input aria-label="Määratava esindaja e-post" type="email" required maxLength={320} value={representativeEmail} disabled={saving} onChange={(event) => setRepresentativeEmail(event.target.value)} />
         </label>
-        <p className="text-xs text-gray-500">Olemasolev konto seotakse kohe. Kui kontot veel pole, saab inimene võistkonnale ligipääsu sama e-postiga sisse logides.</p>
+        <p className="text-xs text-gray-500">Olemasolev konto seotakse kohe. Kui kontot veel pole, saab inimene võistkonnale ligipääsu sama e-postiga sisse logides. Uuele esindajale saadetakse teavitus. Sisesta ka tema telefoninumber.</p>
       </>}
     </fieldset>
-    <DynamicFormFields organizer fields={editableFields.filter((field) => !assignRepresentative || (field.key !== REPRESENTATIVE_FORM_FIELD_KEYS.name && field.key !== REPRESENTATIVE_FORM_FIELD_KEYS.email))} phase="REGISTRATION" values={answers} errors={errors} disabled={saving} teamComposition={includeMandate ? teamComposition : undefined} onChange={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))} />
+    <DynamicFormFields organizer fields={editableFields.filter((field) => field.key !== REPRESENTATIVE_FORM_FIELD_KEYS.name && field.key !== REPRESENTATIVE_FORM_FIELD_KEYS.email)} phase="REGISTRATION" values={answers} errors={errors} disabled={saving} teamComposition={includeMandate ? teamComposition : undefined} onChange={(key, value) => setAnswers((current) => ({ ...current, [key]: value }))} />
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     <div className="flex gap-2">
       <Button type="submit" disabled={saving}>{saving ? "Salvestan..." : "Salvesta võistkond"}</Button>

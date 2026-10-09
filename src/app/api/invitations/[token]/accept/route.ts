@@ -118,6 +118,8 @@ async function handlePOST(
       competitionId: invitation.competitionId,
       userId: session.user.id,
       ...mergedValues,
+      actorId: session.user.id,
+      invitation: { id: invitation.id, tokenHash: invitation.tokenHash, teamIds: invitation.teamIds },
       canManageOrganizers: inviterMayManageOrganizers,
     })
   } catch (error) {
@@ -129,15 +131,6 @@ async function handlePOST(
     }
     throw error
   }
-
-  await prisma.competitionRoleInvitation.updateMany({
-    where: {
-      id: invitation.id,
-      acceptedAt: null,
-      revokedAt: null,
-    },
-    data: { acceptedAt: new Date(), acceptedById: session.user.id },
-  })
 
   return NextResponse.json({
     ok: true,

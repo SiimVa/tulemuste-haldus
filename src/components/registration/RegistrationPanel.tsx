@@ -27,6 +27,7 @@ type Application = {
   submittedAt: string | Date | null
   class: { id: string; name: string } | null
   formValues: FormAnswers
+  readOnly?: boolean
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -92,7 +93,7 @@ export function RegistrationPanel({
     ? undefined
     : applications.find(
         (application) =>
-          application.id === initialApplicationId &&
+          !application.readOnly && application.id === initialApplicationId &&
           canEditRegistrationInPhase(application.status, registrationOpen)
       )
   const [teamName, setTeamName] = useState(initialApplication?.teamName ?? "")
@@ -115,7 +116,7 @@ export function RegistrationPanel({
   const registrationFormAvailable =
     !readOnly &&
     (editingApplication
-      ? canEditRegistrationInPhase(editingApplication.status, registrationOpen)
+      ? !editingApplication.readOnly && canEditRegistrationInPhase(editingApplication.status, registrationOpen)
       : allowCreate && registrationOpen)
 
   function resetForm() {
@@ -266,7 +267,7 @@ export function RegistrationPanel({
                   >
                     {STATUS_LABEL[application.status] ?? application.status}
                   </span>
-                  {!readOnly && canEditRegistrationInPhase(
+                  {!readOnly && !application.readOnly && canEditRegistrationInPhase(
                     application.status,
                     registrationOpen
                   ) && (
@@ -279,7 +280,7 @@ export function RegistrationPanel({
                       Muuda
                     </button>
                   )}
-                  {!readOnly && registrationOpen &&
+                  {!readOnly && !application.readOnly && registrationOpen &&
                     canWithdrawRegistration(application.status) && (
                       <button
                         type="button"

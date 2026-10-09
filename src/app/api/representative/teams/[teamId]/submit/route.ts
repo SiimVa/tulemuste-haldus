@@ -1,3 +1,4 @@
+import { claimTeamWorkflow, TeamRepresentativeChangedError } from "@/lib/teamRepresentatives.server"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
 import {
@@ -46,7 +47,7 @@ async function handlePOST(
       members: {
         select: { role: true, isCaptain: true, assignmentRole: true },
       },
-      representative: { select: { id: true } },
+      representative: { select: { id: true, memberId: true } },
       formValues: { select: { fieldId: true, value: true } },
       registrationApplication: { select: { id: true } },
       competition: {
@@ -139,6 +140,7 @@ async function handlePOST(
     const nextStatus = workflowStatusAfterSubmission(approvalMode)
     const submittedAt = new Date()
     const updated = await prisma.$transaction(async (tx) => {
+    await claimTeamWorkflow(tx, team)
       const result = await tx.team.update({
         where: { id: teamId },
         data: {
@@ -237,6 +239,7 @@ async function handlePOST(
   const nextStatus = workflowStatusAfterSubmission(approvalMode)
   const submittedAt = new Date()
   const updated = await prisma.$transaction(async (tx) => {
+    await claimTeamWorkflow(tx, team)
     const result = await tx.team.update({
       where: { id: teamId },
       data: {
@@ -258,4 +261,10 @@ async function handlePOST(
   return NextResponse.json(updated)
 }
 
-export const POST = withSecurityRoute("/api/representative/teams/[teamId]/submit", handlePOST)
+export const POST = withSecurityRoute<{ teamId: string }>("/api/representative/teams/[teamId]/submit", async (...args) => {
+  try { return await handlePOST(...args) }
+  catch (error) {
+    if (error instanceof TeamRepresentativeChangedError) return NextResponse.json({ error: error.message }, { status: 409 })
+    throw error
+  }
+})

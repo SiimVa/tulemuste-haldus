@@ -136,6 +136,7 @@ async function createApplication(
         data: {
           competitionId,
           submittedById,
+          representativeId: submittedById,
           teamName,
           classId,
           status: initialStatus,

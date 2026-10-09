@@ -1,3 +1,6 @@
+import { claimTeamWorkflow, TeamRepresentativeChangedError } from "@/lib/teamRepresentatives.server"
+import { teamRepresentativeIdentity, currentRepresentativeAnswers } from "@/lib/representativeIdentity"
+import { withRepresentativeIdentity } from "@/lib/registrationForm"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { Prisma } from "@prisma/client"
 import { NextResponse } from "next/server"
@@ -92,7 +95,7 @@ const teamInclude = {
   formValues: {
     select: { fieldId: true, value: true },
   },
-  representative: { select: { id: true } },
+  representative: { include: { member: { include: { user: { select: { id: true, name: true, email: true } } } } } },
   registrationApplication: { select: { id: true } },
 } satisfies Prisma.TeamInclude
 
@@ -123,7 +126,7 @@ function responseTeam(team: TeamWithForm) {
     ...team,
     competition,
     formFields: fields,
-    formValues,
+    formValues: currentRepresentativeAnswers(formValues, teamRepresentativeIdentity(team)),
     composition: {
       representativeRequired,
       captainRequired,
@@ -233,13 +236,16 @@ async function handlePATCH(
       )
     }
 
-    const updated = await prisma.team.update({
+    const updated = await prisma.$transaction(async tx => {
+      await claimTeamWorkflow(tx, team)
+      return tx.team.update({
       where: { id: teamId },
       data: {
         name,
         class: teamClass || null,
       },
       include: teamInclude,
+      })
     })
     return NextResponse.json(responseTeam(updated))
   }
@@ -290,7 +296,7 @@ async function handlePATCH(
   }
   const validated = validateFormAnswers(
     formFields,
-    answersForValidation,
+    withRepresentativeIdentity(answersForValidation, teamRepresentativeIdentity(team) ?? { name: "", email: "" }),
     "MANDATE"
   )
   const firstError = Object.entries(validated.errors)[0]
@@ -390,6 +396,7 @@ async function handlePATCH(
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      await claimTeamWorkflow(tx, team)
       const resolvedMembers = await resolveTeamMemberAccounts(
         tx,
         team.competitionId,
@@ -474,4 +481,10 @@ async function handlePATCH(
 }
 
 export const GET = withSecurityRoute("/api/representative/teams/[teamId]", handleGET)
-export const PATCH = withSecurityRoute("/api/representative/teams/[teamId]", handlePATCH)
+export const PATCH = withSecurityRoute<{ teamId: string }>("/api/representative/teams/[teamId]", async (...args) => {
+  try { return await handlePATCH(...args) }
+  catch (error) {
+    if (error instanceof TeamRepresentativeChangedError) return NextResponse.json({ error: error.message }, { status: 409 })
+    throw error
+  }
+})

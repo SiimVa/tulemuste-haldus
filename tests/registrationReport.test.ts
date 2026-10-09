@@ -138,7 +138,7 @@ test("esindaja andmed on ühes kohas ega kordu vormiveergudena", () => {
   const result = buildRegistrationReport({
     name: "Esindajad", phase: "REGISTRATION", fields: [...fields, ...systemFields],
     applications: [
-      { ...application, fieldValues: [...application.fieldValues, ...repAnswers("Robi Abel", "robi@example.com", "5555 1234")] },
+      { ...application, representative: { name: "Robi Abel", email: "robi@example.com" }, fieldValues: [...application.fieldValues, ...repAnswers("Robi Abel", "robi@example.com", "5555 1234")] },
       { ...application, id: "b", teamId: null, team: null, pendingRepresentativeName: "Kontota Esindaja", pendingRepresentativeEmail: "kontota@example.com", fieldValues: [] },
     ],
     teams: [{ ...team, id: "legacy", formValues: repAnswers("Vana nimi", "vana@example.com", "5000 0000") }],
@@ -148,8 +148,8 @@ test("esindaja andmed on ühes kohas ega kordu vormiveergudena", () => {
   assert.ok(!result.columns.some(column => column.label === "Esitaja / esindaja" || column.label === "E-post"))
   assert.deepEqual([result.rows[0].cells.representative, result.rows[0].cells.email, result.rows[0].cells.phone], ["Robi Abel", "robi@example.com", "5555 1234"])
   assert.deepEqual([result.rows[1].cells.representative, result.rows[1].cells.email, result.rows[1].cells.phone], ["Kontota Esindaja", "kontota@example.com", ""])
-  // Võistkonnaga seotud konto on esindaja; telefon tuleb vormist.
-  assert.deepEqual([result.rows[2].cells.representative, result.rows[2].cells.email, result.rows[2].cells.phone], ["Esindaja", "esindaja@example.com", "5000 0000"])
+  // Võistkonnaga seotud konto on esindaja; vana esindaja telefoni ei kanta üle.
+  assert.deepEqual([result.rows[2].cells.representative, result.rows[2].cells.email, result.rows[2].cells.phone], ["Esindaja", "esindaja@example.com", ""])
   assert.equal(REPRESENTATIVE_FORM_FIELD_KEYS.phone, systemFields[2].key)
 })
 
@@ -194,4 +194,14 @@ test("mandaadi koosseis saab telefoni ja sünniaja liikmete vormivastusest", () 
     ["01", "Öökullid", "Noored", "Esitatud", 1, "Mari Maasikas", "mari@example.com", "5111", "06.05.2011", "Jah", "", "Võistleja"],
     ["01", "Öökullid", "Noored", "Esitatud", 2, "Jüri", "jyri@example.com", "5222", "", "", "Autojuht", "Tugiliige"],
   ])
+})
+
+
+test("registreerimise ja mandaadi aruanne näitavad sama praegust esindajat", () => {
+  const current = { ...team, formValues: repAnswers("Esindaja", "esindaja@example.com", "51234567") }
+  const old = { ...application, fieldValues: repAnswers("Registreerija", "vana@example.com", "50000000") }
+  for (const phase of ["REGISTRATION", "MANDATE"] as const) {
+    const result = buildRegistrationReport({ name: "Vahetus", phase, fields: systemFields, applications: [old], teams: [current] })
+    assert.deepEqual([result.rows[0].cells.representative, result.rows[0].cells.email, result.rows[0].cells.phone], ["Esindaja", "esindaja@example.com", "51234567"])
+  }
 })

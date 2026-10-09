@@ -1,3 +1,4 @@
+import { applicationRepresentativeId, applicationRepresentativeWhere, applicationRepresentativeIdentity, teamRepresentativeIdentity, currentRepresentativeAnswers } from "@/lib/representativeIdentity"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { RegistrationPanel } from "@/components/registration/RegistrationPanel"
@@ -18,10 +19,15 @@ export default async function OwnRegistrationPage({
   // The submitter keeps access to their own application even when public
   // registration is disabled or the invitation link has been rotated.
   const application = await prisma.registrationApplication.findFirst({
-    where: { id: applicationId, submittedById: session.user.id },
+    where: { id: applicationId, OR: [{ submittedById: session.user.id }, applicationRepresentativeWhere(session.user.id), { team: { representative: { member: { userId: session.user.id } } } }] },
     select: {
       id: true,
+      representativeId: true, submittedById: true, pendingRepresentativeEmail: true,
       teamId: true,
+      pendingRepresentativeName: true,
+      representative: { select: { id: true, name: true, email: true } },
+      submittedBy: { select: { id: true, name: true, email: true } },
+      team: { include: { representative: { include: { member: { include: { user: { select: { id: true, name: true, email: true } } } } } } } },
       teamName: true,
       status: true,
       allocationReason: true,
@@ -58,8 +64,14 @@ export default async function OwnRegistrationPage({
   })
   if (!application) notFound()
 
-  const { competition, fieldValues, teamId, ...registration } = application
+  const { competition, fieldValues, teamId } = application
+  const registration = {
+    id: application.id, teamName: application.teamName, status: application.status,
+    allocationReason: application.allocationReason, waitlistPosition: application.waitlistPosition,
+    submittedAt: application.submittedAt, class: application.class,
+  }
   const readOnly = Boolean(
+    applicationRepresentativeId(application) !== session.user.id ||
     teamId ||
     competition.registrationFinalizedAt ||
     competition.status !== "SETUP"
@@ -77,8 +89,8 @@ export default async function OwnRegistrationPage({
         </p>
         {readOnly && (
           <p className="mt-2 text-sm text-gray-500">
-            Registreerimisetapp on lõppenud. Mandaadi ja tulemused leiad oma
-            töölaualt.
+            {(teamId || competition.registrationFinalizedAt || competition.status !== "SETUP") && "Registreerimisetapp on lõppenud. "}
+            See on sinu registreerimisavalduse vaade. Praeguseid võistkonna andmeid haldab määratud esindaja oma töölaual.
           </p>
         )}
       </div>
@@ -101,12 +113,12 @@ export default async function OwnRegistrationPage({
         applications={[
           {
             ...registration,
-            formValues: Object.fromEntries(
+            formValues: currentRepresentativeAnswers(Object.fromEntries(
               fieldValues.flatMap(({ field, value }) => {
                 const parsed = parseFormAnswer(value)
                 return parsed === undefined ? [] : [[field.key, parsed]]
               })
-            ),
+            ), application.team ? teamRepresentativeIdentity(application.team) : applicationRepresentativeIdentity(application)),
           },
         ]}
       />
