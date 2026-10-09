@@ -538,13 +538,14 @@ def render(result):
         public_workload = f"Avalikud SSR lehed ja RSC värskendus iga {fmt(tested_scope['publicRefreshSeconds'])} s."
     else:
         public_workload = "Avaliku värskenduse protokoll ootab mõõtefailide kinnitust." if refresh_mode is None else "Mõõtefailides on eri avaliku värskenduse protokollid."
+    successful_run = main["validForCapacity"] and main["allDurationsConsistentWithPlan"] and main["allIndividualTargetsObserved"] and all(run["passedThresholds"] is True and run["k6ExitCode"] == 0 for run in main["runs"]) and tested_scope["matchesAuthorizedWorkload"] and refresh_mode in ("json", "rsc") and result["baseline"].get("passed") is True and final.get("passed") is True and final.get("scopeCountsMatch") is True and smoke.get("judgeClientIdentities", {}).get("distinctClientsForAllCompetitions") is True and result["acknowledgmentCoverage"]["verifierIncludesAllSummaries"]
     if main["validForCapacity"] and not main["allIndividualTargetsObserved"]:
         headline = "Sihtkoormus jäi saavutamata"
         outcome = "Põhitesti mõõdetud tipud jäid igas võistluses alla 180 kasutaja. Lõppseisu punktid ja kirjutuste püsimine kontrollitakse eraldi."
     elif not final["available"] or not main["runs"]:
         headline = "Lõpptulemus ootab mõõtefaile"
         outcome = "Raport näitab olemasolevaid andmeid; lõpetamata kontrolli ei käsitleta edukana."
-    elif main["validForCapacity"] and main["allDurationsConsistentWithPlan"] and main["allIndividualTargetsObserved"] and all(run["passedThresholds"] is True and run["k6ExitCode"] == 0 for run in main["runs"]) and tested_scope["matchesAuthorizedWorkload"] and refresh_mode in ("json", "rsc") and result["baseline"].get("passed") is True and final.get("passed") is True and final.get("scopeCountsMatch") is True and smoke.get("judgeClientIdentities", {}).get("distinctClientsForAllCompetitions") is True and result["acknowledgmentCoverage"]["verifierIncludesAllSummaries"]:
+    elif successful_run:
         headline = "Neli koormusprofiili ja andmekontroll läbisid testi"
         outcome = "Iga võistluse plaanitud 180 kasutaja profiil lõpetati. Tulemuste koondhinnang kehtib allpool kirjeldatud HTTP töökoormusele."
     else:
@@ -646,8 +647,13 @@ def render(result):
                   "Neli piirkondlikku väljumispunkti ei esinda 720 sõltumatut mobiiliühendust. Mõõdetud tipud ei määra rakenduse absoluutset mahupiiri.</p>")
     pieces.append("<p>Kohtunikud kirjutavad igaüks oma kontrollpunkti. Sama kontrollpunkti samaaegsete kirjutuste taluvust see profiil ei kinnita.</p>")
     pieces.append("<p>HTTP waiting ja receiving eristavad vastuse ootamist ning vastuse vastuvõtmist. Pikk receiving võib viidata suure vastuse või voogedastuse probleemile; "
-                  "see ei tõenda võrgu ega serveri konkreetset algpõhjust. Järgmine samm on edetabeli SSR, JSON ja RSC vastuste mahu ning serveri töö profileerimine, "
-                  "seejärel kordustest ning päris mobiilibrauseri mõõtmine.</p>")
+                  "see ei tõenda võrgu ega serveri konkreetset algpõhjust.</p>")
+    if successful_run:
+        pieces.append("<p>Kirjeldatud HTTP koormusprofiilid ja sõltumatu andmekontroll läbisid testi. "
+                      "Brauseri varade laadimine, renderdamine ning tegelike mobiilsidevõrkude tingimused jäävad selle kinnituse ulatusest välja.</p>")
+    else:
+        pieces.append("<p>Piirangute täpsustamiseks tuleb profileerida edetabeli SSR, JSON ja RSC vastuste mahtu ning serveri tööd, "
+                      "seejärel korrata koormustesti ja mõõta päris mobiilibrauserit.</p>")
     if final.get("acknowledgments", {}).get("failedAttemptsPersisted", 0) or (main["counts"].get("http5xx") or 0):
         pieces.append("<p>Salvestuste tõrgete korral tuleb kontrollida sama kontrollpunkti samaaegseid ümberarvutusi. "
                       "Paranduse suund on salvestuse ja punktiarvutuse atomaarne tehing koos kontrollpunkti kaupa sünkroonimisega, "
