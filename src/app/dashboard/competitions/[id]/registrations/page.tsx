@@ -60,6 +60,7 @@ type RegistrationApplication = {
   waitlistPosition: number | null
   submittedAt: string | null
   class: { id: string; name: string } | null
+  currentRepresentative: { id?: string; name: string; email: string } | null
   submittedBy: { id: string; name: string; email: string }
   team: { id: string; code: string } | null
   pendingRepresentativeEmail: string | null
@@ -543,11 +544,12 @@ export default function RegistrationsPage({
                   </span>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
-                  {application.class ? `${application.class.name} · ` : ""}
-                  {application.pendingRepresentativeName ?? application.submittedBy.name} ·{" "}
-                  {application.pendingRepresentativeEmail ?? application.submittedBy.email}
-                  {application.pendingRepresentativeEmail && !application.team && " · Konto sidumise ootel"}
+                  {application.class ? `${application.class.name} · ` : ""}Praegune esindaja:{" "}
+                  {application.currentRepresentative?.name ?? "Esindaja määramata"} ·{" "}
+                  {application.currentRepresentative?.email ?? ""}
+                  {application.currentRepresentative && !application.currentRepresentative.id && " · Konto sidumise ootel"}
                 </p>
+                <p className="mt-1 text-xs text-gray-500">Registreeris: {application.submittedBy.name}</p>
                 {application.allocationReason && (
                   <p className="text-xs text-blue-700 mt-1">
                     {application.allocationReason}
@@ -578,7 +580,7 @@ export default function RegistrationsPage({
                     setEditingApplicationId(null)
                     const team = teams.find((item) => item.id === application.team?.id)
                     if (team) editTeam(team)
-                    else setEditor({ applicationId: application.id, teamName: application.teamName, classId: application.class?.id, answers: application.answers, representativeName: application.pendingRepresentativeName ?? application.submittedBy.name, representativeEmail: application.pendingRepresentativeEmail ?? application.submittedBy.email })
+                    else setEditor({ applicationId: application.id, teamName: application.teamName, classId: application.class?.id, answers: application.answers, representativeName: application.currentRepresentative?.name ?? "Esindaja määramata", representativeEmail: application.currentRepresentative?.email ?? "" })
                   }}>Muuda võistkonda</Button>
                 )}
                 {editingApplicationId === application.id ? (

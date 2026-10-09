@@ -56,6 +56,8 @@ async function handleGET(
     where: { id },
     select: {
       organizerId: true,
+      teams: { where: { pendingRepresentativeEmail: { not: null }, representative: null }, select: { id: true, name: true, pendingRepresentativeName: true, pendingRepresentativeEmail: true } },
+      registrationApplications: { where: { teamId: null, pendingRepresentativeEmail: { not: null }, status: { notIn: ["REJECTED", "WITHDRAWN"] } }, select: { id: true, teamName: true, pendingRepresentativeName: true, pendingRepresentativeEmail: true } },
       organizer: { select: { id: true, name: true, email: true } },
       members: {
         include: competitionMemberRoleInclude,
@@ -90,6 +92,10 @@ async function handleGET(
   return NextResponse.json({
     canManageOrganizers,
     canClearOwner: session.user.role === "ADMIN",
+    pendingRepresentatives: [
+      ...competition.teams.map(team => ({ id: team.id, teamName: team.name, name: team.pendingRepresentativeName, email: team.pendingRepresentativeEmail })),
+      ...competition.registrationApplications.map(application => ({ id: application.id, teamName: application.teamName, name: application.pendingRepresentativeName, email: application.pendingRepresentativeEmail })),
+    ],
     owner,
     members: competition.members.filter(
       ({ userId }) => userId !== competition.organizerId
@@ -183,6 +189,7 @@ async function handlePUT(
   setSecurityTargets({ competitionId: id, userId: user.id })
   try {
     const member = await updateCompetitionMemberRoles({
+      actorId: session.user.id,
       competitionId: id,
       userId: user.id,
       roles,

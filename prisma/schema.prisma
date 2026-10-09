@@ -89,7 +89,8 @@ model User {
   enteredResults           Result[]
   accounts                 Account[]
   sessions                 Session[]
-  registrationApplications RegistrationApplication[]
+  registrationApplications RegistrationApplication[] @relation("ApplicationSubmitter")
+  representedApplications RegistrationApplication[] @relation("ApplicationRepresentative")
   registrationEvents       RegistrationApplicationEvent[] @relation("RegistrationEventActor")
   competitionPhaseEvents   CompetitionPhaseEvent[]
   teamMemberships          TeamMember[]
@@ -318,8 +319,8 @@ model LeaderboardFreeze {
 // salvestatakse samas tehingus; e-kirja saatmine toimub alles pärast commit'i.
 model Notification {
   id                 String       @id @default(cuid())
-  userId             String
-  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String?
+  user               User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   competitionId      String?
   competition        Competition? @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   type               String
@@ -372,7 +373,9 @@ model RegistrationApplication {
   pendingRepresentativeEmail String?
   pendingRepresentativeName  String?
   submittedById    String
-  submittedBy      User              @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedBy      User              @relation("ApplicationSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  representativeId String?
+  representative User? @relation("ApplicationRepresentative", fields: [representativeId], references: [id], onDelete: Restrict)
   teamName         String
   classId          String?
   class            CompetitionClass? @relation(fields: [classId], references: [id], onDelete: Restrict)
@@ -393,6 +396,7 @@ model RegistrationApplication {
   @@index([competitionId, status, submittedAt])
   @@index([competitionId, status, waitlistPosition], map: "RegistrationApplication_waitlist_order_idx")
   @@index([submittedById, createdAt])
+  @@index([representativeId])
   @@index([pendingRepresentativeEmail])
 }
 

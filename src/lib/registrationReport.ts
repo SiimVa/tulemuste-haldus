@@ -1,3 +1,4 @@
+import { applicationRepresentativeIdentity, teamRepresentativeIdentity, currentRepresentativeAnswers, type RepresentativeIdentity } from "./representativeIdentity"
 import { csvRow } from "./csv"
 import {
   REPRESENTATIVE_FORM_FIELD_KEYS,
@@ -38,6 +39,7 @@ export type ReportView = "teams" | "summary" | "members"
 export type ReportTable = { columns: ReportColumn[]; rows: Pick<ReportRow, "id" | "cells">[] }
 type Values = { fieldId: string; value: string }[]
 export type ReportApplication = {
+  representative?: RepresentativeIdentity | null
   pendingRepresentativeName?: string | null; pendingRepresentativeEmail?: string | null
   id: string; teamName: string; status: string; teamId: string | null
   class: { name: string } | null; team: { code: string } | null
@@ -147,10 +149,6 @@ function teamMembers(team: ReportTeam, answered: ReportMember[]): ReportMember[]
   })
 }
 
-function representativeAnswer(answers: ParsedAnswers, key: string): string {
-  return text(answers.byKey[key])
-}
-
 export function buildRegistrationReport(input: {
   name: string; phase: FormPhase; fields: FormFieldDefinition[]; applications: ReportApplication[]; teams: ReportTeam[]
 }): RegistrationReport {
@@ -179,14 +177,17 @@ export function buildRegistrationReport(input: {
   const rows: ReportRow[] = mandate ? [] : input.applications.map(application => {
     const answers = parseAnswers(input.fields, application.fieldValues)
     const members = answeredMembers(memberFields, answers)
+    const currentTeam = input.teams.find(team => team.id === application.teamId)
+    const identity = currentTeam ? teamRepresentativeIdentity(currentTeam) : applicationRepresentativeIdentity(application)
+    const contacts = currentRepresentativeAnswers(currentTeam ? parseAnswers(input.fields, currentTeam.formValues).byKey : answers.byKey, identity)
     return {
       id: `application:${application.id}`, status: application.status, className: application.class?.name ?? "", members,
       cells: {
         code: application.team?.code ?? "", name: application.teamName, class: application.class?.name ?? "",
         status: REPORT_STATUS_LABELS[application.status] ?? application.status,
-        representative: representativeAnswer(answers, REPRESENTATIVE_FORM_FIELD_KEYS.name) || application.pendingRepresentativeName || application.submittedBy.name,
-        email: representativeAnswer(answers, REPRESENTATIVE_FORM_FIELD_KEYS.email) || application.pendingRepresentativeEmail || application.submittedBy.email,
-        phone: representativeAnswer(answers, REPRESENTATIVE_FORM_FIELD_KEYS.phone),
+        representative: text(contacts[REPRESENTATIVE_FORM_FIELD_KEYS.name]),
+        email: text(contacts[REPRESENTATIVE_FORM_FIELD_KEYS.email]),
+        phone: text(contacts[REPRESENTATIVE_FORM_FIELD_KEYS.phone]),
         submittedAt: date(application.submittedAt), note: application.allocationReason ?? "", waitlist: application.waitlistPosition ?? "",
         memberCount: members.length, members: memberNames(members),
         ...formCells(formFields, answers),
@@ -198,15 +199,16 @@ export function buildRegistrationReport(input: {
     if (!mandate && linkedTeams.has(team.id)) continue
     const status = mandate ? team.mandateStatus : team.registrationStatus
     const answers = parseAnswers(input.fields, team.formValues)
+    const contacts = currentRepresentativeAnswers(answers.byKey, teamRepresentativeIdentity(team))
     const answered = answeredMembers(mandate ? allMemberFields : memberFields, answers)
     const members = mandate || answered.length === 0 ? teamMembers(team, answered) : answered
     rows.push({
       id: `team:${team.id}`, status, className: team.class ?? "", members,
       cells: {
         code: team.code, name: team.name, class: team.class ?? "", status: REPORT_STATUS_LABELS[status] ?? status,
-        representative: team.representative?.member.user.name ?? team.pendingRepresentativeName ?? representativeAnswer(answers, REPRESENTATIVE_FORM_FIELD_KEYS.name),
-        email: team.representative?.member.user.email ?? team.pendingRepresentativeEmail ?? representativeAnswer(answers, REPRESENTATIVE_FORM_FIELD_KEYS.email),
-        phone: representativeAnswer(answers, REPRESENTATIVE_FORM_FIELD_KEYS.phone),
+        representative: text(contacts[REPRESENTATIVE_FORM_FIELD_KEYS.name]),
+        email: text(contacts[REPRESENTATIVE_FORM_FIELD_KEYS.email]),
+        phone: text(contacts[REPRESENTATIVE_FORM_FIELD_KEYS.phone]),
         submittedAt: date(mandate ? team.mandateSubmittedAt : team.registrationSubmittedAt),
         note: (mandate ? team.mandateReviewNote : team.registrationReviewNote) ?? "", waitlist: "",
         memberCount: members.length, members: memberNames(members),

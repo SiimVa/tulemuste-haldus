@@ -1,5 +1,5 @@
+import { applicationRepresentativeIdentity, type RepresentativeIdentity } from "./representativeIdentity"
 import {
-  REPRESENTATIVE_FORM_FIELD_KEYS,
   isFormFieldVisible,
   parseFormAnswer,
   type FormAnswer,
@@ -36,6 +36,7 @@ export const NO_CLASS = ""
 
 type Values = { fieldId: string; value: string }[]
 export type MessageApplication = {
+  representative?: RepresentativeIdentity | null
   id: string
   teamName: string
   status: string
@@ -79,7 +80,6 @@ export function isValidMessageEmail(value: string): boolean {
   return value.length <= 254 && EMAIL_PATTERN.test(value)
 }
 
-const text = (value: FormAnswer | undefined) => (typeof value === "string" ? value.trim() : "")
 const isMember = (value: unknown): value is MemberAnswer =>
   typeof value === "object" && value !== null && typeof (value as MemberAnswer).name === "string"
 
@@ -121,16 +121,15 @@ export function collectMessageContacts(input: { fields: FormFieldDefinition[]; a
   for (const application of input.applications) {
     const group = applicationGroup(application.status)
     if (!group || application.teamId) continue
-    const parsed = answers(input.fields, application.fieldValues)
     const base = { teamKey: `application:${application.id}`, teamName: application.teamName, className: application.className, group }
-    add({ ...base, role: "REPRESENTATIVE", email: text(parsed.byKey[REPRESENTATIVE_FORM_FIELD_KEYS.email]) || application.pendingRepresentativeEmail, name: text(parsed.byKey[REPRESENTATIVE_FORM_FIELD_KEYS.name]) || application.pendingRepresentativeName })
-    add({ ...base, role: "REPRESENTATIVE", email: application.submittedBy.email, name: application.submittedBy.name })
+    const identity = applicationRepresentativeIdentity(application)
+    add({ ...base, role: "REPRESENTATIVE", email: identity.email, name: identity.name })
     for (const member of answeredMembers(input.fields, application.fieldValues)) add({ ...base, role: "MEMBER", email: member.email, name: member.name })
   }
   for (const team of input.teams) {
     const base = { teamKey: `team:${team.id}`, teamName: team.name, className: team.className, group: "TEAM" as const }
     add({ ...base, role: "REPRESENTATIVE", email: team.representative?.email, name: team.representative?.name })
-    add({ ...base, role: "REPRESENTATIVE", email: team.pendingRepresentativeEmail, name: team.pendingRepresentativeName })
+    if (!team.representative) add({ ...base, role: "REPRESENTATIVE", email: team.pendingRepresentativeEmail, name: team.pendingRepresentativeName })
     for (const member of team.members) add({ ...base, role: "MEMBER", email: member.email, name: member.name })
     for (const member of answeredMembers(input.fields, team.formValues)) add({ ...base, role: "MEMBER", email: member.email, name: member.name })
   }

@@ -15,6 +15,7 @@ export async function getRegistrationReport(competitionId: string, phase: FormPh
         pendingRepresentativeName: true, pendingRepresentativeEmail: true,
         id: true, teamName: true, status: true, teamId: true, submittedAt: true, waitlistPosition: true, allocationReason: true,
         class: { select: { name: true } }, team: { select: { code: true } },
+        representative: { select: { name: true, email: true } },
         submittedBy: { select: { name: true, email: true } }, fieldValues: { select: { fieldId: true, value: true } },
       },
     }),

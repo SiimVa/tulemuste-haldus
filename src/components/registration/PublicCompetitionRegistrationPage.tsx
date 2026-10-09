@@ -1,3 +1,4 @@
+import { applicationRepresentativeId, applicationRepresentativeWhere, applicationRepresentativeIdentity, currentRepresentativeAnswers } from "@/lib/representativeIdentity"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { PublicRegistrationList } from "@/components/registration/PublicRegistrationList"
@@ -129,11 +130,15 @@ export async function PublicCompetitionRegistrationPage({
     ? await prisma.registrationApplication.findMany({
         where: {
           competitionId: competition.id,
-          submittedById: session.user.id,
+          OR: [{ submittedById: session.user.id }, applicationRepresentativeWhere(session.user.id)],
         },
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
+          representativeId: true, submittedById: true, pendingRepresentativeEmail: true, pendingRepresentativeName: true, teamId: true,
+          representative: { select: { id: true, name: true, email: true } },
+          submittedBy: { select: { id: true, name: true, email: true } },
+
           teamName: true,
           status: true,
           allocationReason: true,
@@ -255,12 +260,13 @@ export async function PublicCompetitionRegistrationPage({
             applications={ownApplications.map(
               ({ fieldValues, ...application }) => ({
                 ...application,
-                formValues: Object.fromEntries(
+                readOnly: Boolean(application.teamId) || applicationRepresentativeId(application) !== session?.user?.id,
+                formValues: currentRepresentativeAnswers(Object.fromEntries(
                   fieldValues.flatMap(({ field, value }) => {
                     const parsed = parseFormAnswer(value)
                     return parsed === undefined ? [] : [[field.key, parsed]]
                   })
-                ),
+                ), applicationRepresentativeIdentity(application)),
               })
             )}
             registrationPath={registrationPath}

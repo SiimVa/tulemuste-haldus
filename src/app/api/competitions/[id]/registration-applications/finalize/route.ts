@@ -260,7 +260,7 @@ async function handlePOST(
           resolvedMembers.flatMap(({ userId }) => (userId ? [userId] : []))
         )
         if (!application.pendingRepresentativeEmail) {
-          await setTeamRepresentative(tx, competitionId, team.id, application.submittedById)
+          await setTeamRepresentative(tx, competitionId, team.id, application.representativeId ?? application.submittedById, { notify: false })
         }
         await tx.registrationApplication.update({
           where: { id: application.id },

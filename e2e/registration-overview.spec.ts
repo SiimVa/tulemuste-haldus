@@ -27,8 +27,12 @@ test("organizer selects report fields, filters and exports registration and mand
     formValues: { create: [{ fieldId: county.id, value: JSON.stringify("Harju") }, { fieldId: food.id, value: JSON.stringify("Taimne") }] },
     members: { create: { name: "Mari", email: "mari@example.com", isCaptain: true, assignmentRole: "Navigeerija" } },
   } })
+  const representative = await db.user.create({ data: { email: "robi.abel@example.com", name: "Robi Abel" } })
+  const membership = await db.competitionMember.create({ data: { competitionId: competition.id, userId: representative.id, roles: { create: { role: "REPRESENTATIVE" } } } })
+  await db.teamRepresentative.create({ data: { competitionId: competition.id, teamId: team.id, memberId: membership.id } })
+  await db.teamFormFieldValue.createMany({ data: ["Robi Abel", "robi.abel@example.com", "5555 1234"].map((value, index) => ({ teamId: team.id, fieldId: representativeFields[index].id, value: JSON.stringify(value) })) })
   await db.registrationApplication.create({ data: {
-    competitionId: competition.id, submittedById: user.id, teamName: team.name, teamId: team.id, status: "CONFIRMED", submittedAt: new Date(),
+    competitionId: competition.id, submittedById: user.id, representativeId: representative.id, teamName: team.name, teamId: team.id, status: "CONFIRMED", submittedAt: new Date(),
     fieldValues: { create: [
       { fieldId: county.id, value: JSON.stringify("Tartu") },
       ...["Robi Abel", "robi.abel@example.com", "5555 1234"].map((value, index) => ({ fieldId: representativeFields[index].id, value: JSON.stringify(value) })),

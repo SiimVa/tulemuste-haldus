@@ -17,7 +17,7 @@ import {
 type TransactionClient = Prisma.TransactionClient
 
 type QueueNotificationInput = NotificationContent & {
-  userId: string
+  userId: string | null
   competitionId?: string | null
   href?: string | null
   emailTo: string
@@ -33,7 +33,7 @@ export async function queueUserNotification(
   const now = new Date()
   let emailBatchId: string | null = null
   let emailNextAttemptAt = now
-  if (input.batchEmail) {
+  if (input.batchEmail && input.userId) {
     const openBatch = await tx.notification.findFirst({
       where: {
         userId: input.userId,
@@ -93,6 +93,7 @@ export async function queueRegistrationApplicationNotification(
       pendingRepresentativeEmail: true,
       waitlistPosition: true,
       submittedBy: { select: { id: true, email: true } },
+      representative: { select: { id: true, email: true } },
       competition: {
         select: {
           id: true,
@@ -102,7 +103,8 @@ export async function queueRegistrationApplicationNotification(
       },
     },
   })
-  if (!application || application.pendingRepresentativeEmail) return null
+  if (!application) return null
+  const recipient = application.pendingRepresentativeEmail ? { id: null, email: application.pendingRepresentativeEmail } : application.representative ?? application.submittedBy
   const content = registrationNotificationContent({
     status,
     competitionName: application.competition.name,
@@ -113,10 +115,10 @@ export async function queueRegistrationApplicationNotification(
   if (!content) return null
   return queueUserNotification(tx, {
     ...content,
-    userId: application.submittedBy.id,
+    userId: recipient.id,
     competitionId: application.competition.id,
     href: `/dashboard/registrations/${application.id}`,
-    emailTo: application.submittedBy.email,
+    emailTo: recipient.email,
     emailReplyTo: application.competition.organizer?.email ?? null,
     dedupeKey: options.dedupeKey,
     batchEmail: options.batchEmail,
@@ -140,6 +142,7 @@ export async function queueTeamWorkflowNotification(
     select: {
       id: true,
       name: true,
+      pendingRepresentativeEmail: true,
       competition: {
         select: {
           id: true,
@@ -154,7 +157,7 @@ export async function queueTeamWorkflowNotification(
       },
     },
   })
-  const recipient = team?.representative?.member.user
+  const recipient = team?.representative?.member.user ?? (team?.pendingRepresentativeEmail ? { id: null, email: team.pendingRepresentativeEmail } : null)
   if (!team || !recipient) return null
   const content = teamWorkflowNotificationContent({
     phase,
@@ -186,6 +189,7 @@ export async function queueMandateOpenedNotifications(
     select: {
       id: true,
       name: true,
+      pendingRepresentativeEmail: true,
       competition: {
         select: {
           name: true,
@@ -203,10 +207,10 @@ export async function queueMandateOpenedNotifications(
   const batchIds = new Map<string, string>()
   const queuedAt = new Date()
   for (const team of teams) {
-    const recipient = team.representative?.member.user
+    const recipient = team.representative?.member.user ?? (team.pendingRepresentativeEmail ? { id: null, email: team.pendingRepresentativeEmail } : null)
     if (!recipient) continue
-    const emailBatchId = batchIds.get(recipient.id) ?? randomUUID()
-    batchIds.set(recipient.id, emailBatchId)
+    const emailBatchId = batchIds.get(recipient.id ?? recipient.email) ?? randomUUID()
+    batchIds.set(recipient.id ?? recipient.email, emailBatchId)
     const content = mandateOpenedNotificationContent({
       competitionName: team.competition.name,
       teamName: team.name,
@@ -219,7 +223,7 @@ export async function queueMandateOpenedNotifications(
       emailTo: recipient.email.trim().toLowerCase(),
       emailReplyTo:
         team.competition.organizer?.email.trim().toLowerCase() || null,
-      dedupeKey: `mandate-opened:${competitionId}:${team.id}:${recipient.id}`,
+      dedupeKey: `mandate-opened:${competitionId}:${team.id}:${recipient.id ?? recipient.email}`,
       emailBatchId,
       emailNextAttemptAt: queuedAt,
     })
@@ -281,6 +285,7 @@ export async function queueCompetitionStartedNotifications(
     select: {
       id: true,
       name: true,
+      pendingRepresentativeEmail: true,
       competition: {
         select: {
           name: true,
@@ -300,11 +305,12 @@ export async function queueCompetitionStartedNotifications(
   })
   const notifications: Prisma.NotificationCreateManyInput[] = []
   for (const team of teams) {
-    const recipients = new Map<string, { id: string; email: string }>()
+    const recipients = new Map<string, { id: string | null; email: string }>()
     const representative = team.representative?.member.user
-    if (representative) recipients.set(representative.id, representative)
+    if (representative) recipients.set(representative.email, representative)
+    else if (team.pendingRepresentativeEmail) recipients.set(team.pendingRepresentativeEmail, { id: null, email: team.pendingRepresentativeEmail })
     for (const member of team.members) {
-      if (member.user) recipients.set(member.user.id, member.user)
+      if (member.user) recipients.set(member.user.email, member.user)
     }
     for (const recipient of recipients.values()) {
       const content = competitionStartedNotificationContent({
@@ -319,7 +325,7 @@ export async function queueCompetitionStartedNotifications(
         emailTo: recipient.email.trim().toLowerCase(),
         emailReplyTo:
           team.competition.organizer?.email.trim().toLowerCase() || null,
-        dedupeKey: `competition-started:${competitionId}:${team.id}:${recipient.id}`,
+        dedupeKey: `competition-started:${competitionId}:${team.id}:${recipient.id ?? recipient.email}`,
       })
     }
   }

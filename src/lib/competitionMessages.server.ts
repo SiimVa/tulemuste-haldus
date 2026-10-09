@@ -31,6 +31,7 @@ export async function loadMessageContacts(competitionId: string): Promise<Messag
       select: {
         id: true, teamName: true, status: true, teamId: true, pendingRepresentativeName: true, pendingRepresentativeEmail: true,
         class: { select: { name: true } },
+        representative: { select: { name: true, email: true } },
         submittedBy: { select: { name: true, email: true } },
         fieldValues: { select: { fieldId: true, value: true } },
       },

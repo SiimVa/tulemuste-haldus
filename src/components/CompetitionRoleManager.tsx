@@ -24,6 +24,7 @@ type RoleData = {
   canClearOwner: boolean
   owner: CompetitionMember | null
   members: CompetitionMember[]
+  pendingRepresentatives: { id: string; teamName: string; name: string | null; email: string | null }[]
 }
 type RoleInvitation = {
   id: string
@@ -708,6 +709,19 @@ export function CompetitionRoleManager({
           </div>
           {filteredMembers.length > visibleCount && <button type="button" onClick={() => setVisibleCount(count => count + 10)} className="text-sm text-blue-600 hover:underline">Kuva veel ({filteredMembers.length - visibleCount})</button>}
         </div>
+      )}
+
+      {Boolean(data?.pendingRepresentatives.length) && (
+        <section aria-label="Konto sidumist ootavad esindajad" className="space-y-2">
+          <h3 className="text-sm font-semibold text-gray-800">Konto sidumist ootavad esindajad</h3>
+          {data?.pendingRepresentatives.map(representative => (
+            <div key={representative.id} className="rounded-lg border px-4 py-3 text-sm">
+              <p>{representative.teamName} · {representative.name} · {representative.email}</p>
+              <p className="mt-1 text-xs text-gray-500">Ligipääs tekib sama e-postiga sisse logides.</p>
+              <a href={`/dashboard/competitions/${competitionId}/registrations`} className="text-xs text-blue-600 hover:underline">Muuda registreerimise vaates</a>
+            </div>
+          ))}
+        </section>
       )}
 
       {invitations.length > 0 && (

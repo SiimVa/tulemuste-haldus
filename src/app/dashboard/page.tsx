@@ -1,3 +1,4 @@
+import { applicationRepresentativeId, applicationRepresentativeWhere } from "@/lib/representativeIdentity"
 import Link from "next/link"
 import { CompetitionCopyButton } from "@/components/competition/CompetitionCopyButton"
 import { DashboardViews } from "@/components/dashboard/DashboardViews"
@@ -116,9 +117,9 @@ export default async function DashboardPage() {
       orderBy: [{ date: "asc" }, { createdAt: "desc" }],
     }),
     prisma.registrationApplication.findMany({
-      where: { submittedById: currentUser.id, status: { notIn: ["REJECTED", "WITHDRAWN"] }, competition: { status: "SETUP" } },
+      where: { OR: [{ submittedById: currentUser.id }, applicationRepresentativeWhere(currentUser.id)], status: { notIn: ["REJECTED", "WITHDRAWN"] }, competition: { status: "SETUP" } },
       select: {
-        id: true, teamId: true, teamName: true, status: true, allocationReason: true, waitlistPosition: true,
+        id: true, representativeId: true, submittedById: true, pendingRepresentativeEmail: true, teamId: true, teamName: true, status: true, allocationReason: true, waitlistPosition: true,
         competition: { select: { id: true, name: true, date: true, registrationFinalizedAt: true } }, class: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -143,11 +144,11 @@ export default async function DashboardPage() {
       competitionId: application.competition.id, competitionName: application.competition.name,
       teamName: application.teamName, className: application.class?.name ?? null, date: application.competition.date?.toISOString() ?? null,
       href: `/dashboard/registrations/${application.id}`,
-      action: application.teamId || application.competition.registrationFinalizedAt ? "Vaata registreeringut" : application.status === "CHANGES_REQUESTED" ? "Täienda registreeringut" : application.status === "DRAFT" ? "Jätka registreerimist" : "Vaata registreeringut",
-      description: ["CONFIRMED", "APPROVED"].includes(application.status) ? "Sinu võistkonna koht on kinnitatud. Mandaadietapi avanemisel saad koosseisu täiendada." : application.status === "CHANGES_REQUESTED" ? "Korraldaja palus registreeringut täiendada ja uuesti esitada." : application.status === "DRAFT" ? "Registreering on pooleli. Täida andmed ja esita registreering." : application.status === "WAITLISTED" ? "Võistkond ootab vaba kohta. Kinnitamisest antakse teada." : "Registreering on esitatud ja ootab korraldaja kinnitust.",
+      action: applicationRepresentativeId(application) !== currentUser.id || application.teamId || application.competition.registrationFinalizedAt ? "Vaata registreeringut" : application.status === "CHANGES_REQUESTED" ? "Täienda registreeringut" : application.status === "DRAFT" ? "Jätka registreerimist" : "Vaata registreeringut",
+      description: applicationRepresentativeId(application) !== currentUser.id ? "Registreerisid selle võistkonna. Andmeid haldab praegune esindaja." : ["CONFIRMED", "APPROVED"].includes(application.status) ? "Sinu võistkonna koht on kinnitatud. Mandaadietapi avanemisel saad koosseisu täiendada." : application.status === "CHANGES_REQUESTED" ? "Korraldaja palus registreeringut täiendada ja uuesti esitada." : application.status === "DRAFT" ? "Registreering on pooleli. Täida andmed ja esita registreering." : application.status === "WAITLISTED" ? "Võistkond ootab vaba kohta. Kinnitamisest antakse teada." : "Registreering on esitatud ja ootab korraldaja kinnitust.",
       note: application.allocationReason, waitlistPosition: application.waitlistPosition,
       isRepresentative: false, isMember: false, resultsToken: null,
-      requiresAction: !application.teamId && !application.competition.registrationFinalizedAt && ["DRAFT", "CHANGES_REQUESTED"].includes(application.status),
+      requiresAction: applicationRepresentativeId(application) === currentUser.id && !application.teamId && !application.competition.registrationFinalizedAt && ["DRAFT", "CHANGES_REQUESTED"].includes(application.status),
     }))
   for (const team of ownTeams) {
     const isRepresentative = team.representative?.member.userId === currentUser.id
