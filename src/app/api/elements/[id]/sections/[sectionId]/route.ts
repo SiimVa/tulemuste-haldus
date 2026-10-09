@@ -1,4 +1,4 @@
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -25,7 +25,7 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
 
   type FieldInput = { name: string; label: string; type: string; order?: number; isResultField?: boolean; rankingPriority?: number | null; formula?: string; meta?: string }
 
-  await prisma.$transaction(async (tx) => {
+  await withElementScoreTransaction(elementId, async (tx) => {
     await tx.elementSection.update({
       where: { id: sectionId },
       data: {
@@ -77,7 +77,6 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
     include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
   })
 
-  await recomputeElementScores(elementId)
   return NextResponse.json(section)
 }
 
@@ -89,7 +88,7 @@ async function handleDELETE(_req: Request, { params }: { params: Promise<{ id: s
   if (!await canAccessSection(sectionId, elementId, { id: session.user.id, role: session.user.role })) {
     return NextResponse.json({ error: "Keelatud" }, { status: 403 })
   }
-  await prisma.elementSection.delete({ where: { id: sectionId } })
+  await withElementScoreTransaction(elementId, (tx) => tx.elementSection.delete({ where: { id: sectionId } }))
   return NextResponse.json({ ok: true })
 }
 

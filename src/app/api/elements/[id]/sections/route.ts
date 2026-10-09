@@ -1,4 +1,4 @@
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { NextResponse } from "next/server"
@@ -40,7 +40,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
     : (calcMethod?.params ?? {})
 
-  const section = await prisma.elementSection.create({
+  const section = await withElementScoreTransaction(elementId, (tx) => tx.elementSection.create({
     data: {
       elementId,
       name,
@@ -77,9 +77,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
         : undefined,
     },
     include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
-  })
-
-  await recomputeElementScores(elementId)
+  }))
   return NextResponse.json(section)
 }
 

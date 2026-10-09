@@ -1,0 +1,6 @@
+artifacts/
+*manifest*.json
+*plan*.json
+private-*.json
+*.log
+.env*

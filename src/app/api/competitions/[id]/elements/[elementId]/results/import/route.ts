@@ -6,7 +6,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import * as XLSX from "xlsx"
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 import { isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
 import {
   canAccessCompetition,
@@ -325,50 +325,72 @@ async function handlePOST(
   const okRows = rows.filter((r) => r.status === "ok")
   const importErrors: string[] = []
 
-  for (const row of okRows) {
-    const team = teamByCode.get(row.teamCode.toLowerCase())
-    if (!team) continue
-
-    const valuesJson = resultKeepsValues(row, element.exceptions) ? JSON.stringify(row.values ?? {}) : "{}"
-    const exceptionLabel = row.exceptionLabel ?? null
-
-    // Find exception penalty if applicable
-    let exceptionPenalty: number | null = null
-    if (exceptionLabel) {
-      const exc = element.exceptions.find((e) => e.label === exceptionLabel)
-      exceptionPenalty = exc?.penalty ?? null
-    }
-
-    try {
-      await prisma.result.upsert({
-        where: { elementId_teamId: { elementId, teamId: team.id } },
-        create: {
-          elementId,
-          teamId: team.id,
-          values: valuesJson,
-          exceptionLabel,
-          exceptionPenalty,
-          enteredByUserId: session.user.id,
-        },
-        update: {
-          values: valuesJson,
-          exceptionLabel,
-          exceptionPenalty,
-          enteredByUserId: session.user.id,
-        },
-      })
-    } catch {
-      importErrors.push(`Tulemuse salvestamine ebaõnnestus: ${row.teamCode} ${row.teamName}`)
-      row.status = "error"
-      row.message = "Salvestamine ebaõnnestus"
-    }
-  }
-
-  // Trigger recalculate for this element (jagatud loogika)
   try {
-    await recomputeElementScores(elementId)
+    await withElementScoreTransaction(elementId, async (tx) => {
+      for (const row of okRows) {
+        const team = teamByCode.get(row.teamCode.toLowerCase())
+        if (!team) continue
+
+        const valuesJson = resultKeepsValues(row, element.exceptions) ? JSON.stringify(row.values ?? {}) : "{}"
+        const exceptionLabel = row.exceptionLabel ?? null
+
+        // Find exception penalty if applicable
+        let exceptionPenalty: number | null = null
+        if (exceptionLabel) {
+          const exc = element.exceptions.find((e) => e.label === exceptionLabel)
+          exceptionPenalty = exc?.penalty ?? null
+        }
+
+        // Preserve row-level import errors without leaving PostgreSQL's entire
+        // transaction aborted after one failed insert.
+        await tx.$executeRaw`SAVEPOINT result_import_row`
+        try {
+          await tx.result.upsert({
+            where: { elementId_teamId: { elementId, teamId: team.id } },
+            create: {
+              elementId,
+              teamId: team.id,
+              values: valuesJson,
+              exceptionLabel,
+              exceptionPenalty,
+              enteredByUserId: session.user.id,
+            },
+            update: {
+              values: valuesJson,
+              exceptionLabel,
+              exceptionPenalty,
+              enteredByUserId: session.user.id,
+            },
+          })
+          await tx.$executeRaw`RELEASE SAVEPOINT result_import_row`
+        } catch {
+          await tx.$executeRaw`ROLLBACK TO SAVEPOINT result_import_row`
+          await tx.$executeRaw`RELEASE SAVEPOINT result_import_row`
+          importErrors.push(`Tulemuse salvestamine ebaõnnestus: ${row.teamCode} ${row.teamName}`)
+          row.status = "error"
+          row.message = "Salvestamine ebaõnnestus"
+        }
+      }
+    })
   } catch {
-    // Non-fatal: import still succeeded
+    // No row was committed if the final score calculation failed.
+    for (const row of okRows) {
+      if (row.status !== "ok") continue
+      row.status = "error"
+      row.message = "Importimine ebaõnnestus; tulemusi ei salvestatud"
+    }
+    return NextResponse.json({
+      error: "Tulemuste importimine ebaõnnestus. Palun proovi uuesti.",
+      rows,
+      missingTeams,
+      summary: {
+        total: rows.length,
+        imported: 0,
+        errors: rows.filter((r) => r.status === "error").length,
+        skipped: rows.filter((r) => r.status === "skipped").length,
+      },
+      importErrors,
+    }, { status: 500 })
   }
 
   const finalSummary = {

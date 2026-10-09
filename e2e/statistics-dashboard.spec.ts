@@ -323,3 +323,51 @@ test("võistluse koopia saab töölaua seaded uute elemendiviidetega, asukohad j
   expect(copied.map?.imageName).toBe("kaart.png")
   expect(copied.map?.markers).toEqual([{ id: "start", label: "Start KT", mapX: 0.1, mapY: 0.9, mgrs: null, latitude: null, longitude: null }])
 })
+
+test("avalik ülevaade värskendab ainult avalikku JSON-i ja jätab vea korral viimase seisu nähtavale", async ({ page }) => {
+  const { user, competition } = await seedCompetition("json-refresh")
+  const endpoint = `/api/public/competitions/${competition.id}/dashboard`
+  const response = await page.request.get(endpoint)
+  expect(response.status()).toBe(200)
+  expect(response.headers()["cache-control"]).toBe("no-store")
+  const body = await response.text()
+  expect(body).not.toContain(user.id)
+  expect(body).not.toContain("KP1 kohtunik")
+  expect(body).not.toContain("Mari Maasikas")
+  const initial = JSON.parse(body)
+  expect(initial.widgets).toEqual(["summary", "elementProgress"])
+  expect(initial.config.routes).toEqual({})
+  expect(initial.config.finishElementId).toBeNull()
+  expect(initial.summary.alertCount).toBe(0)
+  expect(initial.judges).toBeUndefined()
+  expect(initial.teamTracker).toBeUndefined()
+  expect(initial.withdrawals).toBeUndefined()
+  const unchanged = await page.request.get(endpoint, { headers: { "If-None-Match": response.headers().etag } })
+  expect(unchanged.status()).toBe(304)
+
+  await page.clock.install()
+  await page.goto(`/public/${competition.id}/dashboard`)
+  await expect(page.getByRole("heading", { name: competition.name })).toBeVisible()
+  let jsonRequests = 0
+  let rscRefreshes = 0
+  let fail = false
+  page.on("request", request => {
+    if (request.url().includes(`/public/${competition.id}/dashboard`) && request.headers().rsc === "1") rscRefreshes++
+  })
+  const refreshed = { ...initial, competition: { ...initial.competition, name: "Värskendatud ülevaade" }, generatedAt: new Date().toISOString() }
+  await page.route(`**${endpoint}`, async route => {
+    jsonRequests++
+    await route.fulfill({ status: fail ? 503 : 200, contentType: "application/json", body: JSON.stringify(fail ? { error: "Ajutine viga" } : refreshed), headers: { ETag: '"refreshed-dashboard"' } })
+  })
+  await page.clock.fastForward(31_000)
+  await expect(page.getByRole("heading", { name: "Värskendatud ülevaade" })).toBeVisible()
+  expect(jsonRequests).toBeGreaterThan(0)
+  expect(rscRefreshes).toBe(0)
+  fail = true
+  await page.clock.fastForward(31_000)
+  await expect(page.getByRole("status")).toContainText("Uuendamine ebaõnnestus")
+  await expect(page.getByRole("heading", { name: "Värskendatud ülevaade" })).toBeVisible()
+  await expect(page.locator('[data-widget="summary"]')).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await noHorizontalScroll(page)).toBe(true)
+})

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { canEnterElementResults } from "@/lib/competitionAccess"
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 import { readEstimation, validateEstimation } from "@/lib/estimation"
 import { readPointMeta } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
@@ -35,9 +35,8 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
   const updated = { ...config, targets: config.targets.map(t => ({ ...t, correct: body.correct[t.id] })) }
   const error = validateEstimation(updated)
   if (error) return NextResponse.json({ error }, { status: 422 })
-  const saved = await prisma.fieldDefinition.updateMany({ where: { id: field.id, meta: field.meta }, data: { meta: JSON.stringify({ ...readPointMeta(field.meta), estimation: updated }) } })
+  const saved = await withElementScoreTransaction(elementId, (tx) => tx.fieldDefinition.updateMany({ where: { id: field.id, meta: field.meta }, data: { meta: JSON.stringify({ ...readPointMeta(field.meta), estimation: updated }) } }))
   if (!saved.count) return NextResponse.json({ error: "Seaded muutusid. Värskenda lehte ja proovi uuesti." }, { status: 409 })
-  await recomputeElementScores(elementId)
   return NextResponse.json({ ok: true })
 }
 export const PATCH = withSecurityRoute("/api/elements/[id]/estimation-reference", handlePATCH)

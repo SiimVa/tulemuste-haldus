@@ -128,21 +128,41 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
     }
   }
 
+  async function sendResult(values: Record<string, string>, selectedException: string | null) {
+    if (!selectedTeamId || !selectedElementId) return null
+    const existing = getExisting(selectedElementId, selectedTeamId)
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    if (accessToken) headers["x-access-token"] = accessToken
+    setSaving(true)
+    try {
+      return await fetch(`/api/elements/${selectedElementId}/results`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          teamId: selectedTeamId,
+          values,
+          exceptionLabel: selectedException,
+          expectedUpdatedAt: existing ? new Date(existing.updatedAt).toISOString() : null,
+        }),
+      })
+    } catch {
+      // Keep the form and its original version so the judge can safely repeat
+      // an attempt whose response was lost, including an already committed save.
+      setError("Salvestuse kinnitust ei saadud. Kontrolli ühendust ja proovi uuesti.")
+      return null
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Kustutab valitud võistkonna tulemuse (nt vale võistkonna sisestus).
   async function deleteResult() {
     if (!selectedTeamId || !selectedElementId) return
     const team = teams.find(t => t.id === selectedTeamId)
     if (!window.confirm(`Kustuta võistkonna „${team?.name ?? ""}” tulemus?`)) return
     setError("")
-    setSaving(true)
-    const headers: Record<string, string> = { "Content-Type": "application/json" }
-    if (accessToken) headers["x-access-token"] = accessToken
-    const res = await fetch(`/api/elements/${selectedElementId}/results`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ teamId: selectedTeamId, values: {}, exceptionLabel: null }),
-    })
-    setSaving(false)
+    const res = await sendResult({}, null)
+    if (!res) return
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       setError(data.error ?? "Kustutamine ebaõnnestus")
@@ -181,24 +201,8 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
       }
     }
 
-    setSaving(true)
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-    if (accessToken) headers["x-access-token"] = accessToken
-
-    const res = await fetch(`/api/elements/${selectedElementId}/results`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        teamId: selectedTeamId,
-        values: keepsValues ? formValues : {},
-        exceptionLabel: exceptionLabel || null,
-      }),
-    })
-
-    setSaving(false)
+    const res = await sendResult(keepsValues ? formValues : {}, exceptionLabel || null)
+    if (!res) return
     if (res.ok) {
       const data = await res.json().catch(() => ({}))
       const team = teams.find(t => t.id === selectedTeamId)
@@ -213,7 +217,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
           teamId: selectedTeamId,
           values: keepsValues ? JSON.stringify(formValues) : "{}",
           exceptionLabel: exceptionLabel || null,
-          updatedAt: new Date(),
+          updatedAt: new Date(data.updatedAt),
         }
         return [...filtered, newResult]
       })
@@ -221,7 +225,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
       setFormValues({})
       setExceptionLabel("")
     } else {
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       setError(data.error ?? "Salvestamine ebaõnnestus")
     }
   }
@@ -234,7 +238,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Vali KP / element</h3>
           <div className="flex flex-wrap gap-2">
             {elements.map(el => (
-              <button key={el.id}
+              <button key={el.id} disabled={saving}
                 onClick={() => { setSelectedElementId(el.id); setSelectedTeamId(null); setShowStartHelper(false) }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   selectedElementId === el.id
@@ -351,7 +355,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                 const isSelected = selectedTeamId === team.id
                 const withdrawn = isWithdrawnAtElement(team, selectedElement.order)
                 return (
-                  <button key={team.id} onClick={() => selectTeam(team)}
+                  <button key={team.id} disabled={saving} onClick={() => selectTeam(team)}
                     className={`w-full text-left px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""}`}>
                     <div>
                       <span className="font-mono text-xs text-gray-400 mr-1">{team.code}</span>

@@ -7,7 +7,7 @@ import {
   elementBelongsToCompetition,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
-import { recomputeElementScores } from "@/lib/recompute"
+import { withElementScoreTransaction } from "@/lib/recompute"
 
 async function handleGET(_req: Request, { params }: { params: Promise<{ id: string; elementId: string }> }) {
   const session = await auth()
@@ -52,7 +52,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Võistkond ei kuulu sellele võistlusele" }, { status: 400 })
   }
 
-  const entry = await prisma.miscEntry.create({
+  const entry = await withElementScoreTransaction(elementId, (tx) => tx.miscEntry.create({
     data: {
       elementId, teamId, points: numericPoints, description: description.trim(),
       reason: reason || null,
@@ -60,8 +60,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
       abandonTime: abandonTime || null,
     },
     include: { team: { select: { id: true, name: true, code: true } } },
-  })
-  await recomputeElementScores(elementId)
+  }))
   return NextResponse.json(entry)
 }
 

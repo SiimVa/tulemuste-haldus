@@ -60,3 +60,52 @@ test("leaderboard gaps, medals and class filters agree on desktop, mobile and pr
   await expect(page.getByRole("group", { name: "Klassifilter" })).not.toBeVisible()
   await page.screenshot({ path: "/tmp/tulemuste-leaderboard-print.png", fullPage: true })
 })
+
+test("public leaderboard refreshes a public JSON snapshot and mounts only the current viewport", async ({ page }) => {
+  const user = await db.user.create({ data: { email: `leaderboard-json-${Date.now()}@example.com`, name: "Private organizer" } })
+  const competition = await db.competition.create({ data: { name: "Snapshot refresh", createdById: user.id, organizerId: user.id, isPublic: true } })
+  const element = await db.scoringElement.create({ data: { competitionId: competition.id, code: "KP1", name: "Snapshot point", config: '{"private-marker":true}' } })
+  const team = await db.team.create({ data: { competitionId: competition.id, code: "1", name: "Snapshot team", pendingRepresentativeEmail: "private-contact@example.com", registrationReviewNote: "private-review-marker" } })
+  await db.computedScore.create({ data: { elementId: element.id, teamId: team.id, penaltyPoints: 10 } })
+  const endpoint = `/api/public/competitions/${competition.id}/leaderboard`
+  const response = await page.request.get(endpoint)
+  expect(response.status()).toBe(200)
+  expect(response.headers()["cache-control"]).toBe("no-store")
+  const body = await response.text()
+  expect(body).not.toContain("private-contact")
+  expect(body).not.toContain("private-review-marker")
+  expect(body).not.toContain("private-marker")
+  expect(body).not.toContain(user.id)
+  const initial = JSON.parse(body)
+  expect(initial.ranked[0].points).toEqual([10])
+  const unchanged = await page.request.get(endpoint, { headers: { "If-None-Match": response.headers().etag } })
+  expect(unchanged.status()).toBe(304)
+
+  await page.clock.install()
+  await page.goto(`/public/${competition.id}/leaderboard`)
+  await expect(page.locator("table tbody tr").first()).toContainText("10.00")
+  await expect(page.locator("details")).toHaveCount(0)
+  const refreshed = { ...initial, generatedAt: new Date().toISOString(), ranked: [{ ...initial.ranked[0], total: 7, points: [7] }] }
+  let jsonRequests = 0
+  let rscRefreshes = 0
+  page.on("request", request => {
+    if (request.url().includes(`/public/${competition.id}/leaderboard`) && request.headers().rsc === "1") rscRefreshes++
+  })
+  await page.route(`**${endpoint}`, async route => {
+    jsonRequests++
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(refreshed), headers: { ETag: '"refreshed"' } })
+  })
+  await page.clock.fastForward(31_000)
+  await expect(page.locator("table tbody tr").first()).toContainText("7.00")
+  expect(jsonRequests).toBeGreaterThan(0)
+  expect(rscRefreshes).toBe(0)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.locator("table")).toHaveCount(0)
+  const card = page.locator("details").filter({ hasText: "Snapshot team" })
+  await expect(card).toContainText("7.00")
+  await expect(card.getByText("Snapshot point")).toHaveCount(0)
+  await card.locator("summary").click()
+  await expect(card.getByText("Snapshot point")).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
