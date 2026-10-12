@@ -9,6 +9,7 @@ import {
   NOTIFICATION_EMAIL_BATCH_WINDOW_MS,
   notificationDigestTitle,
   notificationEmailHtml,
+  notificationEmailMessages,
   registrationNotificationContent,
   teamWorkflowNotificationContent,
   type NotificationContent,
@@ -418,7 +419,7 @@ export async function deliverPendingNotifications(
     if (claimed.count !== notificationIds.length) continue
 
     const first = emailNotifications[0]
-    const messages = emailNotifications.map(({ message }) => message)
+    const messages = emailNotifications.flatMap(notificationEmailMessages)
     const title = notificationDigestTitle(
       first.type,
       first.title,

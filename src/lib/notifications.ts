@@ -1,3 +1,5 @@
+import { ORGANIZER_DIGEST_TYPE } from "./organizerDigest"
+
 export type NotificationContent = {
   type: string
   title: string
@@ -5,6 +7,14 @@ export type NotificationContent = {
 }
 
 export const NOTIFICATION_EMAIL_BATCH_WINDOW_MS = 10 * 60 * 1000
+
+// Korraldaja kokkuvõttes on iga rida eraldi sündmus; kirjas kuvatakse need
+// loendina.
+export function notificationEmailMessages(notification: { type: string; message: string }): string[] {
+  return notification.type === ORGANIZER_DIGEST_TYPE
+    ? notification.message.split("\n").filter((line) => line.trim())
+    : [notification.message]
+}
 
 const DIGEST_TITLES: Record<string, string> = {
   REGISTRATION_CONFIRMED: "Võistkonnad on võistlusele kinnitatud",

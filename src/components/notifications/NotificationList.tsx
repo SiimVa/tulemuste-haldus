@@ -71,7 +71,7 @@ export function NotificationList({ items }: { items: NotificationListItem[] }) {
                     {item.competitionName}
                   </p>
                 )}
-                <p className="mt-2 text-sm leading-6 text-gray-600">{item.message}</p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-600">{item.message}</p>
                 {item.href && (
                   <span className="mt-3 inline-block text-sm font-medium text-blue-600">
                     Ava →

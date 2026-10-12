@@ -57,6 +57,7 @@
     "src/lib/competitionMessages.ts",
     "src/lib/leaderboard.ts",
     "src/lib/registrationDashboard.ts",
+    "src/lib/organizerDigest.ts",
     "tests/**/*.test.ts"
   ]
 }

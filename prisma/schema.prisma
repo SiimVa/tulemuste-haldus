@@ -98,6 +98,7 @@ model User {
   acceptedRoleInvitations  CompetitionRoleInvitation[]    @relation("CompetitionRoleInvitationAcceptedBy")
   notifications            Notification[]
   sentCompetitionMessages  CompetitionMessage[]           @relation("CompetitionMessageSender")
+  organizerDigests         OrganizerDigestSubscription[]
 }
 
 model Account {
@@ -281,6 +282,7 @@ model Competition {
   leaderboardFreeze           LeaderboardFreeze?
   seriesMemberships           CompetitionSeriesCompetition[]
   messages                    CompetitionMessage[]
+  organizerDigests            OrganizerDigestSubscription[]
 
   @@index([createdById])
   @@index([organizerId])
@@ -313,6 +315,29 @@ model LeaderboardFreeze {
   createdById   String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+// Korraldaja tellitud kokkuvõte registreerimise ja/või mandaadi sündmustest.
+// Teavituste cron koostab kokkuvõtte, kui nextSendAt on käes, ja hõlmab
+// sündmusi alates coveredUntil'ist. Vt src/lib/organizerDigest.ts.
+model OrganizerDigestSubscription {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registration  Boolean     @default(true)
+  mandate       Boolean     @default(true)
+  // "IMMEDIATE" | "HOURLY" | "DAILY" | "WEEKLY"
+  interval      String      @default("DAILY")
+  coveredUntil  DateTime    @default(now())
+  nextSendAt    DateTime
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([competitionId, userId])
+  @@index([nextSendAt])
+  @@index([userId])
 }
 
 // Kasutaja teavitus on ühtlasi e-kirja outbox. Töövoo muudatus ja teavitus
