@@ -20,7 +20,7 @@ export default async function AccountJudgePage({
 
   const competition = await prisma.competition.findUnique({
     where: { id: competitionId },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, scoringMode: true },
   })
   if (!competition) notFound()
 
@@ -105,6 +105,7 @@ export default async function AccountJudgePage({
         </div>
       ) : (
         <JudgeInterface
+          scoringMode={competition.scoringMode}
           elements={elements.map((element) => ({
             id: element.id,
             name: element.name,

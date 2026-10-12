@@ -7,6 +7,7 @@ import { managedCompetitionsWhere } from "@/lib/competitionAccess"
 import { canCreateCompetition } from "@/lib/permissions"
 import { isTeamCountScope } from "@/lib/classGroups"
 import { isFixedRankingMode, nonNegativeFiniteNumber, parseFixedPointValues } from "@/lib/fixedRanking"
+import { defaultExceptionValues } from "@/lib/exceptionKinds"
 
 async function handleGET() {
   const session = await auth()
@@ -54,8 +55,8 @@ async function handlePOST(req: Request) {
       scoringMode: defaults.scoringMode ?? "PENALTY",
       defaultKPMaxValue: defaults.defaultKPMaxValue ?? 30,
       defaultPKMaxValue: defaults.defaultPKMaxValue ?? 15,
-      defaultNotPassed: defaults.defaultNotPassed ?? 40,
-      defaultPassedNotDone: defaults.defaultPassedNotDone ?? 35,
+      defaultNotPassed: defaults.defaultNotPassed ?? defaultExceptionValues(defaults.scoringMode ?? "PENALTY").defaultNotPassed,
+      defaultPassedNotDone: defaults.defaultPassedNotDone ?? defaultExceptionValues(defaults.scoringMode ?? "PENALTY").defaultPassedNotDone,
       defaultVastutegevusPenaltyPerLife: defaults.defaultVastutegevusPenaltyPerLife ?? 5,
       defaultVarustusPenaltyPerItem: defaults.defaultVarustusPenaltyPerItem ?? 5,
       defaultHilinemineMode: defaults.defaultHilinemineMode ?? "ONE_TIME",

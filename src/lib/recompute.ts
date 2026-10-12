@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { calculateScores, withEffectiveHC } from "@/lib/calculators"
-import { isFailedResult } from "@/lib/exceptionKinds"
+import { exceptionScore, isFailedResult } from "@/lib/exceptionKinds"
 import { parseClassGroups, scopeKeyFor, TEAM_COUNT_SCOPES } from "@/lib/classGroups"
 import { invalidatePublicSnapshots } from "@/lib/publicSnapshotCache"
 
@@ -157,14 +157,13 @@ async function recomputeLockedElementScores(tx: Prisma.TransactionClient, elemen
 
   if (element.sections.length > 0) {
     // Kombineeritud hindamine: iga sektsiooni skoor eraldi ja summeeri
-    // Ebaõnnestunud jäävad iga osa pingeritta viimaseks; teised erandid saavad kindla karistuse.
+    // Ebaõnnestunud jäävad iga osa pingeritta viimaseks; teised erandid saavad erandi kindlad punktid.
     const exceptionResults = activeResults.filter((r) => r.exceptionLabel && !isFailedResult(r, element.exceptions))
     const normalResults = activeResults.filter((r) => !r.exceptionLabel || isFailedResult(r, element.exceptions))
     const teamScores = new Map<string, number>()
 
     for (const r of exceptionResults) {
-      const magnitude = Math.abs(r.exceptionPenalty ?? 0)
-      teamScores.set(r.teamId, isPlusMode ? -magnitude : magnitude)
+      teamScores.set(r.teamId, exceptionScore(r.exceptionPenalty, config.scoringMode))
     }
 
     for (const section of element.sections) {

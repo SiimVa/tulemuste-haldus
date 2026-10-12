@@ -14,6 +14,7 @@ import {
   type ClassGroup,
 } from "@/lib/classGroups"
 import type { TeamCountScope } from "@/lib/classGroups"
+import { exceptionDefaultsForModeChange, exceptionValueHint } from "@/lib/exceptionKinds"
 import { TieBreakSettings } from "@/components/competition/TieBreakSettings"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
@@ -287,7 +288,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             {SCORING_MODES.map(m => (
               <label key={m.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.scoringMode === m.value ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"}`}>
                 <input type="radio" name="scoringMode" value={m.value}
-                  checked={form.scoringMode === m.value} onChange={() => set("scoringMode", m.value)}
+                  checked={form.scoringMode === m.value} onChange={() => setForm(f => f ? exceptionDefaultsForModeChange(f, m.value) : f)}
                   className="mt-0.5 accent-blue-600" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">{m.label}</p>
@@ -454,6 +455,7 @@ export default function SettingsPage({ params }: { params: Promise<{ id: string 
             {numInput("defaultNotPassed", "Ei läbinud KP-d", "p", undefined)}
             {numInput("defaultPassedNotDone", "Läbis aga ei sooritanud", "p", undefined)}
           </div>
+          <p className="text-xs text-gray-500">{exceptionValueHint(form.scoringMode)}</p>
         </Card>
 
         {/* PK vaikeväärtused */}

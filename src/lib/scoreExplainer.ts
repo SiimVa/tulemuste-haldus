@@ -1,7 +1,7 @@
 import { compareElementTimes, pointFieldLabel, readPointMeta } from "./pointFields"
 import { calculateScores, parseTimeToSeconds, computeFields } from "@/lib/calculators"
 import { scopeKeyFor, TEAM_COUNT_SCOPES, type ClassGroup } from "@/lib/classGroups"
-import { FAILED_RANKED_CALC_TYPES, isFailedResult } from "@/lib/exceptionKinds"
+import { FAILED_RANKED_CALC_TYPES, formatExceptionScore, isFailedResult } from "@/lib/exceptionKinds"
 
 export interface TeamBreakdown {
   teamId: string
@@ -338,13 +338,13 @@ export function explainElementScores(
     const rawValues = teamRawValues.get(result.teamId) ?? {}
 
     if (result.exceptionLabel) {
-      // Ebaõnnestunu on pingereas viimastel kohtadel; teistel erandi kindel karistus.
+      // Ebaõnnestunu on pingereas viimastel kohtadel; teistel erandi kindlad punktid.
       const total = results.filter(r => !r.exceptionLabel).length + failedCount
       const explanation = isFailed(result) && hasSections
         ? `Ebaõnnestus "${result.exceptionLabel}": igas osas viimane koht või halvim tulemus → ${score}p`
         : isFailed(result) && rankedMethod
           ? `Ebaõnnestus "${result.exceptionLabel}": pingerea viimane koht (${total}/${total}) → ${score}p`
-          : `Erand: "${result.exceptionLabel}" → ${Math.abs(result.exceptionPenalty ?? 0)}p karistust`
+          : `Erand: "${result.exceptionLabel}" → ${formatExceptionScore(result.exceptionPenalty, scoringMode)}`
       breakdowns.push({
         teamId: result.teamId,
         teamName: team.name,

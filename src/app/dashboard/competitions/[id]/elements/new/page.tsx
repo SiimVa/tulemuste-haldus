@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import type { TeamCountScope } from "@/lib/classGroups"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import { parseFixedPointValues, parseFixedRankingParams, type FixedRankingMode } from "@/lib/fixedRanking"
-import { EXCEPTION_KINDS, EXCEPTION_KIND_LABELS, FAILED_EXCEPTION_LABEL, failedExceptionPenalty, inferExceptionKind, isExceptionKind, type ExceptionKind } from "@/lib/exceptionKinds"
+import { EXCEPTION_KINDS, EXCEPTION_KIND_LABELS, exceptionValueHint, FAILED_EXCEPTION_LABEL, failedExceptionPenalty, inferExceptionKind, isExceptionKind, type ExceptionKind } from "@/lib/exceptionKinds"
 
 type FieldRow = { meta?: string | null; name: string; label: string; type: string; rankingPriority: number | null; formula: string; displayAsTime: boolean; validation: FieldValidation; fieldHigherIsBetter: boolean | null }
 // kind puudub, kui korraldaja pole liiki valinud: siis tuletatakse see nimest.
@@ -1355,7 +1355,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
               <button type="button" onClick={addException}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Lisa erand</button>
             </div>
-            <p className="text-xs text-gray-500">Liik määrab, kuidas erandit hinnatakse ja statistikas loetakse. „Ebaõnnestus” (tegi, kuid mitte kriteeriumite järgi) jääb pingereaga hindamisel pingeritta viimaseks halvima tulemusega ja teised paigutatakse temast ettepoole; karistust kasutatakse ainult ilma pingereata hindamisel. Teised erandid saavad kindla karistuse ja jäävad pingereast välja.</p>
+            <p className="text-xs text-gray-500">Liik määrab, kuidas erandit hinnatakse ja statistikas loetakse. „Ebaõnnestus” (tegi, kuid mitte kriteeriumite järgi) jääb pingereaga hindamisel pingeritta viimaseks halvima tulemusega ja teised paigutatakse temast ettepoole; väärtust kasutatakse ainult ilma pingereata hindamisel. Teised erandid saavad kindla väärtuse ja jäävad pingereast välja. {exceptionValueHint(compDefs?.scoringMode)}</p>
             {exceptions.map((ex, i) => (
               <div key={i} className="flex flex-wrap gap-2 items-center">
                 <Input type="text" value={ex.label} onChange={e => updateException(i, "label", e.target.value)}
@@ -1366,7 +1366,7 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
                   {EXCEPTION_KINDS.map(kind => <option key={kind} value={kind}>{EXCEPTION_KIND_LABELS[kind]}</option>)}
                 </Select>
                 <Input type="number" value={ex.penalty} onChange={e => updateException(i, "penalty", e.target.value)}
-                  placeholder="Karistus"
+                  placeholder={compDefs?.scoringMode === "PLUS" ? "Punktid" : "Karistus"}
                   onFocus={e => e.target.select()}
                     className="w-24 focus:ring-1" />
                 <button type="button" onClick={() => setExceptions(exceptions.filter((_, idx) => idx !== i))}

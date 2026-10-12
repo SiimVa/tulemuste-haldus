@@ -7,6 +7,7 @@ import { parseValidation, validateClockValue, validateFieldValue } from "@/lib/f
 import { withElementScoreTransaction } from "@/lib/recompute"
 import { resultKeepsValues } from "@/lib/exceptionKinds"
 import {
+  canAccessElement,
   canEnterElementResults,
   teamBelongsToCompetition,
 } from "@/lib/competitionAccess"
@@ -231,5 +232,28 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   }
 }
 
+// DELETE – kustuta elemendi kõik tulemused korraga (korraldaja, nt proovisisestuse
+// järel). Kohtuniku token seda ei saa.
+async function handleDELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { id: elementId } = await params
+  const element = await prisma.scoringElement.findUnique({
+    where: { id: elementId },
+    select: { competitionId: true },
+  })
+  if (!element) return NextResponse.json({ error: "Elementi ei leitud" }, { status: 404 })
+  if (!await canAccessElement(elementId, { id: session.user.id, role: session.user.role })) {
+    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+  }
+  setSecurityTargets({ competitionId: element.competitionId, elementId })
+
+  const deleted = await withElementScoreTransaction(elementId, (tx) =>
+    tx.result.deleteMany({ where: { elementId } })
+  )
+  return NextResponse.json({ deleted: deleted.count })
+}
+
 export const GET = withSecurityRoute("/api/elements/[id]/results", handleGET)
 export const POST = withSecurityRoute("/api/elements/[id]/results", handlePOST)
+export const DELETE = withSecurityRoute("/api/elements/[id]/results", handleDELETE)

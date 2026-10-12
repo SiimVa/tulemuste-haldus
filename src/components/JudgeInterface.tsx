@@ -21,9 +21,10 @@ interface Props {
   elements: Element[]
   teams: Team[]
   existingResults: ExistingResult[]
+  scoringMode: string
 }
 
-export function JudgeInterface({ accessToken, elements, teams, existingResults }: Props) {
+export function JudgeInterface({ accessToken, elements, teams, existingResults, scoringMode }: Props) {
   const [selectedElementId, setSelectedElementId] = useState(elements[0]?.id ?? null)
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
@@ -400,7 +401,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults }
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">— Sooritati normaalselt —</option>
                   {selectedElement.exceptions.map(ex => (
-                    <option key={ex.id} value={ex.label}>{exceptionOptionLabel(ex, selectedElement, "p karistust")}</option>
+                    <option key={ex.id} value={ex.label}>{exceptionOptionLabel(ex, selectedElement, scoringMode, "p karistust")}</option>
                   ))}
                 </select>
                 {failedSelected && <p className="mt-1 text-xs text-amber-800">Sisesta tulemus nagu tavaliselt. See salvestatakse koos märkega „{exceptionLabel}”.</p>}

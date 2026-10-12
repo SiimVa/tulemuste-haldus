@@ -75,6 +75,10 @@ async function handlePOST(_req: Request, { params }: { params: Promise<{ id: str
           where: { id: exc.id },
           data: { penalty: newPenalty },
         })
+        await prisma.result.updateMany({
+          where: { elementId: element.id, exceptionLabel: exc.label },
+          data: { exceptionPenalty: newPenalty },
+        })
         updatedExceptions++
       }
     }

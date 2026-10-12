@@ -97,6 +97,14 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
             kind: parseExceptionKind(e.kind, String(e.label ?? "")),
           })),
         })
+        // Tulemus hoiab erandi väärtust sisestamise hetkest; muudetud väärtus
+        // peab kehtima ka juba sisestatud tulemustele.
+        for (const e of exceptions as { label: string; penalty: number }[]) {
+          await tx.result.updateMany({
+            where: { elementId: id, exceptionLabel: e.label, OR: [{ exceptionPenalty: null }, { exceptionPenalty: { not: e.penalty } }] },
+            data: { exceptionPenalty: e.penalty },
+          })
+        }
       }
 
       if (calcMethod) {

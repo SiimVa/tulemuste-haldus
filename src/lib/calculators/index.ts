@@ -4,7 +4,7 @@ import { evaluateFormula } from "../formula"
 
 import { scopeKeyFor, type ClassGroup, type TeamCountScope } from "../classGroups"
 import { parseFixedRankingParams, registeredCountPoints } from "../fixedRanking"
-import { FAILED_RANKED_CALC_TYPES, isFailedResult } from "../exceptionKinds"
+import { exceptionScore, FAILED_RANKED_CALC_TYPES, isFailedResult } from "../exceptionKinds"
 
 // Minimaalne tulemuse kuju, mida skoorimine vajab (täielik Result rahuldab seda samuti)
 export type ScoreInput = {
@@ -26,7 +26,7 @@ export interface ScoredEntry {
   allValues: FieldValues   // kõik arvutatud välja väärtused (tiebreakerite jaoks)
   exceptionPenalty: number | null
   // PENALTY: positiivne arv (väiksem = parem)
-  // PLUS: positiivne = teenitud punktid, negatiivne = erandi karistus
+  // PLUS: positiivne = teenitud punktid, negatiivne = lahutatud punktid
   penaltyPoints: number
   isHorsDeCompetition?: boolean
   teamClass?: string | null
@@ -163,14 +163,13 @@ export function calculateScores(
     const isHC = r.team.isHorsDeCompetition ?? false
     const failed = r.exceptionLabel !== null && isFailedResult(r, element.exceptions)
     if (r.exceptionLabel !== null && (r.exceptionPenalty !== null || failed)) {
-      const magnitude = Math.abs(r.exceptionPenalty ?? 0)
-      const stored = scoringMode === "PLUS" ? -magnitude : magnitude
+      const points = exceptionScore(r.exceptionPenalty, scoringMode)
       return {
         teamId: r.teamId,
         rawValue: null,
         allValues: {},
-        exceptionPenalty: magnitude,
-        penaltyPoints: stored,
+        exceptionPenalty: points,
+        penaltyPoints: points,
         isHorsDeCompetition: isHC,
         teamClass: r.team.class ?? null,
         failed,

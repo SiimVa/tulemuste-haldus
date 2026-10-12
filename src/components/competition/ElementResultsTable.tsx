@@ -94,7 +94,7 @@ export function ElementResultsTable({ element, teams }: Props) {
 
   // Ebaõnnestunud tulemusel on väljad nagu sooritusel, lisaks märge.
   const keepsValues = (label: string | null | undefined) => resultKeepsValues({ exceptionLabel: label }, element.exceptions)
-  const optionLabel = (ex: Exception) => exceptionOptionLabel(ex, element)
+  const optionLabel = (ex: Exception) => exceptionOptionLabel(ex, element, element.scoringMode ?? "PENALTY")
   // Viigi aeg ainult erandita tulemustelt: ebaõnnestunud jagavad viimast kohta.
   const tieValues = (teamId: string) => {
     const result = getResult(teamId)
@@ -186,6 +186,21 @@ export function ElementResultsTable({ element, teams }: Props) {
       })
       if (res.ok) {
         setEditingTeamId(null)
+        window.location.reload()
+      } else { setError((await res.json().catch(() => ({}))).error ?? "Kustutamine ebaõnnestus") }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Kustutab elemendi kõik tulemused korraga (nt proovisisestuse järel).
+  async function deleteAllResults() {
+    if (!window.confirm(`Kustuta elemendi „${element.name}” kõik ${results.length} tulemust? Seda ei saa tagasi võtta.`)) return
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/elements/${element.id}/results`, { method: "DELETE" })
+      if (res.ok) {
         window.location.reload()
       } else { setError((await res.json().catch(() => ({}))).error ?? "Kustutamine ebaõnnestus") }
     } finally {
@@ -436,10 +451,18 @@ export function ElementResultsTable({ element, teams }: Props) {
     <div className="bg-white border rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b flex items-center justify-between">
         <h2 className="font-semibold text-gray-900">Tulemused</h2>
-        <span className="text-sm text-gray-400">{(() => {
-          const progress = elementProgress(teams, element.order, results.map(result => result.teamId))
-          return <>{progress.entered} / {progress.total} sisestatud{progress.withdrawn > 0 && <span className="ml-2 text-red-600">{progress.withdrawn} KAT</span>}</>
-        })()}</span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-400">{(() => {
+            const progress = elementProgress(teams, element.order, results.map(result => result.teamId))
+            return <>{progress.entered} / {progress.total} sisestatud{progress.withdrawn > 0 && <span className="ml-2 text-red-600">{progress.withdrawn} KAT</span>}</>
+          })()}</span>
+          {results.length > 0 && (
+            <button type="button" onClick={deleteAllResults} disabled={saving}
+              className="text-sm text-red-600 hover:text-red-700 font-medium disabled:opacity-50">
+              Kustuta kõik
+            </button>
+          )}
+        </div>
       </div>
       {missingTeams.length > 0 && (inputFields.length > 0 || element.exceptions.length > 0) && (
         <div className="px-5 py-3 border-b bg-gray-50 flex items-center gap-2 flex-wrap">
