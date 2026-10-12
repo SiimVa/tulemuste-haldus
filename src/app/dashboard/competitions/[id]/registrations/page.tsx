@@ -19,6 +19,7 @@ import { Badge, type BadgeProps } from "@/components/ui/badge"
 import { Input, Select } from "@/components/ui/input"
 import { mandateProgress, matchesSearch, statusCounts } from "@/lib/registrationDashboard"
 import { RegistrationExportButtons } from "@/components/registration/RegistrationExportButtons"
+import { OrganizerDigestMenu } from "@/components/registration/OrganizerDigestMenu"
 import { CompetitionNav } from "@/components/competition/CompetitionNav"
 import { FinalizeReview, type FinalizeCheck } from "@/components/registration/FinalizeReview"
 
@@ -573,6 +574,8 @@ export default function RegistrationsPage({
         <Link href={`/dashboard/competitions/${competitionId}/registration-overview`} className="text-sm text-primary hover:underline">
           Registreerimise ülevaade ja ekspordi veergude valik →
         </Link>
+        <div className="flex flex-wrap items-center gap-2">
+        <OrganizerDigestMenu competitionId={competitionId} />
         <details className="group relative">
           <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:bg-canvas [&::-webkit-details-marker]:hidden">
             Ekspordi <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
@@ -588,6 +591,7 @@ export default function RegistrationsPage({
             </section>
           </div>
         </details>
+        </div>
       </div>
 
       {finalizeCheck && !overview?.registrationFinalizedAt && (

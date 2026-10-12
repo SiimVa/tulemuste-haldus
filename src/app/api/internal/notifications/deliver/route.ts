@@ -8,6 +8,7 @@ import { detectSecurityAlertsSafely } from "@/lib/securityAlerts.server"
 import { processDueLeaderboardFreezesSafely } from "@/lib/leaderboardFreeze.server"
 import { processDueSeriesFreezesSafely } from "@/lib/seriesRanking.server"
 import { deliverPendingCompetitionMessagesSafely } from "@/lib/competitionMessages.server"
+import { enqueueDueOrganizerDigestsSafely } from "@/lib/organizerDigest.server"
 
 export const dynamic = "force-dynamic"
 
@@ -35,8 +36,10 @@ export async function GET(req: Request) {
   // Pärast osavõistlusi, et üleriikliku arvestuse snapshot kasutaks nende külmutatud seisu.
   const seriesFreezes = await processDueSeriesFreezesSafely()
   const queued = await enqueueDueMandateOpenedNotifications()
+  // Korraldajate tellitud kokkuvõtted; saadetakse samas käivituses.
+  const organizerDigests = await enqueueDueOrganizerDigestsSafely()
   const delivery = await deliverPendingNotifications({ limit: 100 })
   // Korraldajate kirjad võistkondadele: partiid, mis ei läinud kohe välja.
   const competitionMessages = await deliverPendingCompetitionMessagesSafely()
-  return NextResponse.json({ queued, securityAlerts, leaderboardFreezes, seriesFreezes, competitionMessages, ...delivery })
+  return NextResponse.json({ queued, organizerDigests, securityAlerts, leaderboardFreezes, seriesFreezes, competitionMessages, ...delivery })
 }

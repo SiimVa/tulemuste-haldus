@@ -16,6 +16,27 @@ Võistluse aktiveerimisel saavad tulemuste avanemise teavituse esindaja ja kõik
 võistkonna liikmed, kelle kirje on kasutajakontoga seotud. Sama kasutaja saab ühe
 võistkonna kohta ühe kirja ka siis, kui ta on korraga liige ja esindaja.
 
+## Korraldaja kokkuvõtted
+
+Korraldaja saab tellida endale kokkuvõtte registreerimise ja/või mandaadi
+sündmustest: **Registreerimine → E-posti teavitused**. Tellimus on iga
+kasutaja ja võistluse kohta eraldi ning seda saab muuta või lõpetada samas
+menüüs.
+
+- **Intervall:** kohe (järgmise cron'i käivitusega, kuni 5 min), kord tunnis,
+  kord päevas kell 8 või kord nädalas esmaspäeval kell 8 (Eesti aeg).
+- **Registreerimine:** uued registreeringud, tagasivõtmised, ootenimekirjast
+  koha saamine ja parandatud registreeringud. Ühe avalduse sama perioodi
+  sündmused koondatakse üheks reaks; korraldaja enda otsuseid ei näidata.
+- **Mandaat:** esitatud mandaadid (ka automaatselt kinnitatud).
+- Kirja lõpus on hetkeseis nagu registreerimise lehe kaartidel.
+- Kui perioodis uusi sündmusi pole, kirja ei saadeta.
+
+Kokkuvõtted koostab sama teavituste cron (vt allpool). Periood märgitakse
+hõlmatuks samas tehingus, kus teavitus lisatakse, seega paralleelsed
+käivitused sama perioodi kaks korda ei saada. Kui kasutajalt on võistluse
+haldusõigus ära võetud, tema tellimus kustutatakse.
+
 ## E-kirjade koondamine
 
 Rakendusesisesed teavitused tekivad alati kohe ja iga võistkonna kohta eraldi.
