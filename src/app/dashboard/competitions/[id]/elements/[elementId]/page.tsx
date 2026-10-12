@@ -16,7 +16,7 @@ import { ElementSectionsManager } from "@/components/competition/ElementSections
 import { ResultsImportTrigger } from "@/components/competition/ResultsImportTrigger"
 import { RecalcButton } from "@/components/competition/RecalcButton"
 import { explainElementScores } from "@/lib/scoreExplainer"
-import { failedGetsLastPlace } from "@/lib/exceptionKinds"
+import { exceptionScore, failedGetsLastPlace, formatExceptionScore } from "@/lib/exceptionKinds"
 import { ScoringElementCopyDialog } from "@/components/competition/ScoringElementCopyDialog"
 import { Card } from "@/components/ui/card"
 import { parseClassGroups } from "@/lib/classGroups"
@@ -311,16 +311,18 @@ export default async function ElementPage({
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Erandid</h3>
           <div className="space-y-1.5">
             {element.exceptions.map((ex) => {
-              const magnitude = Math.abs(ex.penalty)
-              const isPlus = element.competition.scoringMode === "PLUS"
+              const scoringMode = element.competition.scoringMode
+              const score = exceptionScore(ex.penalty, scoringMode)
+              // Plusspunktides on positiivne erand võit; karistuspunktides kahju.
+              const tone = score === 0 ? "text-gray-500" : (scoringMode === "PLUS") === (score > 0) ? "text-green-700" : "text-red-600"
               return (
                 <div key={ex.id} className="flex items-center justify-between text-sm">
                   <span className="text-gray-700">{ex.label}</span>
                   {failedGetsLastPlace(ex, exceptionContext) ? (
                     <span className="text-amber-700">viimane koht</span>
                   ) : (
-                    <span className="font-mono text-red-600">
-                      {isPlus ? `−${magnitude}p` : `+${magnitude}p`}
+                    <span className={`font-mono ${tone}`}>
+                      {formatExceptionScore(ex.penalty, scoringMode)}
                     </span>
                   )}
                 </div>
@@ -329,7 +331,7 @@ export default async function ElementPage({
           </div>
           <p className="text-xs text-gray-400 mt-2">
             {element.competition.scoringMode === "PLUS"
-              ? "Erandid lahutavad punkte kogusummast"
+              ? "Positiivne erand annab punkte, negatiivne lahutab kogusummast"
               : "Erandid lisavad karistuspunkte kogusummale"}
           </p>
           {element.exceptions.some((ex) => failedGetsLastPlace(ex, exceptionContext)) && (
@@ -438,7 +440,7 @@ export default async function ElementPage({
                         )}
                       </td>
                       <td className="py-2 text-right font-mono font-semibold text-gray-900 tabular-nums">
-                        {element.competition.scoringMode === "PLUS"
+                        {element.competition.scoringMode === "PLUS" && b.score > 0
                           ? `+${b.score}p`
                           : `${b.score}p`}
                       </td>

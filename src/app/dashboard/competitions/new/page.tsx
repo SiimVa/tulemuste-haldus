@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { FixedRankingSettings } from "@/components/competition/FixedRankingSettings"
 import type { TeamCountScope } from "@/lib/classGroups"
 import { parseFixedPointValues, type FixedRankingMode } from "@/lib/fixedRanking"
+import { exceptionDefaultsForModeChange, exceptionValueHint } from "@/lib/exceptionKinds"
 
 type Form = {
   name: string
@@ -191,7 +192,7 @@ export default function NewCompetitionPage() {
           {SCORING_MODES.map(m => (
             <label key={m.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${form.scoringMode === m.value ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"}`}>
               <input type="radio" name="scoringMode" value={m.value}
-                checked={form.scoringMode === m.value} onChange={() => set("scoringMode", m.value)}
+                checked={form.scoringMode === m.value} onChange={() => setForm(f => exceptionDefaultsForModeChange(f, m.value))}
                 className="mt-0.5 accent-blue-600" />
               <div>
                 <p className="text-sm font-medium text-gray-900">{m.label}</p>
@@ -281,6 +282,7 @@ export default function NewCompetitionPage() {
             {numInput("defaultNotPassed", "Ei läbinud KP-d", "p", undefined)}
             {numInput("defaultPassedNotDone", "Läbis aga ei sooritanud", "p", undefined)}
           </div>
+          <p className="text-xs text-gray-500">{exceptionValueHint(form.scoringMode)}</p>
         </Card>
 
         {/* PK vaikeväärtused */}

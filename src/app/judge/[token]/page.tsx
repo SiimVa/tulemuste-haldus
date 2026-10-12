@@ -9,7 +9,7 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
   const accessToken = await prisma.accessToken.findUnique({
     where: { token },
     include: {
-      competition: { select: { id: true, name: true, status: true } },
+      competition: { select: { id: true, name: true, status: true, scoringMode: true } },
       element: {
         include: {
           fields: { orderBy: { order: "asc" } },
@@ -79,6 +79,7 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
       <main className="max-w-3xl mx-auto px-4 py-6">
         <JudgeInterface
           accessToken={token}
+          scoringMode={accessToken.competition.scoringMode}
           elements={elements.map(el => ({
             id: el.id,
             name: el.name,

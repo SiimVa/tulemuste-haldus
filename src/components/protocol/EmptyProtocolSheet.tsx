@@ -1,5 +1,6 @@
 import { EmptyProtocolAdditionalRows } from "@/components/protocol/EmptyProtocolOptions"
 import { protocolFieldHeading } from "@/lib/protocol"
+import { formatExceptionScore } from "@/lib/exceptionKinds"
 import { ProtocolDocumentHeading } from "@/components/protocol/ProtocolDocumentHeading"
 
 type ProtocolCompetition = {
@@ -100,7 +101,6 @@ export function EmptyProtocolSheet({
   const inComp = teams.filter((team) => !team.isHorsDeCompetition)
   const horsComp = teams.filter((team) => team.isHorsDeCompetition)
   const inputFields = element.fields.filter((field) => !field.formula)
-  const isPlusMode = competition.scoringMode === "PLUS"
   const columnCount =
     4 + inputFields.length + (element.exceptions.length > 0 ? 1 : 0) + 1
 
@@ -225,10 +225,7 @@ export function EmptyProtocolSheet({
                   <td className="pr-3 font-mono font-bold text-gray-700">{index + 1}</td>
                   <td className="pr-4 text-gray-700">{exception.label}</td>
                   <td className="font-mono text-red-600">
-                    {isPlusMode
-                      ? `−${Math.abs(exception.penalty)}`
-                      : `+${Math.abs(exception.penalty)}`}
-                    p
+                    {formatExceptionScore(exception.penalty, competition.scoringMode)}
                   </td>
                 </tr>
               ))}

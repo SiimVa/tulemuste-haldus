@@ -49,10 +49,10 @@ test("pingerida valemiga: ebaõnnestunud saavad halvima tulemuse ja teiste miini
   const penaltyScores = pointsOf(calculateScores(element("RELATIVE_RANKING", { higherIsBetter: true }), results(tenTeams), penalty))
   assert.deepEqual([penaltyScores.s1, penaltyScores.s4, penaltyScores.s7, penaltyScores.f1], [0, 10, 20, 30])
 
-  // Võrdluseks tavaline erand: jääb pingereast välja kindla karistusega.
+  // Võrdluseks tavaline erand: jääb pingereast välja oma kindla väärtusega.
   const other = pointsOf(calculateScores(element("RELATIVE_RANKING", { higherIsBetter: true }),
     results([...tenTeams.slice(0, 7), { id: "x", exception: "Muu" }]), plus))
-  assert.deepEqual([other.s1, other.s7, other.x], [30, 0, -5])
+  assert.deepEqual([other.s1, other.s7, other.x], [30, 0, 5])
 })
 
 test("ebaõnnestumine tuvastatakse liigist või nimest", () => {
@@ -88,13 +88,13 @@ test("väärtusepõhine ja pingereata hindamine", () => {
   const value = pointsOf(calculateScores(element("VALUE_BASED", { higherIsBetter: true }), results([{ id: "a", pts: 10 }, { id: "b", pts: 0 }, { id: "f", exception: "Kriteerium täitmata" }]), penalty))
   assert.deepEqual([value.a, value.b, value.f], [0, 30, 30])
 
-  // Ilma pingereata: ebaõnnestunu saab erandi karistuse nagu teised erandid.
+  // Ilma pingereata: ebaõnnestunu saab erandi väärtuse nagu teised erandid.
   const absoluteElement = { ...element("ABSOLUTE_POINTS"), exceptions: [{ label: "Ebaõnnestus", penalty: 12, kind: "FAILED" }] }
   const absolute = pointsOf(calculateScores(absoluteElement, [
     ...results([{ id: "a", pts: 20 }]),
     { teamId: "f", values: "{}", exceptionLabel: "Ebaõnnestus", exceptionPenalty: 12, team: { id: "f" } },
   ], plus))
-  assert.deepEqual([absolute.a, absolute.f], [20, -12])
+  assert.deepEqual([absolute.a, absolute.f], [20, 12])
   const worst = pointsOf(calculateScores(absoluteElement, [
     ...results([{ id: "a", pts: 20 }]),
     { teamId: "f", values: "{}", exceptionLabel: "Ebaõnnestus", exceptionPenalty: 12, team: { id: "f" } },
@@ -156,9 +156,50 @@ test("ebaõnnestunu tulemus säilib, kuid ei muuda pingerida", () => {
 
 test("erandi valikus näidatakse ebaõnnestumisel pingereaga hindamisel viimast kohta", () => {
   const [notPassed, failed] = exceptions
-  assert.equal(exceptionOptionLabel(failed, { calcType: "RELATIVE_RANKING" }), "Kriteerium täitmata (viimane koht)")
-  assert.equal(exceptionOptionLabel(failed, { calcType: "FIXED_RANKING" }), "Kriteerium täitmata (viimane koht)")
-  assert.equal(exceptionOptionLabel(failed, { calcType: "ABSOLUTE_POINTS", hasSections: true }), "Kriteerium täitmata (viimane koht)")
-  assert.equal(exceptionOptionLabel(failed, { calcType: "ABSOLUTE_POINTS" }), "Kriteerium täitmata (0p)")
-  assert.equal(exceptionOptionLabel(notPassed, { calcType: "RELATIVE_RANKING" }, "p karistust"), "Ei läbinud (40p karistust)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "RELATIVE_RANKING" }, "PENALTY"), "Kriteerium täitmata (viimane koht)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "FIXED_RANKING" }, "PENALTY"), "Kriteerium täitmata (viimane koht)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "ABSOLUTE_POINTS", hasSections: true }, "PENALTY"), "Kriteerium täitmata (viimane koht)")
+  assert.equal(exceptionOptionLabel(failed, { calcType: "ABSOLUTE_POINTS" }, "PENALTY"), "Kriteerium täitmata (0p)")
+  assert.equal(exceptionOptionLabel(notPassed, { calcType: "RELATIVE_RANKING" }, "PENALTY", "p karistust"), "Ei läbinud (40p karistust)")
+})
+
+test("plusspunktides näidatakse erandi punkte märgiga", () => {
+  const notPassed = { label: "Ei läbinud", penalty: -5, kind: "NOT_PASSED" }
+  const passedNotDone = { label: "Läbis aga ei sooritanud", penalty: 5, kind: "PASSED_NOT_DONE" }
+  assert.equal(exceptionOptionLabel(notPassed, { calcType: "RELATIVE_RANKING" }, "PLUS"), "Ei läbinud (−5p)")
+  assert.equal(exceptionOptionLabel(passedNotDone, { calcType: "RELATIVE_RANKING" }, "PLUS"), "Läbis aga ei sooritanud (+5p)")
+  assert.equal(exceptionOptionLabel({ ...notPassed, penalty: 0 }, { calcType: "RELATIVE_RANKING" }, "PLUS"), "Ei läbinud (0p)")
+})
+
+test("plusspunktides on erandi väärtus märgiga, karistuspunktides alati karistus", () => {
+  const signed = [
+    { label: "Ei läbinud", penalty: -5, kind: "NOT_PASSED" },
+    { label: "Läbis aga ei sooritanud", penalty: 5, kind: "PASSED_NOT_DONE" },
+  ]
+  const signedElement = { ...element("RELATIVE_RANKING", { higherIsBetter: true }), exceptions: signed }
+  const rows: ScoreInput[] = [
+    ...results([{ id: "a", pts: 10 }, { id: "b", pts: 5 }]),
+    { teamId: "n", values: "{}", exceptionLabel: "Ei läbinud", exceptionPenalty: -5, team: { id: "n" } },
+    { teamId: "p", values: "{}", exceptionLabel: "Läbis aga ei sooritanud", exceptionPenalty: 5, team: { id: "p" } },
+  ]
+  const plusScores = pointsOf(calculateScores(signedElement, rows, plus))
+  assert.deepEqual([plusScores.n, plusScores.p], [-5, 5])
+
+  const penaltyScores = pointsOf(calculateScores(signedElement, rows, penalty))
+  assert.deepEqual([penaltyScores.n, penaltyScores.p], [5, 5])
+
+  // Kombineeritud elemendis sama reegel.
+  const sectionField = { ...field, id: "osa", name: "osa", label: "osa" } as unknown as FieldDefinition
+  const combo: ComputeElement = {
+    id: "combo", type: "CHECKPOINT", order: 0, isCancelled: false, maxValue: null, fields: [], calcMethod: null, miscEntries: [],
+    exceptions: signed,
+    sections: [{ calcMethod: method("RELATIVE_RANKING", { higherIsBetter: true }), fields: [sectionField], maxValue: 10 }],
+  }
+  const team = (id: string) => ({ id, isHorsDeCompetition: false, hcFromElementOrder: null, dnfFromElementOrder: null })
+  const comboScores = computeAllScores([combo], [
+    { elementId: "combo", teamId: "a", values: JSON.stringify({ osa: 3 }), exceptionLabel: null, exceptionPenalty: null, team: team("a") },
+    { elementId: "combo", teamId: "n", values: "{}", exceptionLabel: "Ei läbinud", exceptionPenalty: -5, team: team("n") },
+    { elementId: "combo", teamId: "p", values: "{}", exceptionLabel: "Läbis aga ei sooritanud", exceptionPenalty: 5, team: team("p") },
+  ], { scoringMode: "PLUS", defaultKPMaxValue: 30, defaultPKMaxValue: 15 }).get("combo")!
+  assert.deepEqual([comboScores.get("n"), comboScores.get("p")], [-5, 5])
 })

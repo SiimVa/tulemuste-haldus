@@ -1,5 +1,5 @@
 import { calculateScores, withEffectiveHC, type ScoringMode } from "./calculators"
-import { isFailedResult } from "./exceptionKinds"
+import { exceptionScore, isFailedResult } from "./exceptionKinds"
 import type { FieldDefinition, CalcMethod } from "@prisma/client"
 
 export type ComputeTeam = {
@@ -74,7 +74,7 @@ export function computeAllScores(
       const exceptionResults = activeResults.filter((r) => r.exceptionLabel && !isFailedResult(r, exceptions))
       const normalResults = activeResults.filter((r) => !r.exceptionLabel || isFailedResult(r, exceptions))
       const teamScores = new Map<string, number>()
-      for (const r of exceptionResults) { const m = Math.abs(r.exceptionPenalty ?? 0); teamScores.set(r.teamId, isPlusMode ? -m : m) }
+      for (const r of exceptionResults) teamScores.set(r.teamId, exceptionScore(r.exceptionPenalty, config.scoringMode))
       for (const section of element.sections) {
         if (!section.calcMethod || section.fields.length === 0) continue
         const mockElement = { id: element.id, calcMethod: section.calcMethod, fields: section.fields, exceptions, maxValue: section.maxValue }
