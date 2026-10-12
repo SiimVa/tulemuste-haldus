@@ -101,7 +101,10 @@ test("esindaja vahetus säilitab registreerija ja kajastub kaardil, mandaadis, e
   await db.registrationApplicationFieldValue.updateMany({ where: { applicationId: f.application.id, fieldId: f.fields[0].id }, data: { value: JSON.stringify(f.original.name) } })
   await db.registrationApplicationFieldValue.updateMany({ where: { applicationId: f.application.id, fieldId: f.fields[1].id }, data: { value: JSON.stringify(f.original.email) } })
   await page.goto(`/dashboard/competitions/${f.competition.id}/registrations`)
+  // Pärast nimekirja kinnitamist avaneb vaikimisi mandaat; avaldus on kõrval vahelehel ja kokku volditud.
+  await page.getByRole("tab", { name: /^Avaldused/ }).click()
   const card = page.locator(`#application-${f.application.id}`)
+  await card.getByRole("button", { name: f.application.teamName, exact: true }).click()
   await expect(card.getByText(`Praegune esindaja: ${f.next.name}`, { exact: false })).toBeVisible()
   await expect(card.locator("dd").filter({ hasText: f.next.email })).toBeVisible()
   await expect(card.getByText(`Registreeris: ${f.original.name}`)).toBeVisible()

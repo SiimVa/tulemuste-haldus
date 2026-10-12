@@ -68,6 +68,7 @@ test("organizer edits full registrations after closing and adds and edits teams 
   await db.team.update({ where: { id: teamId }, data: { mandateStatus: "APPROVED", members: { create: { name: "Tugiliige", role: "SUPPORT" } } } })
 
   await page.reload()
+  await expect(page.getByTestId("mandate-counter")).toContainText("1/2")
   // The application shortcut opens the current team data during mandate.
   await page.locator("article").filter({ hasText: "Muudetud võistkond" }).first().getByRole("button", { name: "Muuda võistkonda" }).click()
   await form.getByLabel("Võistkonna nimi").fill("Mandaadis muudetud")

@@ -797,9 +797,9 @@ test.describe.serial("võistluse põhivoog", () => {
         name: "Registreerimine ja mandaat",
       })
     ).toBeVisible()
-    await adminPage.getByRole("button", { name: "Kinnita" }).click()
+    await adminPage.getByRole("button", { name: "Kinnita registreerimine", exact: true }).click()
     await expect(
-      adminPage.getByText("Kinnitatud", { exact: true }).first()
+      adminPage.getByText("Registreerimine kinnitatud", { exact: true })
     ).toBeVisible()
 
     await page.reload()
@@ -815,9 +815,9 @@ test.describe.serial("võistluse põhivoog", () => {
     ).toBeVisible()
 
     await adminPage.reload()
-    await adminPage.getByRole("button", { name: "Kinnita" }).click()
+    await adminPage.getByRole("button", { name: "Kinnita mandaat", exact: true }).click()
     await expect(
-      adminPage.getByText("Kinnitatud", { exact: true }).nth(1)
+      adminPage.getByText("Mandaat kinnitatud", { exact: true })
     ).toBeVisible()
 
     const workflowResponse = await page.request.get(
@@ -1662,15 +1662,19 @@ test.describe.serial("võistluse põhivoog", () => {
       .locator("article")
       .filter({ hasText: "Avalik testvõistkond 3" })
       .last()
+    await adminPage.getByRole("tab", { name: /^Mandaat/ }).click()
+    // Mandaadi andmed ja parandamisele saatmine on kokkuvolditud rea all.
+    await automaticTeamCard
+      .getByRole("button", { name: /Avalik testvõistkond 3/ })
+      .click()
     adminPage.once("dialog", (dialog) =>
       dialog.accept("Täpsusta mandaadi andmeid")
     )
     await automaticTeamCard
-      .getByRole("button", { name: "Saada parandamisele" })
-      .last()
+      .getByRole("button", { name: "Saada mandaat parandamisele" })
       .click()
     await expect(
-      automaticTeamCard.getByText("Vajab parandamist", { exact: true })
+      automaticTeamCard.getByText("Vajab parandamist", { exact: true }).first()
     ).toBeVisible()
 
     await page.goto("/dashboard")

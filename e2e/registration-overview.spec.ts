@@ -119,6 +119,7 @@ test("organizer selects report fields, filters and exports registration and mand
   expect(await csv.text()).not.toContain("Öökullid")
 
   await page.goto(`/dashboard/competitions/${competition.id}/registrations`)
+  await page.locator("summary", { hasText: "Ekspordi" }).click()
   await expect(page.getByRole("region", { name: "Registreerimise eksport" }).getByRole("button", { name: "Ekspordi Excel" })).toBeVisible()
   await expect(page.getByRole("region", { name: "Mandaadi eksport" }).getByRole("button", { name: "Ekspordi CSV" })).toBeVisible()
   const membersCsv = page.waitForEvent("download")
