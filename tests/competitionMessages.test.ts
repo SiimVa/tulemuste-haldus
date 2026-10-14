@@ -96,6 +96,8 @@ test("saajad: rolli, oleku ja klassi filter", () => {
 test("aadressi ja sisendi kontroll", () => {
   assert.equal(isValidMessageEmail("mari@example.com"), true)
   assert.equal(isValidMessageEmail("vigane@"), false)
+  assert.equal(isValidMessageEmail("rasmus.lõo858@gmail.com"), false)
+  assert.equal(isValidMessageEmail("test@näide.ee"), false)
   assert.equal(isValidMessageEmail("a b@example.com"), false)
   assert.equal(validateMessageInput("", "sisu"), "Kirja teema on kohustuslik")
   assert.equal(validateMessageInput("Teema\nBcc: x@y.ee", "sisu"), "Teema peab olema ühel real")

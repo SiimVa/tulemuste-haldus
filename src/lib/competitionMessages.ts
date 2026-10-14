@@ -77,7 +77,7 @@ export function normalizeMessageEmail(value: string | null | undefined): string 
 }
 
 export function isValidMessageEmail(value: string): boolean {
-  return value.length <= 254 && EMAIL_PATTERN.test(value)
+  return value.length <= 254 && !/[^\x00-\x7F]/.test(value) && EMAIL_PATTERN.test(value)
 }
 
 const isMember = (value: unknown): value is MemberAnswer =>

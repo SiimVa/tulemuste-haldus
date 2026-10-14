@@ -1,4 +1,6 @@
 import "server-only"
+import { createHash } from "node:crypto"
+import { resendBatchFailures } from "./resendBatch"
 import { prisma } from "@/lib/prisma"
 import { resendConfig } from "@/lib/email.server"
 import { toFormFieldDefinition } from "@/lib/registrationForm"
@@ -139,8 +141,9 @@ export async function deliverCompetitionMessages(options: { messageId?: string; 
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
           "Content-Type": "application/json",
+          "x-batch-validation": "permissive",
           // Sama partii korduskatse ei saada kirju topelt.
-          "Idempotency-Key": `competition-message-${messageId}-${batchNo}`,
+          "Idempotency-Key": `competition-message-v2-${messageId}-${batchNo}-${createHash("sha256").update(JSON.stringify(ids)).digest("hex").slice(0, 24)}`,
         },
         body: JSON.stringify(rows.map((row) => {
           const content = messageEmailContent({ competitionName: message.competition.name, subject: message.subject, body: message.body, contexts: [row.context] })
@@ -159,8 +162,19 @@ export async function deliverCompetitionMessages(options: { messageId?: string; 
         const detail = (await response.text()).slice(0, 500)
         throw new Error(`Resend vastas staatusega ${response.status}${detail ? `: ${detail}` : ""}`)
       }
-      await prisma.competitionMessageRecipient.updateMany({ where: { id: { in: ids } }, data: { status: "SENT", sentAt: new Date(), lastError: null } })
-      sent += rows.length
+      const failures = resendBatchFailures(await response.json(), rows.length)
+      const successfulIds = rows.filter((_, index) => !failures.has(index)).map(row => row.id)
+      // Persist both outcomes together. If this transaction fails, a retry
+      // uses the same payload/key and Resend returns its cached outcome.
+      await prisma.$transaction([
+        prisma.competitionMessageRecipient.updateMany({ where: { id: { in: successfulIds } }, data: { status: "SENT", sentAt: new Date(), lastError: null } }),
+        ...[...failures].map(([index, error]) => prisma.competitionMessageRecipient.update({
+          where: { id: rows[index].id },
+          data: { status: "FAILED", attempts: MAX_ATTEMPTS, lastError: `Resend: ${error}`.slice(0, 2000) },
+        })),
+      ])
+      sent += successfulIds.length
+      failed += failures.size
     } catch (error) {
       const attempts = Math.max(...rows.map((row) => row.attempts))
       const delayMinutes = Math.min(2 ** attempts, 60)

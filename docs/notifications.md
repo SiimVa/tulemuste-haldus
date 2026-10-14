@@ -128,3 +128,13 @@ jäävad alles.
 
 `RESEND_API_URL` on vaikimisi `https://api.resend.com`. Testides suunatakse
 kirjad selle muutujaga kohalikku võltsserverisse.
+
+
+### Vigased saajaaadressid partiis
+
+Kirjade saajate eelvaade jätab vigased ja mitte-ASCII märgiga aadressid välja
+ning näitab neid hoiatusega. Aadressi ei parandata oletuse järgi.
+Resendi partiid kasutavad osalise õnnestumise režiimi: ühe saaja valideerimisviga
+ei takista teistele saatmist. Vigane saaja jääb kirja ajalukku eraldi veaga ja
+talle ei tehta mõttetuid korduskatseid. Ajutise ühendus- või teenusevea korral
+jätkuvad senised korduskatsed sama partii kordumatuse võtmega.
