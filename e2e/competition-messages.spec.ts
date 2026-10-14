@@ -10,7 +10,7 @@ const db = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
 const cronSecret = "e2e-cron-secret-used-only-by-playwright-tests"
 
 // Võltsitud Resend (playwright.config.ts: RESEND_API_URL).
-type Captured = { path: string; idempotencyKey: string | undefined; body: unknown }
+type Captured = { validation?: string; path: string; idempotencyKey: string | undefined; body: unknown }
 const captured: Captured[] = []
 let failNextBatch = false
 let server: Server
@@ -22,13 +22,15 @@ test.beforeAll(async () => {
       const path = req.url ?? ""
       if (path === "/emails/batch" && failNextBatch) {
         failNextBatch = false
-        captured.push({ path, idempotencyKey: req.headers["idempotency-key"] as string | undefined, body: JSON.parse(raw) })
+        captured.push({ path, idempotencyKey: req.headers["idempotency-key"] as string | undefined, body: JSON.parse(raw), validation: req.headers["x-batch-validation"] as string | undefined })
         res.writeHead(500, { "Content-Type": "application/json" }).end(JSON.stringify({ message: "Ajutine viga" }))
         return
       }
-      captured.push({ path, idempotencyKey: req.headers["idempotency-key"] as string | undefined, body: JSON.parse(raw) })
-      const count = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw).length : 1
-      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(path === "/emails/batch" ? { data: Array.from({ length: count }, (_, index) => ({ id: `mock-${index}` })) } : { id: "mock" }))
+      captured.push({ path, idempotencyKey: req.headers["idempotency-key"] as string | undefined, body: JSON.parse(raw), validation: req.headers["x-batch-validation"] as string | undefined })
+      const emails = JSON.parse(raw)
+      const count = Array.isArray(emails) ? emails.length : 1
+      const errors = path === "/emails/batch" ? emails.flatMap((email: { to: string[] }, index: number) => email.to.some(to => /[^\x00-\x7F]/.test(to) || to === "rejected@example.com") ? [{ index, message: "Invalid to field" }] : []) : []
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(path === "/emails/batch" ? { data: Array.from({ length: count - errors.length }, (_, index) => ({ id: `mock-${index}` })), errors } : { id: "mock" }))
     })
   })
   await new Promise<void>((resolve) => server.listen(3199, "127.0.0.1", resolve))
@@ -118,6 +120,7 @@ test("korraldaja saadab kirja registreerunud võistkondade esindajatele ja liikm
   expect((await cron.json()).competitionMessages).toMatchObject({ sent: 4, failed: 0 })
   const batch = captured.at(-1)!
   expect(batch.path).toBe("/emails/batch")
+  expect(batch.validation).toBe("permissive")
   expect(batch.idempotencyKey).toBe(failedAttempt.idempotencyKey)
   const emails = batch.body as { to: string[]; subject: string; reply_to: string; text: string; html: string }[]
   expect(emails.map((email) => email.to)).toEqual([[`liis-${stamp}@example.com`], [`mari-${stamp}@example.com`], [`sega-${stamp}@example.com`], [`valga-${stamp}@example.com`]])
@@ -144,4 +147,27 @@ test("korraldaja saadab kirja registreerunud võistkondade esindajatele ja liikm
   const denied = await strangerPage.request.post(`/api/competitions/${competition.id}/messages`, { data: { subject: "x", body: "y", test: true } })
   expect(denied.status()).toBe(403)
   await strangerContext.close()
+})
+
+test("one rejected recipient does not block a 100-recipient batch or resend successful recipients", async ({ request }) => {
+  const user = await db.user.create({ data: { email: `batch-${Date.now()}@example.com`, name: "Saatja" } })
+  const competition = await db.competition.create({ data: { name: "Partii eraldamine", createdById: user.id } })
+  const message = await db.competitionMessage.create({ data: {
+    competitionId: competition.id, subject: "Partii", body: "Test", recipientCount: 100,
+    recipients: { create: Array.from({ length: 100 }, (_, i) => ({ email: i === 50 ? "rasmus.lõo858@gmail.com" : i === 80 ? "rejected@example.com" : `valid-${i}@example.com`, context: "liige", batchNo: 0 })) },
+  } })
+  const previous = captured.length
+  const response = await request.get("/api/internal/notifications/deliver", { headers: { Authorization: `Bearer ${cronSecret}` } })
+  expect(response.ok()).toBe(true)
+  expect((await response.json()).competitionMessages).toMatchObject({ sent: 98, failed: 2 })
+  const rows = await db.competitionMessageRecipient.findMany({ where: { messageId: message.id } })
+  expect(rows.filter(row => row.status === "SENT")).toHaveLength(98)
+  expect(rows.filter(row => row.status === "FAILED").every(row => row.attempts === 6 && row.lastError === "Resend: Invalid to field")).toBe(true)
+  expect(captured.slice(previous).filter(item => item.path === "/emails/batch")).toHaveLength(1)
+  const beforeRetry = captured.length
+  await db.competitionMessageRecipient.updateMany({ where: { messageId: message.id }, data: { nextAttemptAt: new Date(0) } })
+  await request.get("/api/internal/notifications/deliver", { headers: { Authorization: `Bearer ${cronSecret}` } })
+  expect(captured.slice(beforeRetry).filter(item => item.path === "/emails/batch")).toHaveLength(0)
+  await db.competition.delete({ where: { id: competition.id } })
+  await db.user.delete({ where: { id: user.id } })
 })
