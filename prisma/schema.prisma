@@ -711,6 +711,7 @@ model Result {
   teamId           String
   team             Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
   values           String         @default("{}")
+  failureMode      String         @default("AUTO") // AUTO | FORCE_SUCCESS | FORCE_FAILED
   exceptionLabel   String?
   exceptionPenalty Float?
   enteredByUserId  String?

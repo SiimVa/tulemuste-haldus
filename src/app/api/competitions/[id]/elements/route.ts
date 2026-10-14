@@ -1,3 +1,5 @@
+import { validateFailureRule, readFailureRule } from "@/lib/failureRules"
+import { exceptionKind } from "@/lib/exceptionKinds"
 import { parseExceptionKind } from "@/lib/exceptionKinds"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
@@ -55,6 +57,9 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
   type FieldInput = { name: string; label: string; type: string; order?: number; isResultField?: boolean; rankingPriority?: number | null; formula?: string; meta?: string; validation?: Record<string, unknown> }
   type SectionInput = { name: string; maxValue?: number | null; fields?: FieldInput[]; calcMethod?: { type: string; params?: Record<string, unknown>; customFormula?: string } }
 
+  const failureError = validateFailureRule(config, [...(fields ?? []), ...(sections ?? []).flatMap((s: SectionInput) => s.fields ?? [])])
+  if (failureError) return NextResponse.json({ error: failureError }, { status: 422 })
+  if (readFailureRule(config) && !(exceptions ?? []).some((e: { label: string; kind?: string | null }) => exceptionKind(e) === "FAILED")) return NextResponse.json({ error: "Lisa ebaõnnestumise tingimuse jaoks erand liigiga „Ebaõnnestus”." }, { status: 422 })
   const hasSections = Array.isArray(sections) && sections.length > 0
   const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
     ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))

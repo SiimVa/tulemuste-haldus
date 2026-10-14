@@ -1,3 +1,4 @@
+import { FailureRuleError, parseFailureMode, resolveFailure } from "@/lib/failureRules"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
 import { setSecurityActor, setSecurityTargets } from "@/lib/security.server"
 import { NextResponse } from "next/server"
@@ -84,7 +85,7 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
 
   setSecurityActor(enteredByUserId, enteredByTokenId)
   const body = await req.json().catch(() => ({}))
-  const { teamId, values, exceptionLabel, expectedUpdatedAt } = body
+  const { teamId, values, exceptionLabel, expectedUpdatedAt, failureMode } = body
   const checksVersion = Object.prototype.hasOwnProperty.call(body, "expectedUpdatedAt")
   if (checksVersion && expectedUpdatedAt !== null && (
     typeof expectedUpdatedAt !== "string" || !Number.isFinite(Date.parse(expectedUpdatedAt))
@@ -118,22 +119,14 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     include: { fields: true, sections: { include: { fields: true } }, exceptions: true },
   })
 
-  // Leia erandi karistus
-  let exceptionPenalty: number | null = null
-  if (exceptionLabel) {
-    const exc = element?.exceptions.find((item) => item.label === exceptionLabel)
-    if (!exc) return NextResponse.json({ error: "Tundmatu erand" }, { status: 422 })
-    exceptionPenalty = exc.penalty
-  }
-  // Ebaõnnestunud tulemusel on sooritus olemas: väljad valideeritakse ja
-  // salvestatakse. Teiste erandite korral väärtusi ei hoita.
-  const keepsValues = resultKeepsValues({ exceptionLabel }, element?.exceptions ?? [])
-  const storedValues = keepsValues ? (values ?? {}) : {}
+  let mode
+  try { mode = parseFailureMode(failureMode, exceptionLabel, element?.exceptions ?? []) }
+  catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 422 }) }
 
   // Kui erandit pole ja kõik lahtrid on tühjad → loe "sisestamata": kustuta kirje
   // ja skoor. Enne valideerimist, et kohustuslik väli kustutamist ei takistaks.
   const hasAnyValue = values && Object.values(values).some((v) => String(v ?? "").trim() !== "")
-  if (!exceptionLabel && !hasAnyValue) {
+  if (!exceptionLabel && !hasAnyValue && mode !== "FORCE_FAILED") {
     try {
       await withElementScoreTransaction(elementId, async (tx) => {
         const current = await tx.result.findUnique({ where: { elementId_teamId: { elementId, teamId } } })
@@ -151,61 +144,68 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ deleted: true, teamId })
   }
 
-  // Valideeri sisendväljad. Ebaõnnestunul võib mõni väärtus puududa, seega
-  // kohustuslikke välju ei nõuta.
-  if (keepsValues && values) {
-    const failed = Boolean(exceptionLabel)
-    const allFields = [
-      ...(element?.fields ?? []),
-      ...(element?.sections.flatMap(s => s.fields) ?? []),
-    ]
-    for (const field of allFields) {
-      if (field.type === "COMPUTED") continue
-      const parsedValidation = parseValidation(field.validation)
-      const validation = failed ? { ...parsedValidation, required: false } : parsedValidation
-      if (field.type === "TIME_RANGE") {
-        const startError = validateClockValue(
-          values[field.name + "_start"],
-          field.name + "_start",
-          `${field.label} algusaeg`,
-          Boolean(validation.required)
-        )
-        if (startError) return NextResponse.json({ error: startError.message }, { status: 422 })
-        const endError = validateClockValue(
-          values[field.name + "_end"],
-          field.name + "_end",
-          `${field.label} lõppaeg`,
-          Boolean(validation.required)
-        )
-        if (endError) return NextResponse.json({ error: endError.message }, { status: 422 })
-        const hasStart = String(values[field.name + "_start"] ?? "").trim() !== ""
-        const hasEnd = String(values[field.name + "_end"] ?? "").trim() !== ""
-        if (hasStart !== hasEnd) {
-          return NextResponse.json({ error: `${field.label} — sisesta nii algusaeg kui lõppaeg` }, { status: 422 })
-        }
-        continue
-      }
-      const err = validateFieldValue(values[field.name], field.name, field.label, field.type, validation, field.meta)
-      if (err) return NextResponse.json({ error: err.message }, { status: 422 })
-    }
-  }
-
   try {
     const result = await withElementScoreTransaction(elementId, async (tx) => {
       const current = await tx.result.findUnique({
         where: { elementId_teamId: { elementId, teamId } },
         include: { team: true },
       })
+      const lockedElement = await tx.scoringElement.findUniqueOrThrow({ where: { id: elementId }, include: { fields: true, exceptions: true } })
+      const resolvedMode = failureMode === undefined && !exceptionLabel && current
+        ? parseFailureMode(current.failureMode, current.exceptionLabel, lockedElement.exceptions)
+        : parseFailureMode(failureMode, exceptionLabel, lockedElement.exceptions)
+      const resolved = resolveFailure(lockedElement, values ?? {}, resolvedMode, exceptionLabel)
+      const keepsValues = resultKeepsValues(resolved, lockedElement.exceptions)
+      const storedValues = keepsValues ? (values ?? {}) : {}
+      // Valideeri sisendväljad. Ebaõnnestunul võib mõni väärtus puududa, seega
+      // kohustuslikke välju ei nõuta.
+      if (keepsValues && values) {
+        const failed = Boolean(resolved.exceptionLabel)
+        const allFields = [
+          ...lockedElement.fields,
+        ]
+        for (const field of allFields) {
+          if (field.type === "COMPUTED") continue
+          const parsedValidation = parseValidation(field.validation)
+          const validation = failed ? { ...parsedValidation, required: false } : parsedValidation
+          if (field.type === "TIME_RANGE") {
+            const startError = validateClockValue(
+              values[field.name + "_start"],
+              field.name + "_start",
+              `${field.label} algusaeg`,
+              Boolean(validation.required)
+            )
+            if (startError) throw new FailureRuleError(startError.message)
+            const endError = validateClockValue(
+              values[field.name + "_end"],
+              field.name + "_end",
+              `${field.label} lõppaeg`,
+              Boolean(validation.required)
+            )
+            if (endError) throw new FailureRuleError(endError.message)
+            const hasStart = String(values[field.name + "_start"] ?? "").trim() !== ""
+            const hasEnd = String(values[field.name + "_end"] ?? "").trim() !== ""
+            if (hasStart !== hasEnd) {
+              throw new FailureRuleError(`${field.label} — sisesta nii algusaeg kui lõppaeg`)
+            }
+            continue
+          }
+          const err = validateFieldValue(values[field.name], field.name, field.label, field.type, validation, field.meta)
+          if (err) throw new FailureRuleError(err.message)
+        }
+      }
+
       const serializedValues = JSON.stringify(storedValues)
       // The first attempt may have committed even if its HTTP response was
       // lost. Return that record without changing timestamps or provenance.
       if (checksVersion && current &&
         sameValues(current.values, serializedValues) &&
-        current.exceptionLabel === (exceptionLabel ?? null) &&
-        current.exceptionPenalty === exceptionPenalty &&
+        current.exceptionLabel === resolved.exceptionLabel &&
+        current.exceptionPenalty === resolved.exceptionPenalty &&
+        current.failureMode === resolvedMode &&
         current.enteredByUserId === enteredByUserId &&
         current.enteredByTokenId === enteredByTokenId
-      ) return current
+      ) return { ...current, failureReason: resolved.failureReason }
       if (checksVersion && (expectedUpdatedAt === null
         ? current !== null
         : current?.updatedAt.getTime() !== Date.parse(expectedUpdatedAt))) {
@@ -213,20 +213,23 @@ async function handlePOST(req: Request, { params }: { params: Promise<{ id: stri
       }
       const data = {
         values: serializedValues,
-        exceptionLabel: exceptionLabel ?? null,
-        exceptionPenalty,
+        failureMode: resolvedMode,
+        exceptionLabel: resolved.exceptionLabel,
+        exceptionPenalty: resolved.exceptionPenalty,
         enteredByUserId,
         enteredByTokenId,
       }
-      return tx.result.upsert({
+      const saved = await tx.result.upsert({
         where: { elementId_teamId: { elementId, teamId } },
         create: { elementId, teamId, ...data },
         update: data,
         include: { team: true },
       })
+      return { ...saved, failureReason: resolved.failureReason }
     })
     return NextResponse.json(result)
   } catch (error) {
+    if (error instanceof FailureRuleError) return NextResponse.json({ error: error.message }, { status: 422 })
     if (error instanceof ResultVersionConflict) return NextResponse.json({ error: "Tulemus on vahepeal muutunud. Värskenda lehte ja kontrolli tulemust enne uuesti salvestamist." }, { status: 409 })
     throw error
   }

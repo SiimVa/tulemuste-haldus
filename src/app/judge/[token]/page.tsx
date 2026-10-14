@@ -53,7 +53,7 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
   const elementIds = elements.map(e => e.id)
   const results = await prisma.result.findMany({
     where: { elementId: { in: elementIds } },
-    select: { elementId: true, teamId: true, values: true, exceptionLabel: true, updatedAt: true },
+    select: { elementId: true, teamId: true, values: true, exceptionLabel: true, failureMode: true, updatedAt: true },
   })
 
   // Update lastUsedAt
@@ -85,6 +85,7 @@ export default async function JudgePage({ params }: { params: Promise<{ token: s
             name: el.name,
             code: el.code,
             order: el.order,
+            config: el.config,
             fields: el.fields,
             exceptions: el.exceptions,
             calcType: el.calcMethod?.type ?? null,

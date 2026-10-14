@@ -9,6 +9,7 @@ type ImportRowResult = {
   status: "ok" | "error" | "skipped"
   message?: string
   values?: Record<string, string>
+  failureReason?: string
   exceptionLabel?: string
 }
 
@@ -233,6 +234,7 @@ export function ResultsImportModal({ elementId, competitionId, elementName, onCl
                         <td className="px-3 py-1.5 font-mono text-gray-700">{row.teamCode}</td>
                         <td className="px-3 py-1.5 text-gray-700">{row.teamName}</td>
                         <td className="px-3 py-1.5 text-gray-500">
+                          {row.failureReason && <p className="text-xs text-amber-800">{row.failureReason}</p>}
                           {row.exceptionLabel && (
                             <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-xs">
                               {row.exceptionLabel}

@@ -1,12 +1,14 @@
 "use client"
 
+import { FailureModeControl } from "@/components/FailureModeControl"
+import { parseFailureMode, type FailureMode } from "@/lib/failureRules"
 import { PointFieldInput } from "@/components/PointFieldInput"
 import { compareElementTimes, pointFieldLabel, readPointMeta } from "@/lib/pointFields"
 import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { useState } from "react"
 import { naturalCompare } from "@/lib/utils"
 import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
-import { exceptionOptionLabel, isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
+import { exceptionKind, exceptionOptionLabel, isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; meta?: string | null }
 
@@ -35,7 +37,7 @@ function formatComputedValue(f: Field, value: unknown): string {
 }
 
 type Exception = { id: string; label: string; penalty: number; kind?: string | null }
-type ResultRow = { id: string; teamId: string; teamName: string; teamCode: string; values: string; allValues?: Record<string, unknown>; exceptionLabel?: string | null; exceptionPenalty?: number | null; updatedAt: Date }
+type ResultRow = { failureMode?: string; id: string; teamId: string; teamName: string; teamCode: string; values: string; allValues?: Record<string, unknown>; exceptionLabel?: string | null; exceptionPenalty?: number | null; updatedAt: Date }
 type Score = { teamId: string; penaltyPoints: number }
 type Team = { id: string; name: string; code: string; isHorsDeCompetition?: boolean; hcFromElementOrder?: number | null; dnfFromElementOrder?: number | null }
 
@@ -45,6 +47,7 @@ const teamIsHC = (t: Team) => (t.isHorsDeCompetition ?? false) || t.hcFromElemen
 
 interface Props {
   element: {
+    config?: string
     id: string
     order: number
     name: string
@@ -68,6 +71,8 @@ export function ElementResultsTable({ element, teams }: Props) {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [exceptionLabel, setExceptionLabel] = useState<string>("")
+  const [failureMode, setFailureMode] = useState<FailureMode>("AUTO")
+  const [bulkFailureMode, setBulkFailureMode] = useState<FailureMode>("AUTO")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [bulkException, setBulkException] = useState("")
@@ -111,7 +116,7 @@ export function ElementResultsTable({ element, teams }: Props) {
     const missing = teams.filter(t => !teamIsDnf(t) && !results.find(r => r.teamId === t.id))
     if (missing.length === 0) return
     const useException = !!bulkException
-    if (!useException && !hasBulkValues) return
+    if (!useException && !hasBulkValues && bulkFailureMode !== "FORCE_FAILED") return
     setBulkApplying(true)
     try {
       for (const team of missing) {
@@ -122,6 +127,8 @@ export function ElementResultsTable({ element, teams }: Props) {
             teamId: team.id,
             values: keepsValues(bulkException) ? bulkValues : {},
             exceptionLabel: useException ? bulkException : null,
+            failureMode: bulkFailureMode,
+            expectedUpdatedAt: null,
           }),
         })
         if (!response.ok) { setError((await response.json()).error ?? "Salvestamine ebaõnnestus"); return }
@@ -136,10 +143,12 @@ export function ElementResultsTable({ element, teams }: Props) {
     const existing = getResult(team.id)
     if (existing) {
       setFormValues(parseValues(existing.values))
-      setExceptionLabel(existing.exceptionLabel ?? "")
+      setFailureMode(parseFailureMode(existing.failureMode, existing.exceptionLabel, element.exceptions))
+      setExceptionLabel(isFailedResult(existing, element.exceptions) ? "" : existing.exceptionLabel ?? "")
     } else {
       setFormValues({})
       setExceptionLabel("")
+      setFailureMode("AUTO")
     }
     setEditingTeamId(team.id)
   }
@@ -154,6 +163,8 @@ export function ElementResultsTable({ element, teams }: Props) {
           teamId,
           values: keepsValues(exceptionLabel) ? formValues : {},
           exceptionLabel: exceptionLabel || null,
+          failureMode,
+          expectedUpdatedAt: getResult(teamId) ? new Date(getResult(teamId)!.updatedAt).toISOString() : null,
         }),
       })
       if (res.ok) {
@@ -182,7 +193,7 @@ export function ElementResultsTable({ element, teams }: Props) {
       const res = await fetch(`/api/elements/${element.id}/results`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: team.id, values: {}, exceptionLabel: null }),
+        body: JSON.stringify({ teamId: team.id, values: {}, exceptionLabel: null, failureMode: "AUTO", expectedUpdatedAt: new Date(getResult(team.id)!.updatedAt).toISOString() }),
       })
       if (res.ok) {
         setEditingTeamId(null)
@@ -373,11 +384,12 @@ export function ElementResultsTable({ element, teams }: Props) {
                 onKeyDown={onKey}
                 className="w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                <option value="">– Sooritati –</option>
-                {element.exceptions.map(ex => (
+                <option value="">– Muu eriolukord puudub –</option>
+                {element.exceptions.filter(ex => exceptionKind(ex) !== "FAILED").map(ex => (
                   <option key={ex.id} value={ex.label}>{optionLabel(ex)}</option>
                 ))}
               </select>
+              <FailureModeControl element={element} values={formValues} mode={failureMode} onChange={setFailureMode} exceptionLabel={exceptionLabel} />
             </td>
             <td className="px-4 py-2.5 text-right text-gray-400 text-xs">arvutatakse</td>
             <td className="px-4 py-2.5">
@@ -494,15 +506,17 @@ export function ElementResultsTable({ element, teams }: Props) {
               className="px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             >
               <option value="">– Erand (valikuline) –</option>
-              {element.exceptions.map(ex => (
+              {element.exceptions.filter(ex => exceptionKind(ex) !== "FAILED").map(ex => (
                 <option key={ex.id} value={ex.label}>{optionLabel(ex)}</option>
               ))}
             </select>
           )}
 
+          <FailureModeControl element={element} values={bulkValues} mode={bulkFailureMode} onChange={setBulkFailureMode} exceptionLabel={bulkException} />
+
           <button
             onClick={bulkApply}
-            disabled={bulkApplying || (!bulkException && !hasBulkValues)}
+            disabled={bulkApplying || (!bulkException && !hasBulkValues && bulkFailureMode !== "FORCE_FAILED")}
             className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-40 transition-colors"
           >
             {bulkApplying ? "Lisan…" : `Lisa ${missingTeams.length} võistkonnale`}

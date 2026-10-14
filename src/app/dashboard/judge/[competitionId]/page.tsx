@@ -68,7 +68,7 @@ export default async function AccountJudgePage({
       elementId: true,
       teamId: true,
       values: true,
-      exceptionLabel: true,
+      exceptionLabel: true, failureMode: true,
       updatedAt: true,
     },
   })
@@ -111,6 +111,7 @@ export default async function AccountJudgePage({
             name: element.name,
             code: element.code,
             order: element.order,
+            config: element.config,
             fields: element.fields,
             exceptions: element.exceptions,
             calcType: element.calcMethod?.type ?? null,

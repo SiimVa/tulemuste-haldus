@@ -464,6 +464,7 @@ export default async function ElementPage({
         element={{
           id: element.id,
           name: element.name,
+          config: element.config,
           fields: element.fields,
           exceptions: element.exceptions,
           directPointsEntry: element.directPointsEntry,
