@@ -1,3 +1,4 @@
+import { FailureRuleError } from "@/lib/failureRules"
 import { withElementScoreTransaction } from "@/lib/recompute"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
 import { withSecurityRoute } from "@/lib/securityRoute.server"
@@ -23,62 +24,67 @@ async function handleGET(_req: Request, { params }: { params: Promise<{ id: stri
 }
 
 async function handlePOST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth()
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { id: elementId } = await params
-  if (!await canAccessElement(elementId, { id: session.user.id, role: session.user.role })) {
-    return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+    const { id: elementId } = await params
+    if (!await canAccessElement(elementId, { id: session.user.id, role: session.user.role })) {
+      return NextResponse.json({ error: "Keelatud" }, { status: 403 })
+    }
+    const body = await req.json()
+    const pointError = validatePointFields([...(Array.isArray(body.fields) ? body.fields : []), ...(Array.isArray(body.sections) ? body.sections.flatMap((section: { fields?: PointField[] }) => section.fields ?? []) : [])])
+    if (pointError) return NextResponse.json({ error: pointError }, { status: 400 })
+    const { name, maxValue, fields, calcMethod, order } = body
+
+    const count = await prisma.elementSection.count({ where: { elementId } })
+    const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
+      ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
+      : (calcMethod?.params ?? {})
+
+    const section = await withElementScoreTransaction(elementId, (tx) => tx.elementSection.create({
+      data: {
+        elementId,
+        name,
+        maxValue: maxValue != null && maxValue !== "" ? Number(maxValue) : null,
+        order: order ?? count,
+        fields: fields?.length > 0
+          ? {
+              create: fields.map((f: {
+                name: string; label: string; type: string; order?: number
+                isResultField?: boolean; rankingPriority?: number | null
+                formula?: string; meta?: string; validation?: Record<string, unknown>
+              }, i: number) => ({
+                elementId,
+                name: f.name,
+                label: f.label,
+                type: f.type,
+                order: f.order ?? i,
+                isResultField: f.rankingPriority === 1 || (f.isResultField ?? false),
+                rankingPriority: f.rankingPriority ?? null,
+                formula: f.formula ?? null,
+                meta: f.meta ?? null,
+                validation: f.validation && Object.keys(f.validation).length ? JSON.stringify(f.validation) : null,
+              })),
+            }
+          : undefined,
+        calcMethod: calcMethod
+          ? {
+              create: {
+                type: calcMethod.type ?? "RELATIVE_RANKING",
+                params: JSON.stringify(storedCalcParams),
+                customFormula: calcMethod.customFormula ?? null,
+              },
+            }
+          : undefined,
+      },
+      include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
+    }))
+    return NextResponse.json(section)
+  } catch (error) {
+    if (error instanceof FailureRuleError) return NextResponse.json({ error: error.message }, { status: 422 })
+    throw error
   }
-  const body = await req.json()
-  const pointError = validatePointFields([...(Array.isArray(body.fields) ? body.fields : []), ...(Array.isArray(body.sections) ? body.sections.flatMap((section: { fields?: PointField[] }) => section.fields ?? []) : [])])
-  if (pointError) return NextResponse.json({ error: pointError }, { status: 400 })
-  const { name, maxValue, fields, calcMethod, order } = body
-
-  const count = await prisma.elementSection.count({ where: { elementId } })
-  const storedCalcParams = calcMethod?.type === "FIXED_RANKING"
-    ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
-    : (calcMethod?.params ?? {})
-
-  const section = await withElementScoreTransaction(elementId, (tx) => tx.elementSection.create({
-    data: {
-      elementId,
-      name,
-      maxValue: maxValue != null && maxValue !== "" ? Number(maxValue) : null,
-      order: order ?? count,
-      fields: fields?.length > 0
-        ? {
-            create: fields.map((f: {
-              name: string; label: string; type: string; order?: number
-              isResultField?: boolean; rankingPriority?: number | null
-              formula?: string; meta?: string; validation?: Record<string, unknown>
-            }, i: number) => ({
-              elementId,
-              name: f.name,
-              label: f.label,
-              type: f.type,
-              order: f.order ?? i,
-              isResultField: f.rankingPriority === 1 || (f.isResultField ?? false),
-              rankingPriority: f.rankingPriority ?? null,
-              formula: f.formula ?? null,
-              meta: f.meta ?? null,
-              validation: f.validation && Object.keys(f.validation).length ? JSON.stringify(f.validation) : null,
-            })),
-          }
-        : undefined,
-      calcMethod: calcMethod
-        ? {
-            create: {
-              type: calcMethod.type ?? "RELATIVE_RANKING",
-              params: JSON.stringify(storedCalcParams),
-              customFormula: calcMethod.customFormula ?? null,
-            },
-          }
-        : undefined,
-    },
-    include: { fields: { orderBy: { order: "asc" } }, calcMethod: true },
-  }))
-  return NextResponse.json(section)
 }
 
 export const GET = withSecurityRoute("/api/elements/[id]/sections", handleGET)

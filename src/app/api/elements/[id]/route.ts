@@ -1,3 +1,5 @@
+import { FailureRuleError, validateFailureRule, readFailureRule } from "@/lib/failureRules"
+import { exceptionKind } from "@/lib/exceptionKinds"
 import { parseExceptionKind } from "@/lib/exceptionKinds"
 import { withElementScoreTransaction } from "@/lib/recompute"
 import { validatePointFields, type PointField } from "@/lib/pointFields"
@@ -56,6 +58,12 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
       ? fixedRankingParamsForStorage(parseFixedRankingParams(calcMethod.params))
       : (calcMethod?.params ?? {})
     await withElementScoreTransaction(id, async (tx) => {
+      const current = await tx.scoringElement.findUniqueOrThrow({ where: { id }, include: { fields: true, exceptions: true } })
+      const effectiveFields = fields ? [...fields, ...current.fields.filter(f => f.sectionId !== null)] : current.fields
+      const effectiveConfig = config ?? current.config
+      const failureError = validateFailureRule(effectiveConfig, effectiveFields)
+      if (failureError) throw new FailureRuleError(failureError)
+      if (readFailureRule(effectiveConfig) && !(exceptions ?? current.exceptions).some((e: { label: string; kind?: string | null }) => exceptionKind(e) === "FAILED")) throw new FailureRuleError("Lisa ebaõnnestumise tingimuse jaoks erand liigiga „Ebaõnnestus”.")
       await tx.scoringElement.update({
         where: { id },
         data: {
@@ -131,6 +139,7 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
     })
     return NextResponse.json(updated)
   } catch (e) {
+    if (e instanceof FailureRuleError) return NextResponse.json({ error: e.message }, { status: 422 })
     console.error("Element PATCH viga:", e)
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }

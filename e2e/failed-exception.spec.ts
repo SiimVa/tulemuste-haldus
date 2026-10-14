@@ -38,7 +38,7 @@ test("ebaõnnestunud võistkond on pingereas viimane ja teiste miinimum tõuseb"
   for (const [name, points] of [["Alfa", 30], ["Beeta", 20], ["Gamma", 10]] as const) {
     await db.result.create({ data: { elementId: element.id, teamId: teams[name], values: JSON.stringify({ punktid: String(points) }) } })
   }
-  await db.result.create({ data: { elementId: element.id, teamId: teams.Delta, values: "{}", exceptionLabel: "Kriteeriumid täitmata", exceptionPenalty: 0 } })
+  await db.result.create({ data: { elementId: element.id, teamId: teams.Delta, values: "{}", failureMode: "FORCE_FAILED", exceptionLabel: "Kriteeriumid täitmata", exceptionPenalty: 0 } })
 
   await page.goto("/login")
   await page.getByPlaceholder("admin@example.com").fill(user.email)
@@ -115,8 +115,8 @@ test("ebaõnnestunud tulemusel jääb sisestatud tulemus alles koos märkega", a
   await expect(page.getByText("Ebaõnnestunud võistkond jääb pingerea viimasele kohale; sisestatud tulemus jääb alles.")).toBeVisible()
   const row = page.getByRole("row").filter({ hasText: "Osula sega" })
   await row.getByRole("button", { name: "Sisesta" }).click()
-  await expect(row.locator("select option", { hasText: "Ebaõnnestus" })).toHaveText("Ebaõnnestus (viimane koht)")
-  await row.locator("select").selectOption("Ebaõnnestus")
+  await expect(row.getByLabel("Ebaõnnestumise otsus")).toHaveValue("AUTO")
+  await row.getByLabel("Ebaõnnestumise otsus").selectOption("FORCE_FAILED")
   await row.locator('input[type="number"]').fill("1")
   await row.getByPlaceholder("m:ss").fill("123")
   await page.screenshot({ path: testInfo.outputPath("failed-result-editing.png") })
@@ -140,9 +140,9 @@ test("ebaõnnestunud tulemusel jääb sisestatud tulemus alles koos märkega", a
   await page.goto(`/judge/${judge.token}`)
   await page.getByRole("button", { name: /Valga KT/ }).click()
   const form = page.locator("form")
-  await expect(form.locator("select option", { hasText: "Ebaõnnestus" })).toHaveText("Ebaõnnestus (viimane koht)")
-  await form.locator("select").selectOption("Ebaõnnestus")
-  await expect(form.getByText("Sisesta tulemus nagu tavaliselt. See salvestatakse koos märkega „Ebaõnnestus”.")).toBeVisible()
+  await expect(form.getByLabel("Ebaõnnestumise otsus")).toHaveValue("AUTO")
+  await form.getByLabel("Ebaõnnestumise otsus").selectOption("FORCE_FAILED")
+  await expect(form.getByText("Ebaõnnestus: kohtuniku otsus")).toBeVisible()
   await form.locator('input[type="number"]').fill("2")
   await form.getByPlaceholder("m:ss").fill("245")
   await page.setViewportSize({ width: 390, height: 844 })
@@ -157,7 +157,7 @@ test("ebaõnnestunud tulemusel jääb sisestatud tulemus alles koos märkega", a
   // Teise erandi valimisel väärtusi ei hoita.
   await page.goto(`/dashboard/competitions/${competition.id}/elements/${element.id}`)
   await row.getByRole("button", { name: "Muuda" }).click()
-  await row.locator("select").selectOption("Ei läbinud")
+  await row.locator("select").first().selectOption("Ei läbinud")
   await expect(row.locator('input[type="number"]')).toHaveCount(0)
   await row.getByRole("button", { name: "Salvesta" }).click()
   await expect(row.getByRole("button", { name: "Muuda" })).toBeVisible()

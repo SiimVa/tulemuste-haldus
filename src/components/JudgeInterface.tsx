@@ -1,5 +1,7 @@
 "use client"
 
+import { FailureModeControl } from "@/components/FailureModeControl"
+import { evaluateFailureRule, parseFailureMode, type FailureMode } from "@/lib/failureRules"
 import { elementProgress, isWithdrawnAtElement } from "@/lib/elementProgress"
 import { AutoRefresh } from "@/components/AutoRefresh"
 import { useState, useEffect } from "react"
@@ -8,13 +10,13 @@ import { PointFieldInput } from "@/components/PointFieldInput"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
 import { naturalCompare } from "@/lib/utils"
 import { TimeDurationInput, TimeClockInput } from "@/components/TimeInputs"
-import { exceptionOptionLabel, isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
+import { exceptionKind, exceptionOptionLabel, isFailedResult, resultKeepsValues } from "@/lib/exceptionKinds"
 
 type Field = { id: string; name: string; label: string; type: string; isResultField: boolean; formula?: string | null; validation?: string | null; meta?: string | null }
 type Exception = { id: string; label: string; penalty: number; kind?: string | null }
-type Element = { id: string; name: string; code: string; order: number; fields: Field[]; exceptions: Exception[]; calcType?: string | null; hasSections?: boolean }
+type Element = { config?: string; id: string; name: string; code: string; order: number; fields: Field[]; exceptions: Exception[]; calcType?: string | null; hasSections?: boolean }
 type Team = { id: string; name: string; code: string; class?: string | null; dnfFromElementOrder: number | null }
-type ExistingResult = { elementId: string; teamId: string; values: string; exceptionLabel?: string | null; updatedAt: Date }
+type ExistingResult = { failureMode?: string; elementId: string; teamId: string; values: string; exceptionLabel?: string | null; updatedAt: Date }
 
 interface Props {
   accessToken?: string
@@ -29,6 +31,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [exceptionLabel, setExceptionLabel] = useState("")
+  const [failureMode, setFailureMode] = useState<FailureMode>("AUTO")
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [error, setError] = useState("")
@@ -65,7 +68,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
   const inputFields = selectedElement?.fields.filter(f => f.type !== "COMPUTED") ?? []
   // Ebaõnnestunud tulemusel sisestatakse väljad nagu sooritusel, lisaks märge.
   const keepsValues = resultKeepsValues({ exceptionLabel }, selectedElement?.exceptions ?? [])
-  const failedSelected = Boolean(exceptionLabel) && keepsValues
+  const failedSelected = keepsValues && (failureMode === "FORCE_FAILED" || (failureMode === "AUTO" && selectedElement && evaluateFailureRule(selectedElement.config, selectedElement.fields, formValues).failed === true))
   const hasTimeRange = (selectedElement?.fields ?? []).some(f => f.type === "TIME_RANGE")
 
   function timeToSec(v: string): number {
@@ -113,7 +116,8 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
     const existing = getExisting(selectedElement.id, team.id)
     if (existing) {
       try { setFormValues(JSON.parse(existing.values)) } catch { setFormValues({}) }
-      setExceptionLabel(existing.exceptionLabel ?? "")
+      setFailureMode(parseFailureMode(existing.failureMode, existing.exceptionLabel, selectedElement.exceptions))
+      setExceptionLabel(isFailedResult(existing, selectedElement.exceptions) ? "" : existing.exceptionLabel ?? "")
     } else {
       const prefillStart = prefillStarts[team.id]
       if (prefillStart) {
@@ -126,10 +130,11 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
         setFormValues({})
       }
       setExceptionLabel("")
+      setFailureMode("AUTO")
     }
   }
 
-  async function sendResult(values: Record<string, string>, selectedException: string | null) {
+  async function sendResult(values: Record<string, string>, selectedException: string | null, mode = failureMode) {
     if (!selectedTeamId || !selectedElementId) return null
     const existing = getExisting(selectedElementId, selectedTeamId)
     const headers: Record<string, string> = { "Content-Type": "application/json" }
@@ -143,6 +148,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
           teamId: selectedTeamId,
           values,
           exceptionLabel: selectedException,
+          failureMode: mode,
           expectedUpdatedAt: existing ? new Date(existing.updatedAt).toISOString() : null,
         }),
       })
@@ -162,7 +168,7 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
     const team = teams.find(t => t.id === selectedTeamId)
     if (!window.confirm(`Kustuta võistkonna „${team?.name ?? ""}” tulemus?`)) return
     setError("")
-    const res = await sendResult({}, null)
+    const res = await sendResult({}, null, "AUTO")
     if (!res) return
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
@@ -216,8 +222,9 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
         const newResult: ExistingResult = {
           elementId: selectedElementId,
           teamId: selectedTeamId,
-          values: keepsValues ? JSON.stringify(formValues) : "{}",
-          exceptionLabel: exceptionLabel || null,
+          values: data.values,
+          exceptionLabel: data.exceptionLabel,
+          failureMode: data.failureMode,
           updatedAt: new Date(data.updatedAt),
         }
         return [...filtered, newResult]
@@ -399,13 +406,15 @@ export function JudgeInterface({ accessToken, elements, teams, existingResults, 
                 <label className="text-xs text-gray-500 mb-1 block">Eriolukord (jäta tühjaks kui sooritati)</label>
                 <select value={exceptionLabel} onChange={e => setExceptionLabel(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">— Sooritati normaalselt —</option>
-                  {selectedElement.exceptions.map(ex => (
+                  <option value="">— Muu eriolukord puudub —</option>
+                  {selectedElement.exceptions.filter(ex => exceptionKind(ex) !== "FAILED").map(ex => (
                     <option key={ex.id} value={ex.label}>{exceptionOptionLabel(ex, selectedElement, scoringMode, "p karistust")}</option>
                   ))}
                 </select>
-                {failedSelected && <p className="mt-1 text-xs text-amber-800">Sisesta tulemus nagu tavaliselt. See salvestatakse koos märkega „{exceptionLabel}”.</p>}
+                {failedSelected && <p className="mt-1 text-xs text-amber-800">Sisesta tulemus nagu tavaliselt. See salvestatakse koos märkega „{selectedElement.exceptions.find(ex => exceptionKind(ex) === "FAILED")?.label ?? "Ebaõnnestus"}”.</p>}
               </div>
+
+              <FailureModeControl element={selectedElement} values={formValues} mode={failureMode} onChange={setFailureMode} exceptionLabel={exceptionLabel} />
 
               {/* Sisendväljad (erandita või ebaõnnestunud tulemusel) */}
               {keepsValues && inputFields.map(field => (

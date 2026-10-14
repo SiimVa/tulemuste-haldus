@@ -1,3 +1,4 @@
+import { FailureRuleError, validateFailureRule, parseFailureMode, resolveFailure } from "./failureRules"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { calculateScores, withEffectiveHC } from "@/lib/calculators"
@@ -79,6 +80,20 @@ async function recomputeLockedElementScores(tx: Prisma.TransactionClient, elemen
     },
   })
   if (!element) return 0
+
+  // Resolve AUTO results while holding the same element lock used for edits.
+  // Configuration changes and scores therefore commit together.
+  const failureFields = [...element.fields, ...element.sections.flatMap(section => section.fields)]
+  const failureError = validateFailureRule(element.config, failureFields)
+  if (failureError) throw new FailureRuleError(failureError)
+  const storedResults = await tx.result.findMany({ where: { elementId } })
+  for (const result of storedResults) {
+    if (result.exceptionLabel && !isFailedResult(result, element.exceptions) && (result.failureMode !== "FORCE_FAILED" || element.exceptions.some(e => e.label === result.exceptionLabel))) continue
+    const resolved = resolveFailure({ ...element, fields: failureFields }, JSON.parse(result.values), parseFailureMode(result.failureMode, result.exceptionLabel, element.exceptions), (result.failureMode === "FORCE_FAILED" ? null : result.exceptionLabel))
+    if (result.exceptionLabel !== resolved.exceptionLabel || result.exceptionPenalty !== resolved.exceptionPenalty) {
+      await tx.result.update({ where: { id: result.id }, data: { exceptionLabel: resolved.exceptionLabel, exceptionPenalty: resolved.exceptionPenalty } })
+    }
+  }
 
   // Võistkondade arvust sõltuv fikseeritud pingerida vajab registreerunute arvu
   // skoopide kaupa. Loeme kõik võistluse võistkonnad, mitte ainult need, kellel

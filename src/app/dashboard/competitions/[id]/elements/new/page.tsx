@@ -1,5 +1,7 @@
 "use client"
 
+import { FailureRuleEditor } from "@/components/FailureRuleEditor"
+
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -1346,6 +1348,8 @@ export default function NewElementPage({ params }: { params: Promise<{ id: strin
           </Card>
         )}
         </div>
+
+        <FailureRuleEditor config={elementConfig} fields={calcType === "COMBINED" ? sections.flatMap(section => section.fields) : calcType === "DIRECT_ENTRY" ? [{ name: "tulemus", label: "Tulemus", type: "NUMBER" }] : fields} onChange={setElementConfig} />
 
         {/* Erandid */}
         {type !== "COUNTER_ACTION" && type !== "EQUIPMENT_CHECK" && type !== "OTHER" && type !== "ABANDONMENT" && type !== "PENALTY_BOX" && !(type === "LATENESS" && elementConfig.mode === "PER_INTERVAL") && (

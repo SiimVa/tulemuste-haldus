@@ -1,3 +1,4 @@
+import { FailureRuleError, parseFailureMode, resolveFailure, type FailureMode } from "@/lib/failureRules"
 import { parseEstimates, readEstimation, targetUnit } from "@/lib/estimation"
 import { readPointMeta } from "@/lib/pointFields"
 import { parseValidation, validateFieldValue } from "@/lib/fieldValidation"
@@ -43,6 +44,8 @@ export type ImportRowResult = {
   message?: string
   values?: Record<string, string>
   exceptionLabel?: string
+  failureMode?: FailureMode
+  failureReason?: string
 }
 
 export type ImportResult = {
@@ -146,6 +149,7 @@ async function handlePOST(
   const headerRow = (allRows[headerRowIdx] as string[]).map((c) => String(c ?? "").trim())
   const codeColIdx = headerRow.findIndex((h) => h.toLowerCase() === "tähis" || h.toLowerCase() === "code")
   const nameColIdx = headerRow.findIndex((h) => h.toLowerCase() === "võistkond" || h.toLowerCase() === "name")
+  const modeColIdx = headerRow.findIndex(h => ["ebaõnnestumise otsus", "failuremode"].includes(h.toLowerCase()))
   const exceptionColIdx = headerRow.findIndex((h) => h.toLowerCase() === "erand" || h.toLowerCase() === "exception")
 
   // Map field labels to column indices (includes section fields for combined elements)
@@ -183,6 +187,10 @@ async function handlePOST(
   const teamByName = new Map(teams.map((t) => [t.name.toLowerCase(), t]))
   const foundTeamIds = new Set<string>()
 
+  const previousResults = await prisma.result.findMany({ where: { elementId } })
+  const previousByTeam = new Map(previousResults.map(r => [r.teamId, r]))
+  const failureElement = { ...element, fields: [...element.fields, ...element.sections.flatMap(s => s.fields)] }
+  const intentions = new Map<number, { label: string; mode?: FailureMode }>()
   const rows: ImportRowResult[] = []
   const dataRows = allRows.slice(headerRowIdx + 1)
 
@@ -218,15 +226,29 @@ async function handlePOST(
     // Check exception column. Ebaõnnestunud tulemuse väärtused imporditakse
     // koos märkega; teiste erandite korral väärtusi ei loeta.
     const exceptionLabel = exceptionColIdx >= 0 ? rowData[exceptionColIdx] ?? "" : ""
-    const failed = Boolean(exceptionLabel) && isFailedResult({ exceptionLabel }, element.exceptions)
+    let explicitMode: FailureMode | undefined
+    try {
+      const rawMode = modeColIdx >= 0 ? rowData[modeColIdx] ?? "" : ""
+      const modeNames: Record<string, FailureMode> = { "Automaatne": "AUTO", "Ei ebaõnnestunud": "FORCE_SUCCESS", "Ebaõnnestus": "FORCE_FAILED" }
+      if (rawMode) explicitMode = parseFailureMode(modeNames[rawMode] ?? rawMode, exceptionLabel, element.exceptions)
+      if (exceptionLabel && !element.exceptions.some(e => e.label === exceptionLabel)) throw new FailureRuleError("Tundmatu erand")
+    } catch (error) {
+      rows.push({ rowNum, teamCode: team.code, teamName: team.name, status: "error", message: (error as Error).message })
+      continue
+    }
+    intentions.set(rowNum, { label: exceptionLabel, mode: explicitMode })
+    const mode = explicitMode ?? (exceptionLabel ? parseFailureMode(undefined, exceptionLabel, element.exceptions) : parseFailureMode(previousByTeam.get(team.id)?.failureMode, null, element.exceptions))
+    const failed = mode === "FORCE_FAILED"
 
-    if (exceptionLabel && !failed) {
+    if (exceptionLabel && !isFailedResult({ exceptionLabel }, element.exceptions)) {
       rows.push({
         rowNum,
         teamCode: team.code,
         teamName: team.name,
         status: "ok",
         exceptionLabel,
+        failureMode: mode,
+        failureReason: exceptionLabel,
         values: {},
       })
       continue
@@ -277,9 +299,13 @@ async function handlePOST(
       }
     }
 
+    let resolved: ReturnType<typeof resolveFailure> | undefined
+    try { resolved = resolveFailure(failureElement, values, mode, exceptionLabel) }
+    catch (error) { hasError = true; errorMsg = (error as Error).message }
+
     for (const field of inputFields.filter(f => f.type === "POINTS_SELECT" || f.type === "TIME_POINTS" || f.type === "ESTIMATION")) {
       const validation = parseValidation(field.validation)
-      const error = validateFieldValue(values[field.name], field.name, field.label, field.type, failed ? { ...validation, required: false } : validation, field.meta)
+      const error = validateFieldValue(values[field.name], field.name, field.label, field.type, resolved?.exceptionLabel || failed ? { ...validation, required: false } : validation, field.meta)
       if (error) { hasError = true; errorMsg = error.message; break }
     }
     if (hasError) {
@@ -299,7 +325,9 @@ async function handlePOST(
       teamName: team.name,
       status: "ok",
       values,
-      ...(failed ? { exceptionLabel } : {}),
+      exceptionLabel: resolved?.exceptionLabel ?? undefined,
+      failureMode: mode,
+      failureReason: resolved?.failureReason,
     })
   }
 
@@ -327,24 +355,21 @@ async function handlePOST(
 
   try {
     await withElementScoreTransaction(elementId, async (tx) => {
+      const lockedElement = await tx.scoringElement.findUniqueOrThrow({ where: { id: elementId }, include: { fields: true, exceptions: true } })
       for (const row of okRows) {
         const team = teamByCode.get(row.teamCode.toLowerCase())
         if (!team) continue
-
-        const valuesJson = resultKeepsValues(row, element.exceptions) ? JSON.stringify(row.values ?? {}) : "{}"
-        const exceptionLabel = row.exceptionLabel ?? null
-
-        // Find exception penalty if applicable
-        let exceptionPenalty: number | null = null
-        if (exceptionLabel) {
-          const exc = element.exceptions.find((e) => e.label === exceptionLabel)
-          exceptionPenalty = exc?.penalty ?? null
-        }
 
         // Preserve row-level import errors without leaving PostgreSQL's entire
         // transaction aborted after one failed insert.
         await tx.$executeRaw`SAVEPOINT result_import_row`
         try {
+          const intention = intentions.get(row.rowNum)!
+          const current = await tx.result.findUnique({ where: { elementId_teamId: { elementId, teamId: team.id } } })
+          const mode = intention.mode ?? (intention.label ? parseFailureMode(undefined, intention.label, lockedElement.exceptions) : parseFailureMode(current?.failureMode, null, lockedElement.exceptions))
+          const resolved = resolveFailure(lockedElement, row.values ?? {}, mode, intention.label)
+          const valuesJson = resultKeepsValues(resolved, lockedElement.exceptions) ? JSON.stringify(row.values ?? {}) : "{}"
+          const { exceptionLabel, exceptionPenalty } = resolved
           await tx.result.upsert({
             where: { elementId_teamId: { elementId, teamId: team.id } },
             create: {
@@ -353,22 +378,27 @@ async function handlePOST(
               values: valuesJson,
               exceptionLabel,
               exceptionPenalty,
+              failureMode: mode,
               enteredByUserId: session.user.id,
             },
             update: {
               values: valuesJson,
               exceptionLabel,
               exceptionPenalty,
+              failureMode: mode,
               enteredByUserId: session.user.id,
             },
           })
+          row.failureMode = mode
+          row.exceptionLabel = exceptionLabel ?? undefined
+          row.failureReason = resolved.failureReason
           await tx.$executeRaw`RELEASE SAVEPOINT result_import_row`
-        } catch {
+        } catch (error) {
           await tx.$executeRaw`ROLLBACK TO SAVEPOINT result_import_row`
           await tx.$executeRaw`RELEASE SAVEPOINT result_import_row`
           importErrors.push(`Tulemuse salvestamine ebaõnnestus: ${row.teamCode} ${row.teamName}`)
           row.status = "error"
-          row.message = "Salvestamine ebaõnnestus"
+          row.message = error instanceof FailureRuleError ? error.message : "Salvestamine ebaõnnestus"
         }
       }
     })

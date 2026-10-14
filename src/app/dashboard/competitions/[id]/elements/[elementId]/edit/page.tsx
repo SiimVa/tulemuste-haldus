@@ -1,5 +1,7 @@
 "use client"
 
+import { FailureRuleEditor } from "@/components/FailureRuleEditor"
+
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -149,6 +151,7 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
           try { cfg = JSON.parse(el.config ?? "{}") } catch {}
           setElementConfig({ mode: cfg.mode ?? "FIXED", penaltyPerMember: cfg.penaltyPerMember ?? 10 })
         }
+        setElementConfig(prev => ({ ...prev, ...JSON.parse(el.config ?? "{}") }))
         const loadedSections = el.sections ?? []
         setSections(loadedSections)
         if (loadedSections.length > 0 && !el.calcMethod) setCalcType("COMBINED")
@@ -759,6 +762,8 @@ export default function EditElementPage({ params }: { params: Promise<{ id: stri
           )}
         </Card>}
         </div>
+
+        <FailureRuleEditor config={elementConfig} fields={calcType === "COMBINED" ? sections.flatMap(section => section.fields) : calcType === "DIRECT_ENTRY" ? [{ name: "tulemus", label: "Tulemus", type: "NUMBER" }] : fields} onChange={setElementConfig} />
 
         {/* Erandid */}
         {type !== "OTHER" && type !== "ABANDONMENT" && <Card className="p-5 space-y-4">
