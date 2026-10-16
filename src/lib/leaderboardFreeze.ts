@@ -1,6 +1,7 @@
 // Avaliku pingerea külmutamise snapshot: kõik, mis mõjutab avalikke punkte ja
 // kohti. Võistkondade nimed ja klassid loetakse jooksvalt, sest need ei
 // avalda tulemusi.
+import { parseSeriesScoringSource, type SeriesScoringSource } from "./seriesScoringSource"
 
 export type FreezeSnapshot = {
   version: 1
@@ -18,6 +19,7 @@ export type FreezeSnapshot = {
     dnsFlag: boolean
   }[]
   elements: { id: string; isCancelled: boolean }[]
+  seriesScoring?: SeriesScoringSource
 }
 
 export type PublicFreeze = { freezeAt: Date; snapshot: FreezeSnapshot }
@@ -35,9 +37,11 @@ export function emptyFreezeSnapshot(takenAt: Date): FreezeSnapshot {
 export function parseFreezeSnapshot(value: unknown, fallbackTakenAt: Date): FreezeSnapshot {
   if (!value || typeof value !== "object" || (value as { version?: unknown }).version !== 1) return emptyFreezeSnapshot(fallbackTakenAt)
   const raw = value as Record<string, unknown>
+  const seriesScoring = parseSeriesScoringSource(raw.seriesScoring)
   return {
     version: 1,
     takenAt: isString(raw.takenAt) ? raw.takenAt : fallbackTakenAt.toISOString(),
+    ...(seriesScoring ? { seriesScoring } : {}),
     scores: records(raw.scores).flatMap((item) => (
       isString(item.elementId) && isString(item.teamId) && isNumber(item.points)
         ? [{ elementId: item.elementId, teamId: item.teamId, points: item.points }] : [])),

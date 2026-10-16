@@ -36,6 +36,7 @@ export default async function PublicSeriesLeaderboardPage({ params, searchParams
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-gray-600">
               Tulemus = {ranking.countedKpCount ?? "kõigi"} parima KP {unit} + karistused. Hallid KP-d ei lähe arvesse.
+              {" "}KP punktid arvutatakse sama tähisega KP-de ühistest toorandmetest.
             </p>
             <LeaderboardHighlighter competitionId={`series-${view.series.id}`} teams={ranking.rows.map((row) => ({ id: row.team.id, code: row.team.code, name: row.team.name }))} />
           </div>

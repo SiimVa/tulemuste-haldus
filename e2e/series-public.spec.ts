@@ -25,8 +25,9 @@ async function seedCompetition(name: string, ownerId: string, teams: TeamSeed[])
   for (const [order, code] of ["KP1", "KP2", "KP3"].entries()) {
     elements.push((await db.scoringElement.create({ data: {
       competitionId: competition.id, code, name: `Ülesanne ${code}`, order,
-      exceptions: { create: [{ label: "Ei läbinud", penalty: 5, order: 0, kind: "NOT_PASSED" }] },
-      calcMethod: { create: { type: "RELATIVE_RANKING", params: JSON.stringify({ higherIsBetter: true, minPoints: 0 }) } },
+      exceptions: { create: [{ label: "Ei läbinud", penalty: -5, order: 0, kind: "NOT_PASSED" }] },
+      fields: { create: { name: "points", label: "Punktid", type: "NUMBER", isResultField: true, order: 0 } },
+      calcMethod: { create: { type: "ABSOLUTE_POINTS", params: "{}" } },
     } })).id)
   }
   const teamIds: Record<string, string> = {}
@@ -35,7 +36,7 @@ async function seedCompetition(name: string, ownerId: string, teams: TeamSeed[])
     teamIds[teamName] = team.id
     for (const [kpIndex, value] of points.entries()) {
       const exceptionLabel = kpIndex === 2 ? exception : null
-      await db.result.create({ data: { elementId: elements[kpIndex], teamId: team.id, values: "{}", exceptionLabel, exceptionPenalty: exceptionLabel ? 5 : null } })
+      await db.result.create({ data: { elementId: elements[kpIndex], teamId: team.id, values: JSON.stringify({ points: value }), exceptionLabel, exceptionPenalty: exceptionLabel ? value : null } })
       await db.computedScore.create({ data: { elementId: elements[kpIndex], teamId: team.id, penaltyPoints: value } })
     }
   }
@@ -124,7 +125,7 @@ test("üleriiklik arvestus: avaldamine, avalik pingerida, ülevaade, analüüsi 
   // Üleriikliku arvestuse külmutus: hilisem muudatus ei paista avalikult.
   await page.getByRole("button", { name: "Külmuta kohe" }).click()
   await expect(page.getByText(/Avalik pingerida on külmutatud seisuga/)).toBeVisible()
-  await db.computedScore.update({ where: { elementId_teamId: { elementId: north.elements[0], teamId: north.teamIds.Delta } }, data: { penaltyPoints: 40 } })
+  await db.result.update({ where: { elementId_teamId: { elementId: north.elements[0], teamId: north.teamIds.Delta } }, data: { values: JSON.stringify({ points: 40 }) } })
   await anonymous.goto(publicUrl)
   await expect(anonymous.getByText(/Üleriiklik arvestus on külmutatud seisuga/)).toBeVisible()
   expect((await ranking()).find(([team]) => team === "Delta")).toEqual(["Delta", "4", "30.00"])
@@ -141,7 +142,7 @@ test("üleriiklik arvestus: avaldamine, avalik pingerida, ülevaade, analüüsi 
 
   // Osavõistluse külmutus kehtib ka üleriiklikus avalikus vaates.
   expect((await page.request.put(`/api/competitions/${south.competition.id}/leaderboard-freeze`, { data: { now: true } })).status()).toBe(200)
-  await db.computedScore.update({ where: { elementId_teamId: { elementId: south.elements[0], teamId: south.teamIds.Beeta } }, data: { penaltyPoints: 35 } })
+  await db.result.update({ where: { elementId_teamId: { elementId: south.elements[0], teamId: south.teamIds.Beeta } }, data: { values: JSON.stringify({ points: 35 }) } })
   await anonymous.goto(publicUrl)
   await expect(anonymous.getByText(`Osavõistluse Lõuna OV ${stamp} pingerida on külmutatud`)).toBeVisible()
   expect((await ranking()).find(([team]) => team === "Beeta")).toEqual(["Beeta", "4", "45.00"])

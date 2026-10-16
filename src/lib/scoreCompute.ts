@@ -1,12 +1,14 @@
-import { calculateScores, withEffectiveHC, type ScoringMode } from "./calculators"
+import { calculateScores, withEffectiveHC, type ScoringMode, type ScoringCalcMethod } from "./calculators"
 import { exceptionScore, isFailedResult } from "./exceptionKinds"
-import type { FieldDefinition, CalcMethod } from "@prisma/client"
+import type { FieldDefinition } from "@prisma/client"
+import type { ClassGroup } from "./classGroups"
 
 export type ComputeTeam = {
   id: string
   isHorsDeCompetition: boolean
   hcFromElementOrder: number | null
   dnfFromElementOrder: number | null
+  class?: string | null
 }
 
 export type ComputeResult = {
@@ -25,14 +27,20 @@ export type ComputeElement = {
   isCancelled: boolean
   maxValue: number | null
   fields: FieldDefinition[]
-  calcMethod: CalcMethod | null
-  sections: { calcMethod: CalcMethod | null; fields: FieldDefinition[]; maxValue: number | null }[]
+  calcMethod: ScoringCalcMethod | null
+  sections: { calcMethod: ScoringCalcMethod | null; fields: FieldDefinition[]; maxValue: number | null }[]
   miscEntries: { teamId: string; points: number }[]
   // kind määrab ebaõnnestumise (vt exceptionKinds)
   exceptions?: { label: string; kind?: string | null }[]
 }
 
-export type ComputeConfig = { scoringMode: ScoringMode; defaultKPMaxValue: number; defaultPKMaxValue: number }
+export type ComputeConfig = {
+  scoringMode: ScoringMode
+  defaultKPMaxValue: number
+  defaultPKMaxValue: number
+  registeredCounts?: Map<string, number>
+  classGroups?: ClassGroup[]
+}
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 

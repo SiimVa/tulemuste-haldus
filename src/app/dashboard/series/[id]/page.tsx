@@ -154,6 +154,7 @@ export default async function SeriesPage({
           <h2 id="series-ranking-title" className="font-semibold text-ink">Pingerida</h2>
           <p className="mt-1 text-sm text-ink-muted">
             Tulemus = {ranking.countedKpCount ?? "kõigi"} parima KP {unit} + karistused (vastutegevus, varustus, hilinemine, katkestamine, muu element ja käsitsi karistused).
+            KP punktid arvutatakse sama tähisega KP-de ühistest toorandmetest enne parimate valimist.
             Hallid KP-d ei lähe arvesse. Võrdse tulemusega võistkonnad jagavad kohta.
           </p>
         </div>

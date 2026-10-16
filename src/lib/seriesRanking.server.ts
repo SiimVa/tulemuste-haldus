@@ -8,6 +8,8 @@ import { computeSeriesRanking, type SeriesCompetitionData, type SeriesRanking, t
 import { checkSeriesRules, type RuleCompetition, type SeriesRulesCheck } from "@/lib/seriesRules"
 import { parseSeriesDashboardConfig, type SeriesAudience, type SeriesDashboardConfig } from "@/lib/seriesDashboard"
 import { parseSeriesFreezeSnapshot, type SeriesFreezeSnapshot } from "@/lib/seriesFreeze"
+import { recomputeSeriesKpScores, type SeriesScoringInput } from "@/lib/seriesScoring"
+import { parseClassGroups } from "@/lib/classGroups"
 
 export const COMPETITION_STATUS_LABELS: Record<string, string> = {
   SETUP: "Ettevalmistus",
@@ -18,7 +20,7 @@ export const COMPETITION_STATUS_LABELS: Record<string, string> = {
 }
 
 const competitionMetaSelect = {
-  id: true, name: true, status: true, date: true, scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true,
+  id: true, name: true, status: true, date: true, scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true, classGroups: true,
 } as const
 
 const seriesCompetitionsInclude = {
@@ -34,6 +36,7 @@ type CompetitionMeta = {
   scoringMode: string
   defaultKPMaxValue: number
   defaultPKMaxValue: number
+  classGroups: string
 }
 
 // Osavõistluste lähteandmed. Avalikus vaates näidatakse külmutatud
@@ -48,6 +51,7 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
       include: {
         exceptions: { orderBy: { order: "asc" } },
         calcMethod: true,
+        miscEntries: true,
         fields: { where: { sectionId: null }, orderBy: { order: "asc" } },
         sections: { orderBy: { order: "asc" }, include: { calcMethod: true, fields: { orderBy: { order: "asc" } } } },
       },
@@ -58,7 +62,7 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
     }),
     prisma.result.findMany({
       where: { element: { competitionId: { in: competitionIds } } },
-      select: { elementId: true, teamId: true, exceptionLabel: true, enteredAt: true },
+      select: { elementId: true, teamId: true, values: true, exceptionLabel: true, exceptionPenalty: true, enteredAt: true },
     }),
     prisma.computedScore.findMany({
       where: { element: { competitionId: { in: competitionIds } } },
@@ -76,7 +80,7 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
   const competitionOfElement = new Map(elements.map((element) => [element.id, element.competitionId]))
   const inCompetition = (competitionId: string) => <T extends { elementId: string }>(item: T) => competitionOfElement.get(item.elementId) === competitionId
 
-  const data: SeriesCompetitionData[] = competitions.map((competition) => {
+  const inputs: SeriesScoringInput[] = competitions.map((competition) => {
     let competitionElements = elements.filter((element) => element.competitionId === competition.id).map((element) => ({
       id: element.id,
       code: element.code,
@@ -101,18 +105,45 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
       competitionResults = competitionResults.filter((result) => result.enteredAt <= freeze.freezeAt)
       competitionScores = freeze.snapshot.scores
       competitionPenalties = freeze.snapshot.penalties.map(({ teamId, points, description }) => ({ teamId, points, description }))
+      const frozenSource = freeze.snapshot.seriesScoring
+      if (frozenSource) {
+        competitionResults = frozenSource.results.map((result) => ({ ...result, enteredAt: freeze.freezeAt }))
+        competitionElements = [
+          ...competitionElements.filter((element) => element.type !== "CHECKPOINT"),
+          ...frozenSource.elements.map((element) => ({
+            id: element.id, code: element.code, name: element.name ?? element.code, type: element.type,
+            order: element.order, isCancelled: element.isCancelled,
+            exceptions: (element.exceptions ?? []).map(({ label, kind }) => ({ label, kind: kind ?? null })),
+            maxValue: element.maxValue ?? frozenSource.config.defaultKPMaxValue,
+          })),
+        ]
+      }
     }
-    return {
+    const data: SeriesCompetitionData = {
       id: competition.id,
       name: competition.name,
-      scoringMode: competition.scoringMode as SeriesScoringMode,
+      scoringMode: freeze?.snapshot.seriesScoring?.config.scoringMode ?? competition.scoringMode as SeriesScoringMode,
       elements: competitionElements,
       teams: competitionTeams,
       results: competitionResults.map(({ elementId, teamId, exceptionLabel }) => ({ elementId, teamId, exceptionLabel })),
       scores: competitionScores,
       manualPenalties: competitionPenalties,
     }
+    // Vana külmutuse puhul ei loe jooksvaid toorandmeid: need võivad sisaldada
+    // pärast külmutamist muudetud väärtusi. Uued külmutused säilitavad allika.
+    const source = freeze ? freeze.snapshot.seriesScoring : {
+      elements: elements.filter((element) => element.competitionId === competition.id && element.type === "CHECKPOINT"),
+      results: competitionResults.map(({ elementId, teamId, values, exceptionLabel, exceptionPenalty }) => ({ elementId, teamId, values, exceptionLabel, exceptionPenalty })),
+      config: {
+        scoringMode: competition.scoringMode as SeriesScoringMode,
+        defaultKPMaxValue: competition.defaultKPMaxValue,
+        defaultPKMaxValue: competition.defaultPKMaxValue,
+        classGroups: parseClassGroups(competition.classGroups),
+      },
+    }
+    return { data, source }
   })
+  const data = recomputeSeriesKpScores(inputs)
   const ruleData: RuleCompetition[] = competitions.map((competition) => ({
     id: competition.id,
     name: competition.name,

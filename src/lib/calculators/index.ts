@@ -34,9 +34,11 @@ export interface ScoredEntry {
   failed?: boolean
 }
 
+export type ScoringCalcMethod = Pick<CalcMethod, "type" | "params" | "customFormula"> & Partial<CalcMethod>
+
 interface ElementWithConfig {
   id: string
-  calcMethod: CalcMethod | null
+  calcMethod: ScoringCalcMethod | null
   fields: FieldDefinition[]
   // kind määrab ebaõnnestumise; puuduv kind tuletatakse nimest.
   exceptions: { label: string; penalty?: number; kind?: string | null }[]

@@ -4,11 +4,12 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { invalidatePublicSnapshots } from "@/lib/publicSnapshotCache"
 import { parseFreezeSnapshot, type FreezeSnapshot, type PublicFreeze } from "@/lib/leaderboardFreeze"
+import { parseClassGroups } from "@/lib/classGroups"
 
 type Tx = Prisma.TransactionClient
 
 async function createFreezeSnapshot(tx: Tx, competitionId: string, takenAt: Date): Promise<FreezeSnapshot> {
-  const [scores, penalties, miscEntries, teams, elements] = await Promise.all([
+  const [scores, penalties, miscEntries, teams, elements, kpElements, kpResults, competition] = await Promise.all([
     tx.computedScore.findMany({ where: { element: { competitionId } }, select: { elementId: true, teamId: true, penaltyPoints: true } }),
     tx.manualPenalty.findMany({ where: { competitionId }, select: { teamId: true, points: true, description: true, enteredAt: true } }),
     tx.miscEntry.findMany({
@@ -20,6 +21,19 @@ async function createFreezeSnapshot(tx: Tx, competitionId: string, takenAt: Date
       select: { id: true, isHorsDeCompetition: true, hcFromElementOrder: true, dnfFromElementOrder: true, dnfReason: true, dqFromElementOrder: true, dnsFlag: true },
     }),
     tx.scoringElement.findMany({ where: { competitionId }, select: { id: true, isCancelled: true } }),
+    tx.scoringElement.findMany({
+      where: { competitionId, type: "CHECKPOINT" },
+      include: {
+        fields: { where: { sectionId: null }, orderBy: { order: "asc" } },
+        calcMethod: true, exceptions: true, miscEntries: true,
+        sections: { orderBy: { order: "asc" }, include: { fields: { orderBy: { order: "asc" } }, calcMethod: true } },
+      },
+    }),
+    tx.result.findMany({
+      where: { element: { competitionId, type: "CHECKPOINT" } },
+      select: { elementId: true, teamId: true, values: true, exceptionLabel: true, exceptionPenalty: true },
+    }),
+    tx.competition.findUniqueOrThrow({ where: { id: competitionId }, select: { scoringMode: true, defaultKPMaxValue: true, defaultPKMaxValue: true, classGroups: true } }),
   ])
   return {
     version: 1,
@@ -29,6 +43,11 @@ async function createFreezeSnapshot(tx: Tx, competitionId: string, takenAt: Date
     miscEntries: miscEntries.map((entry) => ({ elementId: entry.elementId, teamId: entry.teamId, points: entry.points, description: entry.description, elementType: entry.element.type })),
     teams,
     elements,
+    seriesScoring: {
+      elements: kpElements,
+      results: kpResults,
+      config: { ...competition, scoringMode: competition.scoringMode as "PLUS" | "PENALTY", classGroups: parseClassGroups(competition.classGroups) },
+    },
   }
 }
 
