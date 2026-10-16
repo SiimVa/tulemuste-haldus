@@ -32,14 +32,15 @@ async function seedCompetition(name: string, ownerId: string, status: string, ma
     elements[code] = (await db.scoringElement.create({ data: {
       competitionId: competition.id, code, name: `Ülesanne ${code}`, order, maxValue: maxByCode[code] ?? null,
       exceptions: { create: exceptions },
-      calcMethod: { create: { type: "RELATIVE_RANKING", params: JSON.stringify({ higherIsBetter: true, minPoints: 0 }) } },
+      fields: { create: { name: "points", label: "Punktid", type: "NUMBER", isResultField: true, order: 0 } },
+      calcMethod: { create: { type: "ABSOLUTE_POINTS", params: "{}" } },
     } })).id
   }
   elements.HL = (await db.scoringElement.create({ data: { competitionId: competition.id, code: "HL", name: "Hilinemine", type: "LATENESS", order: 10, config: JSON.stringify({ mode: "ONE_TIME" }) } })).id
   const addTeam = async (code: string, teamName: string, cls: string, list: Entry[], extra: Entry[] = []) => {
     const team = await db.team.create({ data: { competitionId: competition.id, code, name: teamName, class: cls } })
     for (const [elementCode, points, exceptionLabel] of [...list, ...extra]) {
-      if (elementCode !== "HL") await db.result.create({ data: { elementId: elements[elementCode], teamId: team.id, values: "{}", exceptionLabel, exceptionPenalty: exceptionLabel ? 0 : null } })
+      if (elementCode !== "HL") await db.result.create({ data: { elementId: elements[elementCode], teamId: team.id, values: JSON.stringify({ points }), exceptionLabel, exceptionPenalty: exceptionLabel ? points : null } })
       await db.computedScore.create({ data: { elementId: elements[elementCode], teamId: team.id, penaltyPoints: points } })
     }
     return team
@@ -134,6 +135,17 @@ test("administraator loob üleriikliku arvestuse ja näeb keskmisi, reeglite kon
   const sheet = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets.Pingerida, { header: 1 })
   expect(sheet[1]).toEqual(["Arvestatav KP-de arv: 3"])
   expect(sheet.slice(4).map((row) => [row[0], row[4], row[10]])).toEqual([[1, "Beeta", 68], [2, "Gamma", 60], [2, "Delta", 60], [4, "Alfa", 43]])
+
+  // Koha järgi hinnatava KP puhul kasutatakse kõigi OV-de toorandmeid.
+  // OV salvestatud punktid jäävad samaks, kuid Beeta KP1 langeb 25 → 10.
+  await db.calcMethod.updateMany({
+    where: { element: { competitionId: { in: [south.competition.id, north.competition.id] }, code: "KP1" } },
+    data: { type: "RELATIVE_RANKING", params: JSON.stringify({ higherIsBetter: true, minPoints: 0 }) },
+  })
+  await page.goto(`/dashboard/series/${seriesId}`)
+  await expect(page.locator('tr[data-team="Beeta"]').getByRole("cell").nth(5)).toHaveText("10.0")
+  await expect(page.locator('tr[data-team="Beeta"]').getByRole("cell").nth(10)).toHaveText("53.00")
+  expect((await db.computedScore.findFirstOrThrow({ where: { team: { name: "Beeta", competitionId: south.competition.id }, element: { code: "KP1" } } })).penaltyPoints).toBe(25)
 
   // Muutmine: ainult Lõuna jääb alles.
   await page.goto(`/dashboard/series/${seriesId}`)

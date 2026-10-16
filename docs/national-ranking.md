@@ -2,8 +2,9 @@
 
 Üleriiklik arvestus ühendab mitme osavõistluse tulemused üheks pingereaks.
 Osavõistlused jäävad eraldi võistlusteks: igaühel on oma korraldajad, KP-d,
-hindamine ja pingerida. Arvestus loeb osavõistlustel salvestatud punkte ega
-muuda neid.
+hindamine ja pingerida. Üleriiklik arvestus koondab sama tähisega KP-de
+toorandmed ja arvutab KP punktid ühises võrdluses uuesti. Osavõistlustel
+salvestatud punkte see ei muuda.
 
 Arvestust haldab ainult administraator (administraatori menüü
 **Üleriiklik arvestus**). Avaldatud arvestusel on avalik pingerida,
@@ -38,6 +39,10 @@ Avalikud aadressid on `/public/series/<id>` (pingerida), `/overview`,
 - Kui osavõistluse pingerida on külmutatud, näitavad avalikud üleriiklikud
   vaated selle osavõistluse külmutamise hetke seisu. Peidetud tulemused ei
   leki üleriikliku arvestuse kaudu.
+  Uued OV külmutused säilitavad ka KP-de toorandmed ja arvutusseaded.
+  Varasemad külmutused, milles toorandmeid pole, kasutavad säilitatud punkte
+  ega osale ühises toorandmete võrdluses. Varem külmutatud üleriiklik
+  pingerida säilib kuni avalikustamiseni.
 - Üleriikliku arvestuse saab ka ise külmutada (kohe või ajastatult). Siis
   näitavad avalik pingerida, ülevaade ja ekraan külmutamise hetke seisu ning
   analüüs on suletud kuni avalikustamiseni. Administraator näeb jooksvat
@@ -58,7 +63,15 @@ Avalikud aadressid on `/public/series/<id>` (pingerida), `/overview`,
 2. Keskmine ümardatakse matemaatiliselt (11,5 → 12, 11,4 → 11).
 3. Arvestatav KP-de arv N on osavõistluste ümardatud keskmistest väikseim.
 4. Võistkonna tulemus = N parima KP punktid + karistused täies ulatuses.
-   KP punktid on osavõistlusel arvutatud punktid koos erandiga: näiteks
+   Enne parimate valimist arvutatakse KP punktid sama tähisega KP-de
+   kõigi OV-de arvestuses olevate võistkondade toorandmetest uuesti.
+   Arvestusvälised, katkestanud ja startimata võistkonnad võrdlusgruppi ei kuulu.
+   Kasutatakse olemasolevat arvutusmootorit, sh kombineeritud hindamist,
+   erandeid ja KP lisapunkte. Registreerunute arvust sõltuv skaala kasutab
+   kõigi OV-de arvestuses olevate võistkondade arvu; klassi- ja grupipõhine
+   arvestus kehtib üle OV-de. Iga OV KP säilitab oma arvutusseaded;
+   nende erinevused on reeglite kontrollis nähtavad.
+   KP punktid sisaldavad ka erandit: näiteks
    „Ei läbinud” miinuspunktid on selle KP tulemus ega lähe arvesse, kui
    võistkonnal on N paremat KP-d.
 5. Karistused on vastutegevus, varustuskontroll, hilinemine, katkestamine

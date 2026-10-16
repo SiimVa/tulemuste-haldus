@@ -5,7 +5,8 @@ import { resultExceptionKind } from "./exceptionKinds"
 // 1. Iga osavõistluse keskmine läbitud KP-de arv, ümardatud matemaatiliselt.
 // 2. Arvestatav KP-de arv N on osavõistluste ümardatud keskmistest väikseim.
 // 3. Võistkonna tulemus = N parima KP punktid + karistused täies ulatuses.
-// Arvutus kasutab osavõistlustel salvestatud punkte.
+// KP punktid arvutatakse enne seda sama tähisega KP-de ühiste toorandmete
+// põhjal (seriesScoring.ts). Siin valitakse N parimat ja lisatakse karistused.
 
 export type SeriesScoringMode = "PLUS" | "PENALTY"
 export type SeriesElementRole = "KP" | "PENALTY" | "IGNORED"
