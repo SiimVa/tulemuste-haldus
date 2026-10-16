@@ -16,6 +16,7 @@ import {
   getCompetitionRegistrationStatus,
 } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
+import { canSubmitMandate, isMandateEditableInPhase, isTeamWorkflowStatus } from "@/lib/teamWorkflow"
 import {
   formatFormAnswer,
   parseFormAnswer,
@@ -45,6 +46,7 @@ async function handleGET(
       where: { id: competitionId },
       select: {
         id: true,
+        status: true,
         registrationOverride: true,
         registrationOpensAt: true,
         registrationClosesAt: true,
@@ -244,6 +246,12 @@ async function handleGET(
     }),
     legacyTeams: teams.map(({ formValues, ...team }) => ({
       ...team,
+      canSubmitMandate: competition.status === "SETUP"
+        && isTeamWorkflowStatus(team.registrationStatus)
+        && isTeamWorkflowStatus(team.mandateStatus)
+        && canSubmitMandate(team.registrationStatus, team.mandateStatus, team.members.filter((member) => member.role === "COMPETITOR").length)
+        && (!applications.some((application) => application.teamId === team.id)
+          || isMandateEditableInPhase(team.mandateStatus, getCompetitionMandateStatus(competition))),
       answers: organizerTeamAnswers(registrationFormFields.map(toFormFieldDefinition), currentRepresentativeAnswers(Object.fromEntries(formValues.flatMap(({ field, value }) => {
         const answer = parseFormAnswer(value)
         return answer === undefined ? [] : [[field.key, answer]]

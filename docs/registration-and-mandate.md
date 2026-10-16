@@ -108,6 +108,15 @@ võistlused, teavitused ning administraatori tööriistad ka mobiilis.
 
 ## Korraldaja vaade
 
+Mandaadi sakis saab korraldaja võistkonna kaardilt vajutada **Esita mandaat**.
+Nupp on nähtav kinnitatud registreerimisega võistkonnal, kelle mandaati saab
+veel esitada ja kelle koosseisus on vähemalt üks võistleja. Vajadusel täida
+andmed esmalt nupuga **Muuda võistkonda**. Esitamisel kontrollitakse kohustuslikke
+vormivälju ja koosseisu nõudeid ning rakendatakse mandaadi kinnitamise seadistust:
+käsitsi kinnitamise puhul jääb mandaat esitatuks, automaatse puhul kinnitatakse kohe.
+Kehtivad samad mandaadi perioodi piirangud nagu esindajale; parandamisele saadetud
+mandaadi saab uuesti esitada ka pärast perioodi sulgemist.
+
 Võistluse lehel on jaotis **Registreerimine**, kus omanik, korraldaja või
 süsteemiadministraator näeb kõigi võistkondade olekuid, esindajat ja mandaadi
 koosseisu. Esitatud etapi saab kinnitada või märkusega parandamisele saata.

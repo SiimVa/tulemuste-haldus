@@ -113,3 +113,70 @@ test("organizer edits full registrations after closing and adds and edits teams 
   expect((await repPage.request.post(endpoint, { data: payload })).status()).toBe(403)
   await repContext.close()
 })
+
+test("korraldaja esitab mandaadi samade andmekontrollide ja kinnitamisreeglitega", async ({ page, request }) => {
+  const stamp = Date.now()
+  const passwordHash = await bcrypt.hash("organizer-mandate-password", 10)
+  const owner = await db.user.create({ data: { name: "Omanik", email: `mandate-owner-${stamp}@example.com`, passwordHash } })
+  const organizer = await db.user.create({ data: { name: "Korraldaja", email: `mandate-organizer-${stamp}@example.com`, passwordHash } })
+  const competition = await db.competition.create({ data: {
+    name: `Korraldaja mandaat ${stamp}`, createdById: owner.id, organizerId: owner.id,
+    registrationFinalizedAt: new Date(), mandateOverride: "OPEN", mandateApprovalMode: "MANUAL",
+    members: { create: { userId: organizer.id, roles: { create: { role: "ORGANIZER" } } } },
+  } })
+  const team = await db.team.create({ data: {
+    competitionId: competition.id, name: "Korraldaja esitatav", code: "K1", registrationStatus: "APPROVED",
+    members: { create: { name: "Mari", role: "COMPETITOR" } },
+  } })
+  await db.registrationApplication.create({ data: { competitionId: competition.id, submittedById: owner.id, teamName: team.name, teamId: team.id, status: "CONFIRMED" } })
+  const required = await db.competitionFormField.create({ data: {
+    competitionId: competition.id, key: "contact", label: "Kontakttelefon", type: "TEXT",
+    showInRegistration: false, showInMandate: true, requiredInMandate: true,
+  } })
+  const submitUrl = `/api/representative/teams/${team.id}/submit`
+  expect((await request.post(submitUrl, { data: { phase: "MANDATE" } })).status()).toBe(401)
+  await page.goto("/login")
+  await page.getByPlaceholder("admin@example.com").fill(organizer.email)
+  await page.locator('input[type="password"]').fill("organizer-mandate-password")
+  await page.getByRole("button", { name: "Logi sisse" }).click()
+  await page.waitForURL("**/dashboard")
+  await page.goto(`/dashboard/competitions/${competition.id}/registrations`)
+  await page.getByRole("tab", { name: /Mandaat/ }).click()
+  const card = page.locator("article").filter({ hasText: team.name })
+  await card.getByRole("button", { name: "Esita mandaat", exact: true }).click()
+  await expect(page.getByText(/Kontakttelefon:.*kohustuslik/)).toBeVisible()
+  expect((await db.team.findUniqueOrThrow({ where: { id: team.id } })).mandateStatus).toBe("DRAFT")
+  await db.teamFormFieldValue.create({ data: { teamId: team.id, fieldId: required.id, value: '"55512345"' } })
+  await card.getByRole("button", { name: "Esita mandaat", exact: true }).click()
+  await expect(page.getByText("Mandaat esitatud", { exact: true })).toBeVisible()
+  await expect(card.getByRole("button", { name: "Esita mandaat", exact: true })).toHaveCount(0)
+  await expect(card.getByRole("button", { name: "Kinnita mandaat", exact: true })).toBeVisible()
+  const submitted = await db.team.findUniqueOrThrow({ where: { id: team.id } })
+  expect(submitted.mandateStatus).toBe("SUBMITTED")
+  expect(submitted.mandateSubmittedAt).not.toBeNull()
+  expect(submitted.mandateReviewedAt).toBeNull()
+  expect((await page.request.post(submitUrl, { data: { phase: "MANDATE" } })).status()).toBe(409)
+
+  // Tagasi saadetud mandaadi saab korraldaja uuesti esitada ka suletud perioodil.
+  await db.competition.update({ where: { id: competition.id }, data: { mandateOverride: "CLOSED", mandateApprovalMode: "AUTOMATIC" } })
+  await db.team.update({ where: { id: team.id }, data: { mandateStatus: "CHANGES_REQUESTED", mandateReviewNote: "Täienda andmeid" } })
+  await page.reload()
+  await card.getByRole("button", { name: "Esita mandaat", exact: true }).click()
+  await expect(page.getByText("Mandaat esitatud ja automaatselt kinnitatud", { exact: true })).toBeVisible()
+  const approved = await db.team.findUniqueOrThrow({ where: { id: team.id } })
+  expect(approved.mandateStatus).toBe("APPROVED")
+  expect(approved.mandateSubmittedAt).toEqual(approved.mandateReviewedAt)
+  expect(approved.mandateReviewNote).toBeNull()
+  await expect(card.getByRole("button", { name: "Esita mandaat", exact: true })).toHaveCount(0)
+
+  // Tavalist mustandit suletud perioodil ei esitata.
+  await db.team.update({ where: { id: team.id }, data: { mandateStatus: "DRAFT" } })
+  await page.reload()
+  await expect(card.getByRole("button", { name: "Muuda võistkonda" })).toBeVisible()
+  await expect(card.getByRole("button", { name: "Esita mandaat", exact: true })).toHaveCount(0)
+  expect((await page.request.post(submitUrl, { data: { phase: "MANDATE" } })).status()).toBe(409)
+  // Korraldajaroll ei anna õigust teise võistluse võistkonna mandaadile.
+  const foreign = await db.competition.create({ data: { name: "Võõras võistlus", organizerId: owner.id, createdById: owner.id } })
+  const foreignTeam = await db.team.create({ data: { competitionId: foreign.id, code: "V1", name: "Võõras", registrationStatus: "APPROVED" } })
+  expect((await page.request.post(`/api/representative/teams/${foreignTeam.id}/submit`, { data: { phase: "MANDATE" } })).status()).toBe(403)
+})
