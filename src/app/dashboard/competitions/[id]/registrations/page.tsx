@@ -40,6 +40,7 @@ type RegistrationTeam = {
   registrationStatus: WorkflowStatus
   registrationReviewNote: string | null
   mandateStatus: WorkflowStatus
+  canSubmitMandate: boolean
   mandateReviewNote: string | null
   members: {
     id: string
@@ -287,6 +288,30 @@ export default function RegistrationsPage({
   useEffect(() => {
     void loadTeams()
   }, [loadTeams])
+
+  async function submitMandate(teamId: string) {
+    setReviewing(`${teamId}-MANDATE`)
+    setError("")
+    setMessage("")
+    try {
+      const response = await fetch(`/api/representative/teams/${teamId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: "MANDATE" }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setError(data.error ?? "Mandaadi esitamine ebaõnnestus")
+        return
+      }
+      setMessage(data.mandateStatus === "APPROVED" ? "Mandaat esitatud ja automaatselt kinnitatud" : "Mandaat esitatud")
+      await loadTeams()
+    } catch {
+      setError("Mandaadi esitamine ebaõnnestus. Proovi uuesti.")
+    } finally {
+      setReviewing(null)
+    }
+  }
 
   async function review(
     teamId: string,
@@ -896,6 +921,11 @@ export default function RegistrationsPage({
                         <div className="flex flex-wrap items-center gap-1.5">
                           {team.registrationStatus === "SUBMITTED" && (
                             <Button type="button" size="sm" className="bg-success hover:bg-success/90" onClick={() => review(team.id, "REGISTRATION", "APPROVE")} disabled={Boolean(reviewing)}>Kinnita registreerimine</Button>
+                          )}
+                          {team.canSubmitMandate && (
+                            <Button type="button" size="sm" onClick={() => submitMandate(team.id)} disabled={Boolean(reviewing)}>
+                              {reviewing === `${team.id}-MANDATE` ? "Esitan…" : "Esita mandaat"}
+                            </Button>
                           )}
                           {team.mandateStatus === "SUBMITTED" && (
                             <Button type="button" size="sm" className="bg-success hover:bg-success/90" onClick={() => review(team.id, "MANDATE", "APPROVE")} disabled={Boolean(reviewing)}>Kinnita mandaat</Button>
