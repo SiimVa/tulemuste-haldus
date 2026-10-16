@@ -114,8 +114,10 @@ veel esitada ja kelle koosseisus on vähemalt üks võistleja. Vajadusel täida
 andmed esmalt nupuga **Muuda võistkonda**. Esitamisel kontrollitakse kohustuslikke
 vormivälju ja koosseisu nõudeid ning rakendatakse mandaadi kinnitamise seadistust:
 käsitsi kinnitamise puhul jääb mandaat esitatuks, automaatse puhul kinnitatakse kohe.
-Kehtivad samad mandaadi perioodi piirangud nagu esindajale; parandamisele saadetud
-mandaadi saab uuesti esitada ka pärast perioodi sulgemist.
+Korraldaja, omanik ja süsteemiadministraator saavad mandaadi esitada ka enne
+mandaadiperioodi avamist või pärast selle sulgemist ja lõpetamist, kuni võistlus
+on ettevalmistuse olekus. Esindajale jäävad senised tähtajad kehtima; parandamisele
+saadetud mandaadi saab ta uuesti esitada ka pärast perioodi sulgemist.
 
 Võistluse lehel on jaotis **Registreerimine**, kus omanik, korraldaja või
 süsteemiadministraator näeb kõigi võistkondade olekuid, esindajat ja mandaadi
