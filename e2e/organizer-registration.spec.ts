@@ -114,7 +114,7 @@ test("organizer edits full registrations after closing and adds and edits teams 
   await repContext.close()
 })
 
-test("korraldaja esitab mandaadi samade andmekontrollide ja kinnitamisreeglitega", async ({ page, request }) => {
+test("korraldaja esitab mandaadi samade andmekontrollide ja kinnitamisreeglitega", async ({ page, request, browser }) => {
   const stamp = Date.now()
   const passwordHash = await bcrypt.hash("organizer-mandate-password", 10)
   const owner = await db.user.create({ data: { name: "Omanik", email: `mandate-owner-${stamp}@example.com`, passwordHash } })
@@ -169,7 +169,35 @@ test("korraldaja esitab mandaadi samade andmekontrollide ja kinnitamisreeglitega
   expect(approved.mandateReviewNote).toBeNull()
   await expect(card.getByRole("button", { name: "Esita mandaat", exact: true })).toHaveCount(0)
 
-  // Tavalist mustandit suletud perioodil ei esitata.
+  // Korraldaja saab mustandi esitada ka väljaspool mandaadiperioodi;
+  // sama võistkonna esindaja tähtaja piirang jääb alles.
+  const representative = await db.user.create({ data: { name: "Esindaja", email: `mandate-rep-${stamp}@example.com`, passwordHash } })
+  const membership = await db.competitionMember.create({ data: {
+    competitionId: competition.id, userId: representative.id, roles: { create: { role: "REPRESENTATIVE" } },
+  } })
+  await db.teamRepresentative.create({ data: { competitionId: competition.id, teamId: team.id, memberId: membership.id } })
+  const repContext = await browser.newContext()
+  const repPage = await repContext.newPage()
+  await repPage.goto("/login")
+  await repPage.getByPlaceholder("admin@example.com").fill(representative.email)
+  await repPage.locator('input[type="password"]').fill("organizer-mandate-password")
+  await repPage.getByRole("button", { name: "Logi sisse" }).click()
+  await repPage.waitForURL("**/dashboard")
+  for (const phase of ["CLOSED", "NOT_OPEN", "FINALIZED"]) {
+    await db.competition.update({ where: { id: competition.id }, data: {
+      mandateOverride: phase === "NOT_OPEN" ? "AUTO" : "CLOSED",
+      mandateFinalizedAt: phase === "FINALIZED" ? new Date() : null,
+    } })
+    await db.team.update({ where: { id: team.id }, data: { mandateStatus: "DRAFT" } })
+    expect((await repPage.request.post(submitUrl, { data: { phase: "MANDATE" } })).status()).toBe(409)
+    await page.reload()
+    await card.getByRole("button", { name: "Esita mandaat", exact: true }).click()
+    await expect(page.getByText("Mandaat esitatud ja automaatselt kinnitatud", { exact: true })).toBeVisible()
+    expect((await db.team.findUniqueOrThrow({ where: { id: team.id } })).mandateStatus).toBe("APPROVED")
+  }
+  await repContext.close()
+  // Aktiivse võistluse töövoogu ei muudeta ka korraldaja kaudu.
+  await db.competition.update({ where: { id: competition.id }, data: { status: "ACTIVE" } })
   await db.team.update({ where: { id: team.id }, data: { mandateStatus: "DRAFT" } })
   await page.reload()
   await expect(card.getByRole("button", { name: "Muuda võistkonda" })).toBeVisible()

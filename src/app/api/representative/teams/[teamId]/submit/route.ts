@@ -6,7 +6,7 @@ import {
   workflowStatusAfterSubmission,
 } from "@/lib/approvalModes"
 import { auth } from "@/lib/auth"
-import { canManageTeamRegistration } from "@/lib/competitionAccess"
+import { canAccessCompetition, canManageTeamRegistration } from "@/lib/competitionAccess"
 import { getCompetitionMandateStatus } from "@/lib/competitionPhases"
 import { prisma } from "@/lib/prisma"
 import {
@@ -166,6 +166,7 @@ async function handlePOST(
   }
 
   if (
+    !await canAccessCompetition(team.competitionId, { id: session.user.id, role: session.user.role }) &&
     team.registrationApplication &&
     !isMandateEditableInPhase(
       mandateStatus,
