@@ -119,3 +119,31 @@ Valikvastuste tehnilised ID-d võivad osavõistlustel erineda. Reeglite kontroll
 võrdleb valikute sisu ja punkte; ainult ID erinevus hoiatust ei tekita.
 Ühises arvutuses seotakse sama sisuga ja samade punktidega vastused õigete
 OV valikutega ka siis, kui nende ID-d erinevad. OV toorandmeid see ei muuda.
+
+## Jagamine eraldi vaadete kaupa
+
+Avaliku vaate seadetes on üldine avaldamislüliti ning kaks eraldi ligipääsuvalikut:
+
+- **Pingerida ja ülevaade**: avalik, ainult eraldi lingiga või suletud. Sama
+  valik kehtib ekraanirežiimile. Ainult lingiga aadress on
+  `/ranking/series/<tunnus>`, ülevaade ja ekraan asuvad selle all.
+- **Analüüs**: avalik, ainult eraldi lingiga või suletud. See seadistus ei sõltu
+  pingerea nähtavusest. Analüüsi eraldi aadress on `/analysis/series/<tunnus>`.
+
+Pingerida võib olla avalik ja analüüs ainult lingiga; samuti võib jagada ainult
+analüüsi ja jätta pingerea suletuks. Lingiga kaitstud vaate tavaline avalik
+ID-aadress ei avane. Pingerea ja analüüsi tunnused on eraldi ning neid ei saa
+teineteise asemel kasutada. Uue lingi loomine tühistab sama vaate vana lingi.
+Tunnusest säilitatakse ainult räsi, mistõttu kopeeri uus link kohe.
+
+Üldine **Peida avalikust vaatest** sulgeb kõik jagatud vaated, ka tokeniga
+lingid. Administraator näeb suletud vaateid töölaual ja eelvaates edasi.
+Külmutused kehtivad nii avalikes kui ka tokeniga jagatud vaadetes; külmutatud
+üleriikliku arvestuse analüüs jääb suletuks kuni tulemuste avalikustamiseni.
+
+Üleriiklik analüüs kasutab osavõistlusega sama võistkonna- ja KP-võrdluse
+komponenti: toorväärtused, kohad, positsioonid, tugevused/nõrkused ning väljade
+parimad, keskmised ja halvimad väärtused. Kogutulemus on üleriiklik N parima KP
+ja kõigi karistuste tulemus; arvestamata KP-d on märgitud eraldi. Lisaks säilib
+sama KP osavõistluste võrdlus. Toorandmed säilitatakse uutes üleriiklikes
+külmutustes; vanade, toorandmeteta külmutuste analüüs kasutab säilitatud punkte.

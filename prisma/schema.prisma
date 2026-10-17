@@ -886,6 +886,8 @@ model CompetitionSeries {
   name               String
   // Avalikud vaated (/public/series/<id>) avanevad ainult avaldatud arvestusel.
   isPublished        Boolean                        @default(false)
+  leaderboardAccessMode String                      @default("PUBLIC")
+  leaderboardTokenHash String?                      @unique
   // Analüüsi avalik ligipääs nagu võistlusel: "PUBLIC" | "LINK_ONLY" | "PRIVATE".
   analysisAccessMode String                         @default("PUBLIC")
   analysisTokenHash  String?                        @unique

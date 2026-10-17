@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { GapCells, GapHeadings, GapSummary, RankBadge } from "@/components/leaderboard/LeaderboardDetails"
 import { Card } from "@/components/ui/card"
 import type { LeaderboardGap } from "@/lib/leaderboard"
@@ -12,12 +13,13 @@ function kpCell(row: SeriesRow, code: string) {
 
 // Üleriikliku arvestuse pingerida: arvutis tabel KP-de veergudega, telefonis
 // kaardid. Arvesse minevad KP-d on tumedad, arvestamata KP-d hallid.
-export function SeriesLeaderboard({ rows, gaps, kpCodes, showClasses, unit }: {
+export function SeriesLeaderboard({ rows, gaps, kpCodes, showClasses, unit, analysisBasePath }: {
   rows: SeriesRow[]
   gaps: Record<string, LeaderboardGap>
   kpCodes: string[]
   showClasses: boolean
   unit: string
+  analysisBasePath?: string
 }) {
   if (rows.length === 0) return <p className="py-6 text-center text-sm text-ink-muted">Tulemusi pole veel.</p>
   return (
@@ -34,7 +36,7 @@ export function SeriesLeaderboard({ rows, gaps, kpCodes, showClasses, unit }: {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {!isAutomaticRegistrationCode(row.team.code) && <span className="font-mono text-xs text-gray-400">{row.team.code}</span>}
-                    <span className="truncate font-medium text-gray-900">{row.team.name}</span>
+                    <span className="truncate font-medium text-gray-900">{analysisBasePath ? <Link href={`${analysisBasePath}?team=${row.team.id}`} className="hover:text-blue-600 hover:underline">{row.team.name}</Link> : row.team.name}</span>
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-2">
                     {row.team.class && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{row.team.class} · <RankBadge rank={row.classRank} /></span>}
@@ -78,7 +80,7 @@ export function SeriesLeaderboard({ rows, gaps, kpCodes, showClasses, unit }: {
                   <td className="sticky left-12 z-10 w-12 bg-white px-2 py-3 text-center text-xs text-gray-400"><RankBadge rank={row.team.class ? row.classRank : null} /></td>
                   <td className="sticky left-24 z-10 min-w-48 border-r bg-white px-4 py-3">
                     {!isAutomaticRegistrationCode(row.team.code) && <span className="mr-1.5 font-mono text-xs text-gray-400">{row.team.code}</span>}
-                    <span className="font-medium text-gray-900">{row.team.name}</span>
+                    <span className="font-medium text-gray-900">{analysisBasePath ? <Link href={`${analysisBasePath}?team=${row.team.id}`} className="hover:text-blue-600 hover:underline">{row.team.name}</Link> : row.team.name}</span>
                     <span className="block text-xs text-gray-500">{row.competitionName}</span>
                   </td>
                   <td className="px-4 py-3">{row.team.class && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{row.team.class}</span>}</td>

@@ -27,6 +27,13 @@ function parseCompetition(raw: Record<string, unknown>): SeriesCompetitionData |
             isCancelled: element.isCancelled === true,
             exceptions: list(element.exceptions).flatMap((item) => (isString(item.label) ? [{ label: item.label, kind: isString(item.kind) ? item.kind : null }] : [])),
             maxValue: isNumber(element.maxValue) ? element.maxValue : null,
+            ...(typeof element.rawHigherIsBetter === "boolean" ? { rawHigherIsBetter: element.rawHigherIsBetter } : {}),
+            fields: list(element.fields).flatMap((field) => isString(field.name) && isString(field.type) ? [{
+              name: field.name, label: isString(field.label) ? field.label : field.name, type: field.type,
+              isResultField: field.isResultField === true, rankingPriority: orderOrNull(field.rankingPriority),
+              formula: isString(field.formula) ? field.formula : null, order: isNumber(field.order) ? field.order : 0,
+              meta: isString(field.meta) ? field.meta : null,
+            }] : []),
           }]
         : [])),
     teams: list(raw.teams).flatMap((team) => (
@@ -44,7 +51,7 @@ function parseCompetition(raw: Record<string, unknown>): SeriesCompetitionData |
         : [])),
     results: list(raw.results).flatMap((result) => (
       isString(result.elementId) && isString(result.teamId)
-        ? [{ elementId: result.elementId, teamId: result.teamId, exceptionLabel: isString(result.exceptionLabel) ? result.exceptionLabel : null }]
+        ? [{ elementId: result.elementId, teamId: result.teamId, exceptionLabel: isString(result.exceptionLabel) ? result.exceptionLabel : null, ...(isString(result.values) ? { values: result.values } : {}) }]
         : [])),
     scores: list(raw.scores).flatMap((score) => (
       isString(score.elementId) && isString(score.teamId) && isNumber(score.points) ? [{ elementId: score.elementId, teamId: score.teamId, points: score.points }] : [])),

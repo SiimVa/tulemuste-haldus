@@ -1,4 +1,7 @@
 import { resultExceptionKind } from "./exceptionKinds"
+import type { FieldDefinition } from "@prisma/client"
+
+export type SeriesAnalysisField = Pick<FieldDefinition, "name" | "label" | "type" | "isResultField" | "rankingPriority" | "formula" | "order" | "meta">
 
 // Üleriiklik arvestus mitme osavõistluse (eraldi võistluse) tulemustest,
 // vt docs/national-ranking.md:
@@ -36,6 +39,8 @@ export type SeriesElement = {
   exceptions: { label: string; kind?: string | null }[]
   // Efektiivne maksimum (elemendi oma või võistluse vaikeväärtus) protsentide jaoks.
   maxValue?: number | null
+  fields?: SeriesAnalysisField[]
+  rawHigherIsBetter?: boolean
 }
 
 export type SeriesTeam = {
@@ -55,7 +60,7 @@ export type SeriesCompetitionData = {
   scoringMode: SeriesScoringMode
   elements: SeriesElement[]
   teams: SeriesTeam[]
-  results: { elementId: string; teamId: string; exceptionLabel: string | null }[]
+  results: { elementId: string; teamId: string; exceptionLabel: string | null; values?: string }[]
   scores: { elementId: string; teamId: string; points: number }[]
   manualPenalties: { teamId: string; points: number; description?: string }[]
 }

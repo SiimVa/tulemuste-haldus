@@ -34,6 +34,7 @@ export function AnalysisAccessSettings({
   title = "VK analüüsi ligipääs",
   linkLabel = "VK analüüs →",
   managersText = "Korraldajad näevad andmeid töölaual edasi.",
+  resource = "analysis",
 }: {
   competitionId: string
   initialMode: AnalysisAccessMode
@@ -45,7 +46,11 @@ export function AnalysisAccessSettings({
   title?: string
   linkLabel?: string
   managersText?: string
+  resource?: "analysis" | "leaderboard"
 }) {
+  const modeKey = resource === "analysis" ? "analysisAccessMode" : "leaderboardAccessMode"
+  const tokenKey = resource === "analysis" ? "analysisLinkToken" : "leaderboardLinkToken"
+  const hasLinkKey = resource === "analysis" ? "hasAnalysisLink" : "hasLeaderboardLink"
   const router = useRouter()
   const [mode, setMode] = useState<AnalysisAccessMode>(initialMode)
   const [hasLink, setHasLink] = useState(initialHasLink)
@@ -70,7 +75,7 @@ export function AnalysisAccessSettings({
     const res = await fetch(accessUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ analysisAccessMode: mode }),
+      body: JSON.stringify({ [modeKey]: mode }),
     })
     setSaving(false)
     if (!res.ok) {
@@ -78,8 +83,8 @@ export function AnalysisAccessSettings({
       return
     }
     const data = await res.json()
-    if (data.analysisLinkToken) setLinkToken(data.analysisLinkToken)
-    setHasLink(Boolean(data.hasAnalysisLink))
+    if (data[tokenKey]) setLinkToken(data[tokenKey])
+    setHasLink(Boolean(data[hasLinkKey]))
     setSaved(true)
     window.setTimeout(() => setSaved(false), 2000)
     router.refresh()
@@ -95,7 +100,7 @@ export function AnalysisAccessSettings({
       return
     }
     const data = await res.json()
-    setLinkToken(data.analysisLinkToken)
+    setLinkToken(data[tokenKey])
     setHasLink(true)
   }
 
@@ -110,12 +115,11 @@ export function AnalysisAccessSettings({
   }
 
   return (
-    <div className="bg-white border rounded-xl p-5 space-y-4">
+    <section aria-label={title} className="bg-white border rounded-xl p-5 space-y-4">
       <div>
         <h2 className="font-semibold text-gray-900">{title}</h2>
         <p className="text-xs text-gray-500 mt-1">
-          Määrab, kas pingerea jagamisel saab sealt otse analüüsi vaatesse
-          liikuda. Analüüsist pingereasse tagasi saab alati.
+          {resource === "analysis" ? "Vali, kas analüüs on avalik, eraldi lingiga jagatav või suletud." : "Määrab pingerea, ülevaate ja ekraanirežiimi ligipääsu. Analüüsi nähtavust saad valida eraldi."}
         </p>
       </div>
 
@@ -129,7 +133,7 @@ export function AnalysisAccessSettings({
           >
             <input
               type="radio"
-              name="analysisAccessMode"
+              name={modeKey}
               value={option.value}
               checked={mode === option.value}
               onChange={() => setMode(option.value)}
@@ -139,7 +143,7 @@ export function AnalysisAccessSettings({
               <span className="block text-sm font-medium text-gray-900">
                 {option.label}
               </span>
-              <span className="block text-xs text-gray-500">{option.desc}</span>
+              <span className="block text-xs text-gray-500">{resource === "analysis" ? option.desc : option.value === "PUBLIC" ? "Pingerida ja ülevaade avanevad avalikult arvestuse aadressilt." : option.value === "LINK_ONLY" ? "Pingerida ja ülevaade avanevad ainult eraldi jagatava lingiga." : "Avalik pingerida ja ülevaade on suletud. Administraator näeb neid töölaual edasi."}</span>
             </span>
           </label>
         ))}
@@ -150,9 +154,9 @@ export function AnalysisAccessSettings({
           {linkToken && origin ? (
             <>
               <label className="block text-xs text-gray-600">
-                Analüüsilink
+                {resource === "analysis" ? "Analüüsilink" : "Pingerealink"}
                 <Input
-                  aria-label="Analüüsilink"
+                  aria-label={resource === "analysis" ? "Analüüsilink" : "Pingerealink"}
                   readOnly
                   value={link}
                   onFocus={(event) => event.currentTarget.select()}
@@ -216,6 +220,6 @@ export function AnalysisAccessSettings({
         </button>
         {saved && <span className="text-xs text-green-600">Salvestatud</span>}
       </div>
-    </div>
+    </section>
   )
 }
