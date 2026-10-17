@@ -142,8 +142,21 @@ function describeCalc(method: RuleCalcMethod | null, directPointsEntry = false):
 function fieldsKey(fields: RuleField[]) {
   return canonical([...fields].sort((a, b) => a.order - b.order).map((field) => ({
     name: field.name, type: field.type, isResultField: field.isResultField, rankingPriority: field.rankingPriority,
-    formula: field.formula ?? null, meta: parseJson(field.meta),
+    formula: field.formula ?? null, meta: fieldRuleMeta(field),
   })))
+}
+
+// Valiku ID seob kohtuniku sisestuse selle OV valikuga, mitte hindamisreegliga.
+// Võrdleme sisu; punktide ja kõigi muude seadete erinevused jäävad nähtavaks.
+function fieldRuleMeta(field: RuleField): unknown {
+  const meta = parseJson(field.meta)
+  if (field.type !== "POINTS_SELECT" || !meta || typeof meta !== "object" || Array.isArray(meta)) return meta
+  const record = meta as Record<string, unknown>
+  if (!Array.isArray(record.options)) return meta
+  return { ...record, options: record.options.map((option) => {
+    if (!option || typeof option !== "object" || Array.isArray(option)) return option
+    return Object.fromEntries(Object.entries(option).filter(([key]) => key !== "id"))
+  }) }
 }
 
 function describeFields(fields: RuleField[]): { key: string; value: string } {

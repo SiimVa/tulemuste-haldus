@@ -11,7 +11,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint .",
-    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js scripts/railway/event-backups.test.mjs",
     "db:up": "docker compose -f compose.postgres.yml up -d --wait",
     "db:down": "docker compose -f compose.postgres.yml down",
     "db:generate": "prisma generate",

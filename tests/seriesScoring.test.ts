@@ -95,3 +95,22 @@ test("OV külmutus säilitab toorandmed ja üleriiklik külmutus ümberarvutatud
   assert.equal(parseFreezeSnapshot({ ...emptyFreezeSnapshot(takenAt), seriesScoring: { config: {} } }, takenAt).seriesScoring, undefined)
   assert.equal(recomputeSeriesKpScores([{ data: a.data }])[0].scores[0].points, 999)
 })
+
+test("eri OV-de valiku ID-d seotakse sisu järgi ka ühise punktiarvutuse jaoks", () => {
+  for (const combined of [false, true]) {
+    const a = input("a", [1])
+    const b = input("b", [0])
+    for (const [prefix, item] of [["a", a], ["b", b]] as const) {
+      const element = item.source!.elements[0]
+      const choiceField = { ...field, type: "POINTS_SELECT", meta: JSON.stringify({ options: [{ id: `${prefix}-yes`, label: "Jah", points: 1 }, { id: `${prefix}-no`, label: "Ei", points: 0 }] }) }
+      if (combined) {
+        element.fields = []
+        element.sections = [{ calcMethod: ranked, fields: [choiceField], maxValue: 30 }]
+      } else element.fields = [choiceField]
+      item.source!.results[0].values = JSON.stringify({ points: `${prefix}-${prefix === "a" ? "yes" : "no"}` })
+    }
+    const before = JSON.stringify([a, b])
+    assert.deepEqual(kpPoints([a, b]), [["a-0", 2], ["b-0", 1]])
+    assert.equal(JSON.stringify([a, b]), before)
+  }
+})
