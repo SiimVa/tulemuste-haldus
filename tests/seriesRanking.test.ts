@@ -154,3 +154,15 @@ test("reeglite kontroll leiab erinevused, puuduvad elemendid ja arvestusest väl
   assert.deepEqual(check.missing, [{ code: "KP3", name: "Element KP3", missingIn: ["B"] }])
   assert.deepEqual(check.ignored.map((item) => [item.competitionId, item.code]), [["A", "PK1"]])
 })
+
+test("valikvastuste tehnilised ID-d ei ole reeglite erinevus, sisu ja punktid on", () => {
+  const choice = (prefix: string, points = 1, label = "Jah") => ({
+    name: "valik", label: "Kas sooritas?", type: "POINTS_SELECT", order: 1,
+    isResultField: false, rankingPriority: null, formula: null,
+    meta: JSON.stringify({ options: [{ id: `${prefix}-yes`, label, points }, { id: `${prefix}-no`, label: "Ei", points: 0 }] }),
+  })
+  const check = (fields: RuleElement["fields"][]) => checkSeriesRules(fields.map((f, i) => ruleCompetition(String(i), [ruleElement("KP1", { fields: f, sections: [{ name: "Osa", order: 0, maxValue: 10, calcMethod: null, fields: f }] })])))
+  assert.deepEqual(check([[choice("a")], [choice("b")], [choice("c")], [choice("d")]]).differences, [])
+  assert.deepEqual(check([[choice("a")], [choice("a", 2)]]).differences.map((item) => item.property), ["Väljad", "Hindamisosad"])
+  assert.deepEqual(check([[choice("a")], [choice("b", 1, "Osaliselt")]]).differences.map((item) => item.property), ["Väljad", "Hindamisosad"])
+})

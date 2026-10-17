@@ -114,3 +114,8 @@ Exceli failis on kolm lehte:
 - Arvestus arvutatakse lehe avamisel osavõistluste praegustest punktidest.
 - Kuni mõni osavõistlus pole lõppenud, on arvestus esialgne.
 - Osavõistluse ümberarvutus muudab ka arvestust.
+
+Valikvastuste tehnilised ID-d võivad osavõistlustel erineda. Reeglite kontroll
+võrdleb valikute sisu ja punkte; ainult ID erinevus hoiatust ei tekita.
+Ühises arvutuses seotakse sama sisuga ja samade punktidega vastused õigete
+OV valikutega ka siis, kui nende ID-d erinevad. OV toorandmeid see ei muuda.

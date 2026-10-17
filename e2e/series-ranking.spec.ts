@@ -32,7 +32,10 @@ async function seedCompetition(name: string, ownerId: string, status: string, ma
     elements[code] = (await db.scoringElement.create({ data: {
       competitionId: competition.id, code, name: `Ülesanne ${code}`, order, maxValue: maxByCode[code] ?? null,
       exceptions: { create: exceptions },
-      fields: { create: { name: "points", label: "Punktid", type: "NUMBER", isResultField: true, order: 0 } },
+      fields: { create: [
+        { name: "points", label: "Punktid", type: "NUMBER", isResultField: true, order: 0 },
+        { name: "done", label: "Kas sooritas?", type: "POINTS_SELECT", order: 1, meta: JSON.stringify({ options: [{ id: crypto.randomUUID(), label: "Jah", points: 1 }, { id: crypto.randomUUID(), label: "Ei", points: 0 }] }) },
+      ] },
       calcMethod: { create: { type: "ABSOLUTE_POINTS", params: "{}" } },
     } })).id
   }
@@ -96,6 +99,9 @@ test("administraator loob üleriikliku arvestuse ja näeb keskmisi, reeglite kon
   const difference = page.getByRole("listitem").filter({ hasText: "KP2 · Ülesanne KP2 — Maksimum" })
   await expect(difference).toContainText(`Lõuna OV ${stamp}: 30 p`)
   await expect(difference).toContainText(`Kirde OV ${stamp}: 25 p`)
+
+  // Eri OV-de valikute ID-d ei tekita sisuliselt samade väljade hoiatust.
+  await expect(page.getByRole("listitem").filter({ hasText: /— Väljad/ })).toHaveCount(0)
 
   // 3 parimat KP-d + karistused: Beeta 68, Gamma 60, Delta 60, Alfa 50 − 5 − 2 = 43.
   const rankingRows = page.locator("tr[data-team]")
