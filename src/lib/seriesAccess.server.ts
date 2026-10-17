@@ -20,11 +20,11 @@ export async function requireSeriesAdmin(params: Promise<{ id: string }>): Promi
 
 // Avalik vaade: avaldatud arvestus kõigile, avaldamata arvestus ainult
 // administraatori eelvaatena. Avaldamist kontrollitakse enne andmete laadimist.
-export async function loadPublicSeries(seriesId: string): Promise<{ view: SeriesView; preview: boolean } | null> {
-  const series = await prisma.competitionSeries.findUnique({ where: { id: seriesId }, select: { isPublished: true } })
+export async function loadPublicSeries(seriesId: string, part: "leaderboard" | "analysis" = "leaderboard"): Promise<{ view: SeriesView; preview: boolean } | null> {
+  const series = await prisma.competitionSeries.findUnique({ where: { id: seriesId }, select: { isPublished: true, leaderboardAccessMode: true, analysisAccessMode: true } })
   if (!series) return null
   let preview = false
-  if (!series.isPublished) {
+  if (!series.isPublished || (part === "analysis" ? series.analysisAccessMode : series.leaderboardAccessMode) !== "PUBLIC") {
     const session = await auth()
     if (session?.user?.role !== "ADMIN") return null
     preview = true

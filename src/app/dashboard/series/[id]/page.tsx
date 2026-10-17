@@ -161,7 +161,7 @@ export default async function SeriesPage({
         {ranking.mixedScoringModes ? <p className="py-6 text-center text-sm text-ink-muted">Pingerida ei arvutata.</p> : (
           <>
             <LeaderboardClassFilter classes={ranking.classes} />
-            <SeriesLeaderboard rows={rows} gaps={seriesGaps(ranking)} kpCodes={seriesKpCodes(ranking)} showClasses={ranking.classes.length > 0} unit={unit} />
+            <SeriesLeaderboard analysisBasePath={`/dashboard/series/${id}/analysis`} rows={rows} gaps={seriesGaps(ranking)} kpCodes={seriesKpCodes(ranking)} showClasses={ranking.classes.length > 0} unit={unit} />
           </>
         )}
       </section>

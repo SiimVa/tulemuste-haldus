@@ -11,7 +11,7 @@ async function handlePATCH(req: Request, { params }: { params: Promise<{ id: str
   const access = await requireSeriesAdmin(params)
   if (!access.ok) return access.response
   const body = await req.json().catch(() => ({}))
-  if (!isAnalysisAccessMode(body.analysisAccessMode)) return NextResponse.json({ error: "Tundmatu ligipääsuviis" }, { status: 400 })
+  if (!isAnalysisAccessMode(body?.analysisAccessMode)) return NextResponse.json({ error: "Tundmatu ligipääsuviis" }, { status: 400 })
   const analysisAccessMode = body.analysisAccessMode
   const current = await prisma.competitionSeries.findUniqueOrThrow({ where: { id: access.id }, select: { analysisAccessMode: true, analysisTokenHash: true } })
 

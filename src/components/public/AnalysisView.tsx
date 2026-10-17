@@ -25,6 +25,8 @@ export type SimElementConfig = {
 }
 
 export type AnalysisTeam = {
+  selectionLabel?: string
+  scoreSummary?: string
   tieBreakReason?: string | null
   classTieBreakReason?: string | null
   id: string
@@ -57,6 +59,7 @@ export type AnalysisElement = {
 }
 
 export type TeamElementStat = {
+  counted?: boolean
   teamId: string
   elementId: string
   score: number | null
@@ -88,6 +91,10 @@ export type ElementStat = {
 }
 
 interface Props {
+  embedded?: boolean
+  enableSimulator?: boolean
+  initialTeamId?: string | null
+  teamUrlBase?: string
   competitionId: string
   analysisLinkToken?: string
   competitionName: string
@@ -110,14 +117,14 @@ function secondsToTime(s: number): string {
 
 function formatRawValue(value: string | number | null, type: string | null): string {
   if (value === null || value === undefined || value === "") return "–"
-  if (type === "TIME") return String(value)
+  if (type === "TIME" || type === "TIME_RANGE") return String(value)
   const n = parseFloat(String(value))
   return isNaN(n) ? String(value) : (Number.isInteger(n) ? String(n) : n.toFixed(2))
 }
 
 function formatAvgRaw(avg: number | null, type: string | null): string {
   if (avg === null) return "–"
-  if (type === "TIME") return secondsToTime(avg)
+  if (type === "TIME" || type === "TIME_RANGE") return secondsToTime(avg)
   return avg.toFixed(2)
 }
 
@@ -139,6 +146,10 @@ function ScoreBar({ pct, isGood }: { pct: number; isGood: boolean }) {
 type Tab = "team" | "kp" | "sim"
 
 export default function AnalysisView({
+  embedded = false,
+  enableSimulator = true,
+  initialTeamId,
+  teamUrlBase,
   competitionId,
   analysisLinkToken,
   competitionName,
@@ -150,7 +161,7 @@ export default function AnalysisView({
   simElements,
 }: Props) {
   const [tab, setTab] = useState<Tab>("team")
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? "")
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams.some((team) => team.id === initialTeamId) ? initialTeamId! : teams[0]?.id ?? "")
   const [selectedElementId, setSelectedElementId] = useState<string>(elements[0]?.id ?? "")
 
   // "Minu võistkond" valik on jagatud pingerea vaatega (sama localStorage võti),
@@ -158,13 +169,14 @@ export default function AnalysisView({
   const teamStorageKey = `lb-myteam-${competitionId}`
   useEffect(() => {
     const saved = localStorage.getItem(teamStorageKey)
-    if (saved && teams.some((t) => t.id === saved)) setSelectedTeamId(saved)
+    if (!initialTeamId && saved && teams.some((t) => t.id === saved)) setSelectedTeamId(saved)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function chooseTeam(id: string) {
     setSelectedTeamId(id)
     if (id) localStorage.setItem(teamStorageKey, id)
+    if (teamUrlBase) window.history.replaceState(null, "", `${teamUrlBase}?team=${encodeURIComponent(id)}`)
   }
 
   const isPlusMode = scoringMode === "PLUS"
@@ -256,10 +268,10 @@ export default function AnalysisView({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className={embedded ? "" : "min-h-screen bg-gray-50"} data-team-analysis={selectedTeam?.name}>
+      <div className={embedded ? "min-w-0" : "max-w-5xl mx-auto px-4 py-8"}>
         {/* Header */}
-        <div className="mb-5 flex items-start justify-between">
+        {!embedded && <div className="mb-5 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{competitionName}</h1>
             <p className="text-gray-500 text-sm mt-0.5">Tulemuste analüüs</p>
@@ -267,7 +279,7 @@ export default function AnalysisView({
           <Link href={`/public/${competitionId}/leaderboard`} className="text-xs text-blue-600 hover:underline">
             ← Pingerida
           </Link>
-        </div>
+        </div>}
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit mb-6">
@@ -283,12 +295,12 @@ export default function AnalysisView({
           >
             KP võrdlus
           </button>
-          <button
+          {enableSimulator && <button
             onClick={() => setTab("sim")}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "sim" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
           >
             Simulaator
-          </button>
+          </button>}
         </div>
 
         {/* ── TEAM TAB ── */}
@@ -298,6 +310,7 @@ export default function AnalysisView({
             <Card className="p-4 mb-5">
               <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
               <select
+                aria-label={embedded ? "Võistkond" : "Vali võistkond"}
                 value={selectedTeamId}
                 onChange={(e) => chooseTeam(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
@@ -306,8 +319,7 @@ export default function AnalysisView({
                   <optgroup label="Arvestussisesed">
                     {teams.filter(t => !t.isHorsDeCompetition).map((t) => (
                       <option key={t.id} value={t.id}>
-                        {teamDisplayName(t)}{t.class ? ` (${t.class})` : ""}
-                        {t.overallRank != null ? ` · #${t.overallRank}/${t.totalInComp}` : ""}
+                        {t.selectionLabel ?? `${teamDisplayName(t)}${t.class ? ` (${t.class})` : ""}${t.overallRank != null ? ` · #${t.overallRank}/${t.totalInComp}` : ""}`}
                       </option>
                     ))}
                   </optgroup>
@@ -333,6 +345,7 @@ export default function AnalysisView({
                           <span className="font-mono text-sm text-gray-400">{selectedTeam.code}</span>
                         )}
                         <h2 className="text-lg font-bold text-gray-900">{selectedTeam.name}</h2>
+                        {selectedTeam.scoreSummary && <p className="text-xs text-gray-500">{selectedTeam.scoreSummary}</p>}
                         {selectedTeam.class && (
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selectedTeam.class}</span>
                         )}
@@ -442,10 +455,11 @@ export default function AnalysisView({
                           const isBottom = pct !== null && pct <= 20
 
                           return (
-                            <tr key={el.id} className={`hover:bg-gray-50 ${isTop ? "bg-green-50/50" : isBottom ? "bg-red-50/30" : ""}`}>
+                            <tr key={el.id} data-kp={el.code} className={`hover:bg-gray-50 ${stat?.counted === false ? "opacity-50" : ""} ${isTop ? "bg-green-50/50" : isBottom ? "bg-red-50/30" : ""}`}>
                               <td className="px-4 py-3">
                                 <span className="font-mono text-xs text-gray-400 mr-1.5">{el.code}</span>
                                 <span className={`font-medium ${el.isCancelled ? "line-through text-gray-400" : "text-gray-900"}`}>{el.name}</span>
+                                {stat?.counted !== undefined && <span className="ml-2 text-xs text-gray-500">{stat.counted ? "Arvestatud" : "Arvestamata"}</span>}
                                 {el.isCancelled && (
                                   <span className="ml-1.5 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">ANN</span>
                                 )}
@@ -519,7 +533,8 @@ export default function AnalysisView({
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-2">Hindamiselement</label>
                 <select
-                  value={selectedElementId}
+                  aria-label="KP"
+                value={selectedElementId}
                   onChange={(e) => setSelectedElementId(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
@@ -531,7 +546,8 @@ export default function AnalysisView({
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-2">Minu võistkond</label>
                 <select
-                  value={selectedTeamId}
+                  aria-label={embedded ? "Võistkond" : "Vali võistkond"}
+                value={selectedTeamId}
                   onChange={(e) => chooseTeam(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
@@ -728,11 +744,12 @@ export default function AnalysisView({
         )}
 
         {/* ── SIMULAATOR TAB ── */}
-        {tab === "sim" && (
+        {enableSimulator && tab === "sim" && (
           <>
             <Card className="p-4 mb-5">
               <label className="text-xs font-medium text-gray-500 block mb-2">Vali võistkond</label>
               <select
+                aria-label={embedded ? "Võistkond" : "Vali võistkond"}
                 value={selectedTeamId}
                 onChange={(e) => chooseTeam(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"

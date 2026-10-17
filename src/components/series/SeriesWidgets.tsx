@@ -224,10 +224,10 @@ export function SeriesFreezeNotice({ view }: { view: SeriesView }) {
 export function SeriesDashboardView({ view, widgets }: { view: SeriesView; widgets: SeriesWidgetId[] }) {
   if (widgets.length === 0) return <p className="py-10 text-center text-ink-muted">Ühtegi vidinat pole valitud.</p>
   return (
-    <div className="grid min-w-0 gap-5">
+    <div className="grid min-w-0 gap-5 lg:grid-cols-2">
       {widgets.map((id) => {
         const Widget = RENDERERS[id]
-        return <div key={id} className="min-w-0"><Widget view={view} /></div>
+        return <div key={id} className={`min-w-0 ${["classComparison", "closeContests"].includes(id) ? "" : "lg:col-span-2"}`}><Widget view={view} /></div>
       })}
     </div>
   )

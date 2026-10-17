@@ -10,6 +10,7 @@ import { parseSeriesDashboardConfig, type SeriesAudience, type SeriesDashboardCo
 import { parseSeriesFreezeSnapshot, type SeriesFreezeSnapshot } from "@/lib/seriesFreeze"
 import { recomputeSeriesKpScores, type SeriesScoringInput } from "@/lib/seriesScoring"
 import { parseClassGroups } from "@/lib/classGroups"
+import { seriesRawDirection } from "@/lib/seriesAnalysis"
 
 export const COMPETITION_STATUS_LABELS: Record<string, string> = {
   SETUP: "Ettevalmistus",
@@ -90,6 +91,8 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
       isCancelled: element.isCancelled,
       exceptions: element.exceptions.map(({ label, kind }) => ({ label, kind })),
       maxValue: element.maxValue ?? (element.type === "CHECKPOINT" ? competition.defaultKPMaxValue : element.type === "PENALTY_BOX" ? competition.defaultPKMaxValue : null),
+      fields: [...element.fields, ...element.sections.flatMap((section) => section.fields)],
+      rawHigherIsBetter: seriesRawDirection(element.calcMethod, competition.scoringMode),
     }))
     let competitionTeams = teams.filter((team) => team.competitionId === competition.id).map((team) => ({
       id: team.id, code: team.code, name: team.name, class: team.class, isHorsDeCompetition: team.isHorsDeCompetition,
@@ -115,8 +118,15 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
             order: element.order, isCancelled: element.isCancelled,
             exceptions: (element.exceptions ?? []).map(({ label, kind }) => ({ label, kind: kind ?? null })),
             maxValue: element.maxValue ?? frozenSource.config.defaultKPMaxValue,
+            fields: [...element.fields, ...element.sections.flatMap((section) => section.fields)],
+            rawHigherIsBetter: seriesRawDirection(element.calcMethod, frozenSource.config.scoringMode),
           })),
         ]
+      } else {
+        // Legacy snapshots have scores but no historical raw inputs. Never
+        // expose a subsequently edited live input through national analysis.
+        competitionResults = competitionResults.map((result) => ({ ...result, values: "{}" }))
+        competitionElements = competitionElements.map((element) => ({ ...element, fields: [] }))
       }
     }
     const data: SeriesCompetitionData = {
@@ -125,7 +135,7 @@ async function loadCompetitionData(competitions: CompetitionMeta[], audience: Se
       scoringMode: freeze?.snapshot.seriesScoring?.config.scoringMode ?? competition.scoringMode as SeriesScoringMode,
       elements: competitionElements,
       teams: competitionTeams,
-      results: competitionResults.map(({ elementId, teamId, exceptionLabel }) => ({ elementId, teamId, exceptionLabel })),
+      results: competitionResults.map(({ elementId, teamId, exceptionLabel, values }) => ({ elementId, teamId, exceptionLabel, values })),
       scores: competitionScores,
       manualPenalties: competitionPenalties,
     }
@@ -181,6 +191,8 @@ export type SeriesView = {
     id: string
     name: string
     isPublished: boolean
+    leaderboardAccessMode: AnalysisAccessMode
+    hasLeaderboardLink: boolean
     analysisAccessMode: AnalysisAccessMode
     hasAnalysisLink: boolean
     freezeAt: Date | null
@@ -205,7 +217,7 @@ export async function loadSeriesView(seriesId: string, audience: SeriesAudience,
   const series = await prisma.competitionSeries.findUnique({
     where: { id: seriesId },
     select: {
-      id: true, name: true, isPublished: true, analysisAccessMode: true, analysisTokenHash: true, dashboardConfig: true, freezeAt: true,
+      id: true, name: true, isPublished: true, leaderboardAccessMode: true, leaderboardTokenHash: true, analysisAccessMode: true, analysisTokenHash: true, dashboardConfig: true, freezeAt: true,
       competitions: seriesCompetitionsInclude,
     },
   })
@@ -230,6 +242,8 @@ export async function loadSeriesView(seriesId: string, audience: SeriesAudience,
       id: series.id,
       name: series.name,
       isPublished: series.isPublished,
+      leaderboardAccessMode: isAnalysisAccessMode(series.leaderboardAccessMode) ? series.leaderboardAccessMode : "PUBLIC",
+      hasLeaderboardLink: Boolean(series.leaderboardTokenHash),
       analysisAccessMode: isAnalysisAccessMode(series.analysisAccessMode) ? series.analysisAccessMode : "PUBLIC",
       hasAnalysisLink: Boolean(series.analysisTokenHash),
       freezeAt: series.freezeAt,

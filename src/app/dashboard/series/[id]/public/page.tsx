@@ -18,18 +18,30 @@ export default async function SeriesPublicSettingsPage({ params }: { params: Pro
   const { id } = await params
   const series = await prisma.competitionSeries.findUnique({
     where: { id },
-    select: { id: true, isPublished: true, analysisAccessMode: true, analysisTokenHash: true, dashboardConfig: true, freezeAt: true },
+    select: { id: true, isPublished: true, leaderboardAccessMode: true, leaderboardTokenHash: true, analysisAccessMode: true, analysisTokenHash: true, dashboardConfig: true, freezeAt: true },
   })
   if (!series) notFound()
   const mode = isAnalysisAccessMode(series.analysisAccessMode) ? series.analysisAccessMode : "PUBLIC"
   return (
     <div className="max-w-3xl space-y-6">
-      <SeriesPublishSettings seriesId={series.id} initialPublished={series.isPublished} analysisPublic={mode === "PUBLIC"} />
+      <SeriesPublishSettings seriesId={series.id} initialPublished={series.isPublished} analysisPublic={mode === "PUBLIC"} leaderboardPublic={series.leaderboardAccessMode === "PUBLIC"} />
       <LeaderboardFreezeSettings
         competitionId={series.id}
         url={`/api/series/${series.id}/freeze`}
         initial={{ freezeAt: series.freezeAt?.toISOString() ?? null, frozen: series.freezeAt !== null && series.freezeAt <= new Date() }}
         description="Külmutamise hetkest näitavad üleriikliku arvestuse avalik pingerida, ülevaade ja ekraan seda seisu ning analüüs on suletud. Administraator näeb jooksvat seisu edasi. Osavõistluste külmutused kehtivad sõltumata sellest. Autasustamisel avalikusta tulemused."
+      />
+      <AnalysisAccessSettings
+        competitionId={series.id}
+        initialMode={isAnalysisAccessMode(series.leaderboardAccessMode) ? series.leaderboardAccessMode : "PUBLIC"}
+        initialHasLink={Boolean(series.leaderboardTokenHash)}
+        resource="leaderboard"
+        accessUrl={`/api/series/${series.id}/leaderboard-access`}
+        rotateUrl={`/api/series/${series.id}/leaderboard-link/rotate`}
+        linkPath="/ranking/series/"
+        title="Pingerea ja ülevaate ligipääs"
+        linkLabel="Pingerida"
+        managersText="Administraator näeb pingerida töölaual edasi."
       />
       <AnalysisAccessSettings
         competitionId={series.id}

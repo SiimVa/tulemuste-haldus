@@ -5,14 +5,14 @@ import { formatFreezeTime } from "@/lib/leaderboardFreeze"
 import type { SeriesView } from "@/lib/seriesRanking.server"
 
 // Avalike üleriiklike vaadete päis: nimi, vaated ja värskendus.
-export function SeriesPublicHeader({ view, preview, current }: { view: SeriesView; preview: boolean; current: "leaderboard" | "overview" | "analysis" }) {
-  const base = `/public/series/${view.series.id}`
+export function SeriesPublicHeader({ view, preview, current, leaderboardBasePath }: { view: SeriesView; preview: boolean; current: "leaderboard" | "overview" | "analysis"; leaderboardBasePath?: string }) {
+  const base = leaderboardBasePath ?? `/public/series/${view.series.id}`
+  const leaderboardOpen = preview || Boolean(leaderboardBasePath) || view.series.leaderboardAccessMode === "PUBLIC"
   const analysisOpen = preview || (view.series.analysisAccessMode === "PUBLIC" && !view.publicFreeze)
   const links = [
-    { key: "leaderboard", href: base, label: "Pingerida" },
-    { key: "overview", href: `${base}/overview`, label: "Ülevaade" },
-    ...(analysisOpen ? [{ key: "analysis", href: `${base}/analysis`, label: "Analüüs" }] : []),
-    { key: "screen", href: `${base}/screen`, label: "Ekraanirežiim" },
+    ...(leaderboardOpen ? [{ key: "leaderboard", href: base, label: "Pingerida" }, { key: "overview", href: `${base}/overview`, label: "Ülevaade" }] : []),
+    ...(analysisOpen ? [{ key: "analysis", href: `/public/series/${view.series.id}/analysis`, label: "Analüüs" }] : []),
+    ...(leaderboardOpen ? [{ key: "screen", href: `${base}/screen`, label: "Ekraanirežiim" }] : []),
   ]
   const unfinished = view.publicFreeze ? [] : view.competitions.filter((competition) => competition.status !== "FINISHED")
   const updatedAt = view.generatedAt.toLocaleString("et-EE", { timeZone: "Europe/Tallinn", dateStyle: "medium", timeStyle: "short" })
@@ -20,7 +20,7 @@ export function SeriesPublicHeader({ view, preview, current }: { view: SeriesVie
     <div className="mb-6 space-y-3">
       {preview && (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Eelvaade: arvestus ei ole avaldatud. Seda näeb ainult administraator.
+          {view.series.isPublished ? "Eelvaade: see vaade ei ole avalik. Seda näeb ainult administraator." : "Eelvaade: arvestus ei ole avaldatud. Seda näeb ainult administraator."}
         </p>
       )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

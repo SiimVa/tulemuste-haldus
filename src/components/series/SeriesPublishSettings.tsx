@@ -8,16 +8,18 @@ import { Button } from "@/components/ui/button"
 
 // Avaldamine: avalikud vaated avanevad ainult avaldatud arvestusel. Avalike
 // võistluste nimekirja arvestust ei lisata, seega jaga linki ise.
-export function SeriesPublishSettings({ seriesId, initialPublished, analysisPublic }: { seriesId: string; initialPublished: boolean; analysisPublic: boolean }) {
+export function SeriesPublishSettings({ seriesId, initialPublished, analysisPublic, leaderboardPublic }: { seriesId: string; initialPublished: boolean; analysisPublic: boolean; leaderboardPublic: boolean }) {
   const router = useRouter()
   const [published, setPublished] = useState(initialPublished)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const base = `/public/series/${seriesId}`
   const links = [
-    { href: base, label: "Pingerida" },
-    { href: `${base}/overview`, label: "Ülevaade" },
-    { href: `${base}/screen`, label: "Ekraanirežiim" },
+    ...(leaderboardPublic ? [
+      { href: base, label: "Pingerida" },
+      { href: `${base}/overview`, label: "Ülevaade" },
+      { href: `${base}/screen`, label: "Ekraanirežiim" },
+    ] : []),
     ...(analysisPublic ? [{ href: `${base}/analysis`, label: "Analüüs" }] : []),
   ]
 
@@ -44,7 +46,7 @@ export function SeriesPublishSettings({ seriesId, initialPublished, analysisPubl
       <div>
         <h2 className="font-semibold text-ink">Avaldamine</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Avaldatud arvestuse pingerida, ülevaade ja ekraanirežiim on avatud kõigile, kellel on link. Arvestust ei lisata avalike võistluste nimekirja.
+          Lülita jagamine sisse ning vali allpool eraldi pingerea ja analüüsi ligipääs. Ainult lingiga režiimis kasuta vastava vaate jagamislinki. Arvestust ei lisata avalike võistluste nimekirja.
           Osavõistluste külmutatud pingeread jäävad avalikus vaates külmutatuks.
         </p>
       </div>

@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic"
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const series = await prisma.competitionSeries.findUnique({ where: { id }, select: { name: true, isPublished: true } })
+  const series = await prisma.competitionSeries.findFirst({ where: { id, isPublished: true, analysisAccessMode: "PUBLIC" }, select: { name: true, isPublished: true } })
   return { title: series?.isPublished ? `${series.name} – Analüüs` : "Analüüs" }
 }
 
 // Avalik analüüs: ainult režiimis „Avalik”. Administraator näeb alati.
 export default async function PublicSeriesAnalysisPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ team?: string; vaade?: string }> }) {
   const [{ id }, query] = await Promise.all([params, searchParams])
-  const loaded = await loadPublicSeries(id)
+  const loaded = await loadPublicSeries(id, "analysis")
   if (!loaded) notFound()
   const { view, preview } = loaded
   const admin = preview || (await isAdminViewer())
