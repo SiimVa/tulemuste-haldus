@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http"
 import { test, expect } from "@playwright/test"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import { createHmac, createHash } from "node:crypto"
 
 const databaseUrl = process.env.E2E_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:5432/tulemuste_haldus?schema=e2e"
 const parsed = new URL(databaseUrl)
@@ -30,7 +31,7 @@ test.beforeAll(async () => {
       const emails = JSON.parse(raw)
       const count = Array.isArray(emails) ? emails.length : 1
       const errors = path === "/emails/batch" ? emails.flatMap((email: { to: string[] }, index: number) => email.to.some(to => /[^\x00-\x7F]/.test(to) || to === "rejected@example.com") ? [{ index, message: "Invalid to field" }] : []) : []
-      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(path === "/emails/batch" ? { data: Array.from({ length: count - errors.length }, (_, index) => ({ id: `mock-${index}` })), errors } : { id: "mock" }))
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(path === "/emails/batch" ? { data: Array.from({ length: count - errors.length }, (_, index) => ({ id: `mock-${createHash("sha256").update(req.headers["idempotency-key"] as string).digest("hex").slice(0, 16)}-${index}` })), errors } : { id: "mock" }))
     })
   })
   await new Promise<void>((resolve) => server.listen(3199, "127.0.0.1", resolve))
@@ -111,7 +112,7 @@ test("korraldaja saadab kirja registreerunud võistkondade esindajatele ja liikm
     [`sega-${stamp}@example.com`, "FAILED", "Osula sega (esindaja)"],
     [`valga-${stamp}@example.com`, "FAILED", "Valga KT (esindaja)"],
   ])
-  await expect(page.locator(`[data-message="Stardiinfo"] [data-message-status]`)).toHaveText("Saadetud 0/4 · ootel 4")
+  await expect(page.locator(`[data-message="Stardiinfo"] [data-message-status]`)).toHaveText("Saadetud 0/4 · kohale 0 · avatud 0 · ootel 4")
   const failedAttempt = captured.at(-1)!
 
   await db.competitionMessageRecipient.updateMany({ where: { messageId: message.id }, data: { nextAttemptAt: new Date(Date.now() - 1000) } })
@@ -129,7 +130,44 @@ test("korraldaja saadab kirja registreerunud võistkondade esindajatele ja liikm
   expect(emails[0].html).toContain('<a href="https://www.matkamang.ee/info"')
 
   await page.reload()
-  await expect(page.locator(`[data-message="Stardiinfo"] [data-message-status]`)).toHaveText("Saadetud 4/4")
+  await expect(page.locator(`[data-message="Stardiinfo"] [data-message-status]`)).toHaveText("Saadetud 4/4 · kohale 0 · avatud 0")
+
+  const recipients = await db.competitionMessageRecipient.findMany({ where: { messageId: message.id }, orderBy: { email: "asc" } })
+  expect(recipients.every(r => r.resendId)).toBe(true)
+  expect(new Set(recipients.map(r => r.resendId)).size).toBe(4)
+  const recipient = recipients[0]
+  const eventAt = new Date().toISOString()
+  const webhook = async (type: string, at = eventAt, email = recipient.email, resendId = recipient.resendId, tags = {}, ageSeconds = 0) => {
+    const payload = JSON.stringify({ type, created_at: at, data: { email_id: resendId, to: [email], tags } })
+    const id = "msg_e2e_status"
+    const timestamp = String(Math.floor(Date.now() / 1000) - ageSeconds)
+    const signature = createHmac("sha256", Buffer.from("e2e-resend-webhook-secret-32-bytes")).update(`${id}.${timestamp}.${payload}`).digest("base64")
+    return page.request.post("/api/webhooks/resend", { data: payload, headers: { "content-type": "application/json", "svix-id": id, "svix-timestamp": timestamp, "svix-signature": `v1,${signature}` } })
+  }
+  expect((await page.request.post("/api/webhooks/resend", { data: { type: "email.opened" } })).status()).toBe(400)
+  expect((await webhook("email.opened", eventAt, recipient.email, recipient.resendId, {}, 600)).status()).toBe(400)
+  expect((await webhook("email.opened", eventAt, "wrong@example.com")).ok()).toBe(true)
+  expect((await db.competitionMessageRecipient.findUniqueOrThrow({ where: { id: recipient.id } })).openedAt).toBeNull()
+  expect((await webhook("email.opened")).ok()).toBe(true)
+  expect((await webhook("email.delivered")).ok()).toBe(true)
+  expect((await webhook("email.delivery_delayed")).ok()).toBe(true)
+  expect((await webhook("email.opened", new Date(Date.now() + 60_000).toISOString())).ok()).toBe(true)
+  expect((await db.competitionMessageRecipient.findUniqueOrThrow({ where: { id: recipient.id } })).openedAt?.toISOString()).toBe(eventAt)
+  // A webhook may arrive before the sending response is stored.
+  await db.competitionMessageRecipient.update({ where: { id: recipients[1].id }, data: { resendId: null, status: "SENDING" } })
+  expect((await webhook("email.bounced", eventAt, recipients[1].email, recipients[1].resendId, { portal_recipient_id: recipients[1].id })).ok()).toBe(true)
+  await db.competitionMessageRecipient.update({ where: { id: recipients[1].id }, data: { status: "SENT" } })
+  await page.reload()
+  const history = page.locator('[data-message="Stardiinfo"]')
+  await history.locator("summary").click()
+  await expect(history.locator("[data-message-status]")).toContainText("kohale 1 · avatud 1")
+  await expect(history.getByText("Avatud", { exact: true })).toBeVisible()
+  await expect(history.getByText("Tagasi põrganud", { exact: true })).toBeVisible()
+  await expect(history.getByText("Avamist pole registreeritud").first()).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath("messages-status-mobile.png"), fullPage: true })
+  await page.setViewportSize({ width: 1280, height: 800 })
 
   // Server saadab ainult arvutatud saajatele ja ainult korraldaja nimel.
   const forged = await page.request.post(`/api/competitions/${competition.id}/messages`, {

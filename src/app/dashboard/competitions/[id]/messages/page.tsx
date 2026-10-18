@@ -44,6 +44,7 @@ export default async function CompetitionMessagesPage({ params }: { params: Prom
         ) : (
           <MessageComposer competitionId={id} contacts={contacts} senderEmail={sender?.email ?? ""} />
         )}
+        {!process.env.RESEND_WEBHOOK_SECRET && history.length > 0 && <p role="status" className="text-sm text-amber-900">Kohaletoimetamise ja avamiste sündmuste ühendus pole veel seadistatud.</p>}
         <MessageHistory items={history} />
       </div>
     </div>

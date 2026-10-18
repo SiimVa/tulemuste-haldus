@@ -12,3 +12,16 @@ export function resendBatchFailures(payload: unknown, recipientCount: number): M
   if (data.length + failures.size !== recipientCount || data.some(item => !item || typeof item.id !== "string" || !item.id)) throw new Error("Resend ei kinnitanud kõigi partii saajate tulemust")
   return failures
 }
+
+// Successes retain their input order, with indexed validation failures omitted.
+export function resendBatchResults(payload: unknown, recipientCount: number) {
+  const failures = resendBatchFailures(payload, recipientCount)
+  const data = (payload as { data: { id: string }[] }).data
+  if (new Set(data.map(item => item.id)).size !== data.length) throw new Error("Resendi partii sisaldab korduvaid kirja ID-sid")
+  const ids = new Map<number, string>()
+  let successIndex = 0
+  for (let index = 0; index < recipientCount; index++) {
+    if (!failures.has(index)) ids.set(index, data[successIndex++].id)
+  }
+  return { failures, ids }
+}

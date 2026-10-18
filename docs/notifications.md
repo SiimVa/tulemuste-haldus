@@ -138,3 +138,30 @@ Resendi partiid kasutavad osalise õnnestumise režiimi: ühe saaja valideerimis
 ei takista teistele saatmist. Vigane saaja jääb kirja ajalukku eraldi veaga ja
 talle ei tehta mõttetuid korduskatseid. Ajutise ühendus- või teenusevea korral
 jätkuvad senised korduskatsed sama partii kordumatuse võtmega.
+
+### Kohaletoimetamine ja avamised
+
+„Kirjad võistkondadele → Saadetud kirjad” näitab saaja kohta saatmise olekut,
+kohaletoimetamist, esimest registreeritud avamist ning tagasipõrkumist,
+viivitust või rämpspostikaebust. Kokkuvõttes on saadetud, kohale toimetatud ja
+avatud kirjade arvud. Leht uueneb iga 30 sekundi järel.
+
+Resendis tuleb luua webhook aadressile
+`https://www.matkamang.ee/api/webhooks/resend`, sündmustega
+`email.delivered`, `email.opened`, `email.bounced`, `email.complained`,
+`email.delivery_delayed`, `email.failed`, `email.suppressed`.
+Webhooki signing secret tuleb salvestada Railway rakenduse muutujasse
+`RESEND_WEBHOOK_SECRET`. Saatmiseks mõeldud piiratud API-võti jääb samaks.
+Avamiste sündmused eeldavad saatjadomeeni Open tracking seadistust.
+
+Allkiri kontrollitakse Svixi teegiga algse päringu keha ja ajatembli põhjal.
+Saaja Resendi ID salvestatakse partii vastusest, arvestades osalisi vigu.
+Kirjale lisatud `portal_recipient_id` silt seob ka enne saatmisvastuse
+salvestamist saabunud sündmused; lisaks peab kattuma saaja meiliaadress.
+Korduvad ja vales järjekorras saabunud sündmused ei kustuta varasemaid fakte.
+Isikuandmete kustutamise järel saabunud sündmused ei loo saajaid uuesti.
+
+Vanadele, enne Resendi ID salvestamist saadetud kirjadele ei omistata oletuslikult
+kohaletoimetamist ega avamist. Kohaletoimetamine tähendab saaja meiliserveri
+kinnitust, mitte postkasti kausta. Avamine on jälgimispildi laadimisel registreeritud
+signaal, mitte lugemiskinnitus. Puuduv avamismärge ei tähenda „lugemata”.
