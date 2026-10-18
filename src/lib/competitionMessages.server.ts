@@ -1,6 +1,7 @@
 import "server-only"
 import { createHash } from "node:crypto"
-import { resendBatchFailures } from "./resendBatch"
+import { resendBatchResults } from "./resendBatch"
+import type { DeliveryDates } from "./messageDelivery"
 import { prisma } from "@/lib/prisma"
 import { resendConfig } from "@/lib/email.server"
 import { toFormFieldDefinition } from "@/lib/registrationForm"
@@ -153,6 +154,7 @@ export async function deliverCompetitionMessages(options: { messageId?: string; 
             subject: content.subject,
             text: content.text,
             html: content.html,
+            tags: [{ name: "portal_recipient_id", value: row.id }],
             ...(message.replyTo ? { reply_to: message.replyTo } : {}),
           }
         })),
@@ -162,12 +164,14 @@ export async function deliverCompetitionMessages(options: { messageId?: string; 
         const detail = (await response.text()).slice(0, 500)
         throw new Error(`Resend vastas staatusega ${response.status}${detail ? `: ${detail}` : ""}`)
       }
-      const failures = resendBatchFailures(await response.json(), rows.length)
+      const { failures, ids: resendIds } = resendBatchResults(await response.json(), rows.length)
       const successfulIds = rows.filter((_, index) => !failures.has(index)).map(row => row.id)
       // Persist both outcomes together. If this transaction fails, a retry
       // uses the same payload/key and Resend returns its cached outcome.
       await prisma.$transaction([
-        prisma.competitionMessageRecipient.updateMany({ where: { id: { in: successfulIds } }, data: { status: "SENT", sentAt: new Date(), lastError: null } }),
+        ...[...resendIds].map(([index, resendId]) => prisma.competitionMessageRecipient.update({
+          where: { id: rows[index].id }, data: { status: "SENT", sentAt: new Date(), resendId, lastError: null },
+        })),
         ...[...failures].map(([index, error]) => prisma.competitionMessageRecipient.update({
           where: { id: rows[index].id },
           data: { status: "FAILED", attempts: MAX_ATTEMPTS, lastError: `Resend: ${error}`.slice(0, 2000) },
@@ -228,9 +232,9 @@ export type MessageHistoryItem = {
   senderName: string | null
   createdAt: Date
   recipientCount: number
-  counts: { sent: number; pending: number; failed: number }
+  counts: { sent: number; pending: number; failed: number; delivered: number; opened: number; bounced: number }
   failures: { email: string; error: string | null }[]
-  recipients: { email: string; name: string | null; context: string; status: string }[]
+  recipients: ({ email: string; name: string | null; context: string; status: string; sentAt: Date | null; tracked: boolean } & DeliveryDates)[]
 }
 
 export async function loadMessageHistory(competitionId: string): Promise<MessageHistoryItem[]> {
@@ -241,7 +245,7 @@ export async function loadMessageHistory(competitionId: string): Promise<Message
     select: {
       id: true, subject: true, body: true, replyTo: true, createdAt: true, recipientCount: true,
       sentBy: { select: { name: true } },
-      recipients: { orderBy: { email: "asc" }, select: { email: true, name: true, context: true, status: true, attempts: true, lastError: true } },
+      recipients: { orderBy: { email: "asc" }, select: { email: true, name: true, context: true, status: true, attempts: true, lastError: true, resendId: true, sentAt: true, deliveredAt: true, openedAt: true, bouncedAt: true, complainedAt: true, deliveryFailedAt: true, deliveryDelayedAt: true } },
     },
   })
   return messages.map((message) => {
@@ -259,9 +263,12 @@ export async function loadMessageHistory(competitionId: string): Promise<Message
         sent: message.recipients.filter((recipient) => recipient.status === "SENT").length,
         failed: finalFailures.length,
         pending: message.recipients.filter((recipient) => recipient.status !== "SENT").length - finalFailures.length,
+        delivered: message.recipients.filter((r) => r.deliveredAt || r.openedAt).length,
+        opened: message.recipients.filter((r) => r.openedAt).length,
+        bounced: message.recipients.filter((r) => r.bouncedAt || r.deliveryFailedAt).length,
       },
       failures: message.recipients.filter((recipient) => recipient.status === "FAILED").map((recipient) => ({ email: recipient.email, error: recipient.lastError })),
-      recipients: message.recipients.map(({ email, name, context, status }) => ({ email, name, context, status })),
+      recipients: message.recipients.map(({ email, name, context, status, sentAt, resendId, deliveredAt, openedAt, bouncedAt, complainedAt, deliveryFailedAt, deliveryDelayedAt }) => ({ email, name, context, status, sentAt, tracked: Boolean(resendId), deliveredAt, openedAt, bouncedAt, complainedAt, deliveryFailedAt, deliveryDelayedAt })),
     }
   })
 }

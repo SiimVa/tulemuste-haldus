@@ -949,6 +949,13 @@ model CompetitionMessageRecipient {
   nextAttemptAt DateTime           @default(now())
   lastError     String?            @db.Text
   sentAt        DateTime?
+  resendId      String?            @unique
+  deliveredAt   DateTime?
+  openedAt      DateTime?
+  bouncedAt     DateTime?
+  complainedAt  DateTime?
+  deliveryDelayedAt DateTime?
+  deliveryFailedAt  DateTime?
   updatedAt     DateTime           @updatedAt
 
   @@index([status, nextAttemptAt])

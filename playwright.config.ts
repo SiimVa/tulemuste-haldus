@@ -16,6 +16,7 @@ const e2eEnvironment = {
   RESEND_API_KEY: "e2e-resend-key",
   EMAIL_FROM: "Matkamäng <noreply@example.com>",
   RESEND_API_URL: "http://127.0.0.1:3199",
+  RESEND_WEBHOOK_SECRET: `whsec_${Buffer.from("e2e-resend-webhook-secret-32-bytes").toString("base64")}`,
 }
 
 export default defineConfig({
