@@ -7,7 +7,7 @@ haldamiseks. Rakendus kasutab PostgreSQL-i.
 
 Eeldused:
 
-- Node.js 20 või 22 (projekti `.node-version` kasutab Node.js 20)
+- Node.js 22.23.4 (versioon on määratud failides `.node-version` ja `package.json`)
 - Docker Desktop
 
 ```bash
@@ -43,6 +43,10 @@ lähtestada.
 ## Railway
 
 `railway.json` rakendab Prisma migratsioonid enne uue versiooni käivitamist.
+Railway kasutab Railpacki ja `package.json` failis määratud Node.js-i versiooni.
+Kui teenusel on `RAILPACK_NODE_VERSION` muutuja, eemalda see või määra samaks
+versiooniks: see muutuja kirjutab projekti versioonivaliku üle. Pärast muudatuse
+juurutamist kontrolli build'i logist, et Node.js-i versioon on 22.23.4.
 Rakenduse `DATABASE_URL` peab viitama Railway PostgreSQL-i privaatsele
 ühendusele.
 
